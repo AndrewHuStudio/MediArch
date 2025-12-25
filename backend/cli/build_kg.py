@@ -1,0 +1,55 @@
+"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+知识图谱构建器（CLI 版本）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+功能说明:
+   从 MongoDB chunks 读取文本，使用 DeepSeek V3 抽取实体和关系，
+   写入 Neo4j 图数据库，并可选构建 Milvus 实体属性向量库
+
+涉及的主要文件:
+   - backend/databases/graph/builders/kg_builder.py (核心构建器)
+   - backend/databases/graph/schemas/medical_architecture.json (图谱 Schema)
+
+使用方法:
+   # 方法1: 直接运行模块
+   python -m backend.cli.build_kg
+
+   # 方法2: 禁用 Milvus 向量库
+   python -m backend.cli.build_kg --no-milvus
+
+   # 方法3: 指定自定义 Schema
+   python -m backend.cli.build_kg --schema path/to/schema.json
+
+   # 方法4: 跳过磁盘检查
+   python -m backend.cli.build_kg --skip-disk-check
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+# 确保项目根目录在 sys.path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+os.environ.setdefault("PYTHONPATH", str(PROJECT_ROOT))
+
+def main() -> None:
+    from backend.databases.graph.build_kg_with_deepseek import main as build_kg_main
+
+    build_kg_main()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n[WARN] 用户中断")
+        sys.exit(130)
+    except Exception as e:
+        print(f"\n\n[FAIL] 发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)

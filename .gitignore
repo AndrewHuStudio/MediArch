@@ -1,0 +1,49 @@
+# Secrets
+.env
+*.env
+
+# Local AI/tool state
+.claude/
+.cursor/
+.vscode/
+.langgraph_api/
+backend/.langgraph_api/
+
+# Node
+node_modules/
+**/node_modules/
+.next/
+dist/
+build/
+out/
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# Backend data (large / machine-generated)
+backups/
+logs/
+backend/databases/documents/
+backend/databases/documents_ocr/
+backend/databases/**/nul
+backend/databases/nul
+backend/databases/ingestion/*.sqlite
+backend/databases/ingestion/*cache*.json
+backend/databases/ingestion/*cache*.jsonl
+backend/databases/ingestion/*usage*.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+ENV/
+
+# OS / Editor
+.DS_Store
+Thumbs.db

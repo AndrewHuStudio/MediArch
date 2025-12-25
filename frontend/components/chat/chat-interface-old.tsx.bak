@@ -1,0 +1,1375 @@
+"use client"
+
+import type React from "react"
+import { useState, useRef, useEffect, useCallback, startTransition } from "react"
+import {
+  User,
+  Bot,
+  FileText,
+  ImageIcon,
+  Paperclip,
+  ArrowUpIcon,
+  PanelRightClose,
+  PanelRightOpen,
+  Stethoscope,
+  Building2,
+  FileSearch,
+  Lightbulb,
+} from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import { Component as EtherealShadow } from "@/components/ui/ethereal-shadow"
+import { motion, AnimatePresence } from "framer-motion"
+import { ShiningText } from "@/components/ui/shining-text"
+import { SuggestedQuestions } from "@/components/ui/suggested-questions"
+import { ConversationSidebar } from "@/components/chat/conversation-sidebar"
+import { ConversationTopBar } from "@/components/chat/conversation-top-bar"
+import { MessageWithSources } from "@/components/chat/message-with-sources"
+import type { PDFSource } from "@/components/chat/pdf-source-card"
+import dynamic from "next/dynamic"
+import type { GraphData } from "@/components/ui/knowledge-graph-d3"
+
+const AgentThinkingPanel = dynamic(() => import("@/components/chat/agent-thinking-panel"), {
+  ssr: false,
+  loading: () => <div className="h-full animate-pulse rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md" />,
+})
+
+const KnowledgeGraphPanel = dynamic(() => import("@/components/chat/knowledge-graph-panel"), {
+  ssr: false,
+  loading: () => <div className="h-full animate-pulse rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md" />,
+})
+
+const ImageLightbox = dynamic(() => import("@/components/ui/image-lightbox"), {
+  ssr: false,
+})
+
+interface Message {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+  files?: File[]
+  agentThinking?: AgentThinkingStep[]
+  sources?: PDFSource[]
+  images?: string[]
+}
+
+interface AgentThinkingStep {
+  agentName: string
+  thoughts: string[]
+  isActive: boolean
+  isComplete: boolean
+}
+
+const DEFAULT_CONVERSATION_TITLE = "新的对话"
+const DEFAULT_CONVERSATION_SUMMARY = "大模型正在梳理对话意图..."
+const RESPONSE_WARNING_COPY = "MediArch 的回答未必正确无误,请注意核查"
+
+// localStorage 相关常量
+const CONVERSATION_STORAGE_PREFIX = "mediarch-conversation-"
+const CURRENT_CONVERSATION_KEY = "mediarch-current-conversation-id"
+
+// 对话数据结构
+interface StoredConversation {
+  id: string
+  title: string
+  summary?: string
+  messages: Message[]
+  timestamp: Date
+  isPinned: boolean
+}
+
+// localStorage 工具函数
+const saveConversationToStorage = (conversation: StoredConversation) => {
+  try {
+    const key = `${CONVERSATION_STORAGE_PREFIX}${conversation.id}`
+    localStorage.setItem(key, JSON.stringify({
+      ...conversation,
+      timestamp: conversation.timestamp.toISOString(),
+    }))
+  } catch (error) {
+    console.error("Failed to save conversation:", error)
+  }
+}
+
+const loadConversationFromStorage = (id: string): StoredConversation | null => {
+  try {
+    const key = `${CONVERSATION_STORAGE_PREFIX}${id}`
+    const data = localStorage.getItem(key)
+    if (!data) return null
+
+    const parsed = JSON.parse(data)
+    return {
+      ...parsed,
+      timestamp: new Date(parsed.timestamp),
+      messages: parsed.messages.map((msg: any) => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp),
+      })),
+    }
+  } catch (error) {
+    console.error("Failed to load conversation:", error)
+    return null
+  }
+}
+
+const deleteConversationFromStorage = (id: string) => {
+  try {
+    const key = `${CONVERSATION_STORAGE_PREFIX}${id}`
+    localStorage.removeItem(key)
+  } catch (error) {
+    console.error("Failed to delete conversation:", error)
+  }
+}
+
+const setCurrentConversationId = (id: string | null) => {
+  try {
+    if (id) {
+      localStorage.setItem(CURRENT_CONVERSATION_KEY, id)
+    } else {
+      localStorage.removeItem(CURRENT_CONVERSATION_KEY)
+    }
+  } catch (error) {
+    console.error("Failed to set current conversation:", error)
+  }
+}
+
+const getCurrentConversationId = (): string | null => {
+  try {
+    return localStorage.getItem(CURRENT_CONVERSATION_KEY)
+  } catch (error) {
+    console.error("Failed to get current conversation:", error)
+    return null
+  }
+}
+
+const createAutoConversationTitle = (raw: string, maxLength = 20) => {
+  const normalized = raw.replace(/\s+/g, " ").trim()
+  if (!normalized) return DEFAULT_CONVERSATION_TITLE
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized
+}
+
+const createConversationSummary = (raw: string) => {
+  const normalized = raw.replace(/\s+/g, " ").trim()
+  if (!normalized) return DEFAULT_CONVERSATION_SUMMARY
+  return normalized.length > 60 ? `${normalized.slice(0, 60)}...` : normalized
+}
+
+interface AutoResizeProps {
+  minHeight: number
+  maxHeight?: number
+}
+
+function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const adjustHeight = useCallback(
+    (reset?: boolean) => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+
+      if (reset) {
+        textarea.style.height = `${minHeight}px`
+        return
+      }
+
+      textarea.style.height = `${minHeight}px`
+      const scrollHeight = textarea.scrollHeight
+
+      if (maxHeight && scrollHeight > maxHeight) {
+        textarea.style.height = `${maxHeight}px`
+        textarea.style.overflowY = "auto"
+      } else {
+        textarea.style.height = `${scrollHeight}px`
+        textarea.style.overflowY = "hidden"
+      }
+    },
+    [minHeight, maxHeight],
+  )
+
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.style.height = `${minHeight}px`
+  }, [minHeight])
+
+  return { textareaRef, adjustHeight }
+}
+
+function MarkdownContent({ content, images }: { content: string; images: string[] }) {
+  const parseMarkdown = (text: string) => {
+    const parts: React.ReactNode[] = []
+    const codeBlockRegex = /\`\`\`(\w+)?\n([\s\S]*?)\`\`\`/g
+    const imageRegex = /\[image:(\d+)\]/g
+    let lastIndex = 0
+    let match
+
+    const codeBlocks: Array<{ start: number; end: number; lang: string; code: string }> = []
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      codeBlocks.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        lang: match[1] || "text",
+        code: match[2].trim(),
+      })
+    }
+
+    let currentIndex = 0
+    const processedParts: React.ReactNode[] = []
+
+    codeBlocks.forEach((block, idx) => {
+      if (currentIndex < block.start) {
+        const textBefore = text.slice(currentIndex, block.start)
+        const textParts = processTextWithImages(textBefore, images)
+        textParts.forEach((part, partIdx) => {
+          processedParts.push(<span key={`text-${idx}-${partIdx}`}>{part}</span>)
+        })
+      }
+
+      processedParts.push(
+        <div key={`code-${idx}`} className="my-3 rounded-lg overflow-hidden bg-gray-900 border border-gray-700">
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700">
+            <span className="text-xs text-gray-400 font-mono">{block.lang}</span>
+          </div>
+          <pre className="p-4 overflow-x-auto">
+            <code className="text-sm font-mono text-gray-100">{block.code}</code>
+          </pre>
+        </div>,
+      )
+
+      currentIndex = block.end
+    })
+
+    if (currentIndex < text.length) {
+      const remainingText = text.slice(currentIndex)
+      const textParts = processTextWithImages(remainingText, images)
+      textParts.forEach((part, partIdx) => {
+        processedParts.push(<span key={`text-final-${partIdx}`}>{part}</span>)
+      })
+    }
+
+    return processedParts
+  }
+
+  const processTextWithImages = (text: string, images: string[]) => {
+    const parts: React.ReactNode[] = []
+    const imageRegex = /\[image:(\d+)\]/g
+    let lastIndex = 0
+    let match
+
+    while ((match = imageRegex.exec(text)) !== null) {
+      // Add text before the image
+      if (match.index > lastIndex) {
+        const textBefore = text.slice(lastIndex, match.index)
+        parts.push(<span key={`text-${lastIndex}`} dangerouslySetInnerHTML={{ __html: formatText(textBefore) }} />)
+      }
+
+      // Add the image with lightbox
+      const imageIndex = parseInt(match[1])
+      if (images[imageIndex]) {
+        parts.push(
+          <ImageLightbox
+            key={`image-${imageIndex}-${match.index}`}
+            src={images[imageIndex] || "/placeholder.svg"}
+            alt={`图 ${imageIndex + 1}: 来自数据库的相关资料`}
+          />
+        )
+      }
+
+      lastIndex = match.index + match[0].length
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      const remainingText = text.slice(lastIndex)
+      parts.push(<span key={`text-${lastIndex}`} dangerouslySetInnerHTML={{ __html: formatText(remainingText) }} />)
+    }
+
+    return parts.length > 0 ? parts : [<span key="text-all" dangerouslySetInnerHTML={{ __html: formatText(text) }} />]
+  }
+
+  const formatText = (text: string) => {
+    return text
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-700/50 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-4 mb-2">$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold mt-3 mb-2">$1</h3>')
+      .replace(/^- (.+)$/gm, '<li class="ml-4">• $1</li>')
+      .replace(/^\d+\. (.+)$/gm, '<li class="ml-4">$1</li>')
+      .replace(/\n\n/g, "<br/><br/>")
+  }
+
+  return <div className="prose prose-invert prose-sm max-w-none">{parseMarkdown(content)}</div>
+}
+
+
+interface QuickActionProps {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}
+
+function QuickActionComponent({ icon, label, onClick }: QuickActionProps) {
+  return (
+    <Button
+      variant="outline"
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full border transition-colors pointer-events-auto bg-transparent"
+    >
+      {icon}
+      <span className="text-xs">{label}</span>
+    </Button>
+  )
+}
+
+function InitialChatState({
+  onQuickAction,
+  textareaRef,
+  message,
+  setMessage,
+  handleSendMessage,
+  uploadedFiles,
+  setUploadedFiles,
+  fileInputRef,
+  handleFileChange,
+  adjustHeight,
+}: {
+  onQuickAction: (text: string) => void
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
+  message: string
+  setMessage: (msg: string) => void
+  handleSendMessage: () => void
+  uploadedFiles: File[]
+  setUploadedFiles: (files: File[]) => void
+  fileInputRef: React.RefObject<HTMLInputElement | null>
+  handleFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  adjustHeight: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
+      transition={{ duration: 0.5 }}
+      className="flex-1 flex flex-col items-center justify-center p-4 relative z-10"
+    >
+      <div className="w-full max-w-3xl flex flex-col items-center gap-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="text-center space-y-4"
+        >
+          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-br from-white via-gray-200 to-gray-400 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">
+            MediArch AI
+          </h1>
+          <p className="text-neutral-400 text-lg font-light tracking-wide">综合医院建筑设计问答助手</p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+          className="w-full"
+        >
+          <div className="relative bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden group hover:border-white/20 transition-colors duration-300">
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value)
+                adjustHeight()
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
+              placeholder="输入您的问题..."
+              className={cn(
+                "w-full px-6 py-5 resize-none border-none",
+                "bg-transparent text-white text-lg",
+                "focus-visible:ring-0 focus-visible:ring-offset-0",
+                "placeholder:text-neutral-500 min-h-[80px] max-h-[200px]",
+                "overflow-y-auto",
+              )}
+            />
+
+            {uploadedFiles.length > 0 && (
+              <div className="px-6 pb-2 flex flex-wrap gap-2">
+                {uploadedFiles.map((file, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5 text-xs text-white backdrop-blur-md"
+                  >
+                    {file.type.startsWith("image/") ? (
+                      <ImageIcon className="w-3 h-3" />
+                    ) : (
+                      <FileText className="w-3 h-3" />
+                    )}
+                    <span className="truncate max-w-[150px]">{file.name}</span>
+                    <button
+                      onClick={() => setUploadedFiles(uploadedFiles.filter((_, i) => i !== idx))}
+                      className="hover:text-red-400 transition-colors"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-t border-white/5">
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <Paperclip className="w-5 h-5" />
+              </Button>
+
+              <Button
+                disabled={!message.trim() && uploadedFiles.length === 0}
+                onClick={handleSendMessage}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300",
+                  message.trim() || uploadedFiles.length > 0
+                    ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/10"
+                    : "bg-white/10 text-neutral-500 cursor-not-allowed",
+                )}
+              >
+                <span className="text-sm font-medium">发送</span>
+                <ArrowUpIcon className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5, duration: 0.5 }}
+          className="flex flex-wrap justify-center gap-3"
+        >
+          <QuickActionComponent
+            icon={<Stethoscope className="w-4 h-4" />}
+            label="医疗流程设计"
+            onClick={() => onQuickAction("请帮我设计一个高效的医疗流程")}
+          />
+          <QuickActionComponent
+            icon={<Building2 className="w-4 h-4" />}
+            label="建筑规范查询"
+            onClick={() => onQuickAction("医疗建筑设计有哪些规范要求？")}
+          />
+          <QuickActionComponent
+            icon={<FileSearch className="w-4 h-4" />}
+            label="案例分析"
+            onClick={() => onQuickAction("分析一个优秀的医疗建筑案例")}
+          />
+          <QuickActionComponent
+            icon={<Lightbulb className="w-4 h-4" />}
+            label="创新方案"
+            onClick={() => onQuickAction("给我一些创新的医疗空间设计方案")}
+          />
+        </motion.div>
+      </div>
+    </motion.div>
+  )
+}
+
+export default function ChatInterface() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialQuestion = searchParams.get("q")
+
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isInitialState, setIsInitialState] = useState(true)
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [streamingMessage, setStreamingMessage] = useState("")
+  const [message, setMessage] = useState("")
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [activeAgentIndex, setActiveAgentIndex] = useState(-1)
+  const [currentThought, setCurrentThought] = useState("")
+  const [isThinking, setIsThinking] = useState(false)
+  const [agentStatus, setAgentStatus] = useState<"thinking" | "synthesizing" | "idle">("idle")
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
+  const [showSuggestedQuestions, setShowSuggestedQuestions] = useState(false)
+  const [conversationTitle, setConversationTitle] = useState(DEFAULT_CONVERSATION_TITLE)
+  const [isConversationPinned, setIsConversationPinned] = useState(false)
+  const [isAutoTitleActive, setIsAutoTitleActive] = useState(true)
+  const [conversationSummary, setConversationSummary] = useState(DEFAULT_CONVERSATION_SUMMARY)
+  const [displayedSummary, setDisplayedSummary] = useState(DEFAULT_CONVERSATION_SUMMARY)
+  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(undefined)
+
+  const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] })
+  const [isGraphAnimating, setIsGraphAnimating] = useState(false)
+
+  const hasProcessedInitialQuestion = useRef(false)
+
+  const agents = [
+    "Orchestrator Agent",
+    "Neo4j Agent",
+    "MongoDB Agent",
+    "Milvus Agent",
+    "Online Search Agent",
+    "Result Synthesizer Agent",
+  ]
+
+  const agentThoughts = {
+    "Orchestrator Agent": ["分析问题结构...", "制定查询策略...", "分配任务给各智能体..."],
+    "Neo4j Agent": ["查询知识图谱...", "分析关系网络...", "提取关键节点..."],
+    "MongoDB Agent": ["检索文档数据...", "过滤相关记录...", "聚合结果集..."],
+    "Milvus Agent": ["向量相似度搜索...", "语义匹配分析...", "排序相关内容..."],
+    "Online Search Agent": ["在线资源检索...", "验证最新信息...", "补充外部数据..."],
+    "Result Synthesizer Agent": ["整合各方数据...", "生成综合答案...", "优化表达方式..."],
+  }
+
+  const suggestedQuestions = ["能详细解释一下吗？", "有什么实际案例？", "如何实现这个功能？", "还有其他建议吗？"]
+
+  const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+    minHeight: 48,
+    maxHeight: 200,
+  })
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, streamingMessage])
+
+  useEffect(() => {
+    const target = conversationSummary || DEFAULT_CONVERSATION_SUMMARY
+    if (!target) return
+
+    let index = 0
+    setDisplayedSummary("")
+    const interval = setInterval(() => {
+      index += 1
+      setDisplayedSummary(target.slice(0, index))
+      if (index >= target.length) {
+        clearInterval(interval)
+      }
+    }, 45)
+
+    return () => clearInterval(interval)
+  }, [conversationSummary])
+
+  useEffect(() => {
+    if (!isAutoTitleActive) return
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        setConversationTitle(createAutoConversationTitle(messages[i].content))
+        break
+      }
+    }
+  }, [messages, isAutoTitleActive])
+
+  useEffect(() => {
+    if (initialQuestion && !hasProcessedInitialQuestion.current) {
+      hasProcessedInitialQuestion.current = true
+      setIsInitialState(false)
+      setMessage(initialQuestion)
+      requestAnimationFrame(() => {
+        handleSendMessageWithText(initialQuestion)
+      })
+    }
+  }, [initialQuestion])
+
+  // 对话初始化：组件挂载时创建或加载对话
+  useEffect(() => {
+    // 只在组件挂载时执行一次
+    if (currentConversationId !== undefined) return
+
+    // 使用 startTransition 延迟非紧急更新，避免阻塞首次渲染
+    startTransition(() => {
+      const savedId = getCurrentConversationId()
+      if (savedId) {
+        // 如果有保存的对话ID，尝试加载
+        const conversation = loadConversationFromStorage(savedId)
+        if (conversation) {
+          console.log("Loading saved conversation:", savedId)
+          handleConversationSelect(savedId)
+          return
+        }
+      }
+
+      // 如果没有保存的对话或加载失败，创建新对话
+      console.log("Creating new conversation on mount")
+      const newId = `conv-${Date.now()}`
+      const newConversation: StoredConversation = {
+        id: newId,
+        title: DEFAULT_CONVERSATION_TITLE,
+        summary: DEFAULT_CONVERSATION_SUMMARY,
+        messages: [],
+        timestamp: new Date(),
+        isPinned: false,
+      }
+      saveConversationToStorage(newConversation)
+      setCurrentConversationId(newId)
+    })
+  }, []) // 空依赖数组，只执行一次
+
+  const simulateNeo4jQuery = async () => {
+    setGraphData({ nodes: [], links: [] })
+    setIsGraphAnimating(true)
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    setGraphData({
+      nodes: [{ id: "hospital", label: "综合医院", type: "concept" }],
+      links: [],
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    setGraphData({
+      nodes: [
+        { id: "hospital", label: "综合医院", type: "concept" },
+        { id: "emergency", label: "急诊科", type: "entity" },
+        { id: "outpatient", label: "门诊部", type: "entity" },
+      ],
+      links: [
+        { source: "hospital", target: "emergency", label: "包含" },
+        { source: "hospital", target: "outpatient", label: "包含" },
+      ],
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    setGraphData({
+      nodes: [
+        { id: "hospital", label: "综合医院", type: "concept" },
+        { id: "emergency", label: "急诊科", type: "entity" },
+        { id: "outpatient", label: "门诊部", type: "entity" },
+        { id: "design", label: "建筑设计", type: "attribute" },
+        { id: "flow", label: "医疗流程", type: "attribute" },
+      ],
+      links: [
+        { source: "hospital", target: "emergency", label: "包含" },
+        { source: "hospital", target: "outpatient", label: "包含" },
+        { source: "hospital", target: "design", label: "需要" },
+        { source: "emergency", target: "flow", label: "遵循" },
+        { source: "outpatient", target: "flow", label: "遵循" },
+      ],
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    setGraphData({
+      nodes: [
+        { id: "hospital", label: "综合医院", type: "concept" },
+        { id: "emergency", label: "急诊科", type: "entity" },
+        { id: "outpatient", label: "门诊部", type: "entity" },
+        { id: "design", label: "建筑设计", type: "attribute" },
+        { id: "flow", label: "医疗流程", type: "attribute" },
+        { id: "standard", label: "规范标准", type: "relation" },
+        { id: "safety", label: "安全要求", type: "relation" },
+      ],
+      links: [
+        { source: "hospital", target: "emergency", label: "包含" },
+        { source: "hospital", target: "outpatient", label: "包含" },
+        { source: "hospital", target: "design", label: "需要" },
+        { source: "emergency", target: "flow", label: "遵循" },
+        { source: "outpatient", target: "flow", label: "遵循" },
+        { source: "design", target: "standard", label: "符合" },
+        { source: "flow", target: "safety", label: "保证" },
+      ],
+    })
+
+    setIsGraphAnimating(false)
+  }
+
+  const simulateAgentThinking = async () => {
+    setIsThinking(true)
+    setAgentStatus("thinking")
+    setActiveAgentIndex(0)
+
+    for (let i = 0; i < agents.length - 1; i++) {
+      setActiveAgentIndex(i)
+      const thoughts = agentThoughts[agents[i] as keyof typeof agentThoughts]
+
+      if (agents[i] === "Neo4j Agent") {
+        simulateNeo4jQuery()
+      }
+
+      for (let j = 0; j < thoughts.length; j++) {
+        setCurrentThought(thoughts[j])
+        await new Promise((resolve) => setTimeout(resolve, 800))
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+
+    setAgentStatus("synthesizing")
+    setActiveAgentIndex(agents.length - 1)
+    const synthesizerThoughts = agentThoughts["Result Synthesizer Agent"]
+    for (let j = 0; j < synthesizerThoughts.length; j++) {
+      setCurrentThought(synthesizerThoughts[j])
+      await new Promise((resolve) => setTimeout(resolve, 800))
+    }
+
+    setIsThinking(false)
+  }
+
+  const streamResponse = async (text: string) => {
+    await simulateAgentThinking()
+
+    const response = `这是一个关于"${text}"的专业回答。
+
+作为医疗建筑设计助手，我可以为您提供详细的设计建议和规范标准。
+
+## 主要考虑因素
+
+1. **功能分区** - 合理规划医疗功能区域[1]
+2. **流线设计** - 优化人员和物资流动路径
+3. **感染控制** - 严格遵守医疗卫生标准[2]
+
+下图展示了典型的医院功能分区布局：
+
+[image:0]
+
+建筑空间计算示例：
+
+\`\`\`javascript
+// 示例代码：空间计算
+function calculateRoomArea(length, width) {
+  return length * width;
+}
+
+const area = calculateRoomArea(10, 8);
+console.log("房间面积:", area);
+\`\`\`
+
+根据《综合医院建筑设计规范》[1]，医疗建筑应充分考虑患者、医护人员和后勤保障的使用需求。
+
+以下是医疗建筑流线设计示意图：
+
+[image:1]
+
+感染控制方面需要特别注意洁净手术部的空调净化系统[2]。
+
+请问您需要了解更具体的哪方面内容？`
+
+    setStreamingMessage("")
+    for (let i = 0; i < response.length; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      setStreamingMessage(response.slice(0, i + 1))
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    setAgentStatus("idle")
+    setActiveAgentIndex(-1)
+
+    return response
+  }
+
+  const updateConversationSummaryFromText = (text: string) => {
+    const normalized = text.replace(/\s+/g, " ").trim()
+    if (!normalized) return
+    const summary = createConversationSummary(normalized)
+    setConversationSummary(summary)
+    if (isAutoTitleActive) {
+      setConversationTitle(createAutoConversationTitle(normalized))
+    }
+  }
+
+  const populateInput = (text: string) => {
+    setMessage(text)
+    if (textareaRef.current) {
+      textareaRef.current.focus()
+      setTimeout(() => adjustHeight(), 0)
+    }
+  }
+
+  const sendText = (text: string) => {
+    setMessage(text)
+    setIsInitialState(false)
+    updateConversationSummaryFromText(text)
+    handleSendMessageWithText(text)
+  }
+
+  const handleSendMessageWithText = async (textOverride?: string) => {
+    const textToSend = textOverride || message
+    if ((!textToSend.trim() && uploadedFiles.length === 0) || isLoading) return
+
+    setIsInitialState(false)
+    setShowSuggestedQuestions(false)
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: textToSend,
+      timestamp: new Date(),
+      files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setMessage("")
+    setUploadedFiles([])
+    adjustHeight(true)
+    setIsLoading(true)
+    setStreamingMessage("")
+
+    updateConversationSummaryFromText(textToSend)
+
+    const fullResponse = await streamResponse(textToSend)
+
+    const mockSources: PDFSource[] = [
+      {
+        id: "pdf-1",
+        title: "综合医院建筑设计规范",
+        pageNumber: 23,
+        snippet: "医疗建筑应充分考虑患者、医护人员和后勤保障的使用需求...",
+        highlightText: "功能分区应明确划分医疗区、行政区和后勤保障区，各区域之间应有明确的分隔和独立的交通流线。",
+      },
+      {
+        id: "pdf-2",
+        title: "医院感染控制标准",
+        pageNumber: 45,
+        snippet: "严格遵守医疗卫生标准，确保医疗流程的高效运转...",
+        highlightText: "洁净手术部应采用集中空调净化系统，保持正压，防止污染空气进入。",
+      },
+    ]
+
+    const mockImages: string[] = [
+      "/modern-hospital-building-aerial-view-with-medical-.jpg",
+      "/hospital-floor-plan-layout-with-patient-rooms-and-.jpg",
+    ]
+
+    console.log("[v0] Creating assistant message with images:", mockImages)
+
+    const assistantMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      role: "assistant",
+      content: fullResponse,
+      timestamp: new Date(),
+      sources: mockSources,
+      images: mockImages,
+    }
+    setMessages((prev) => {
+      const newMessages = [...prev, assistantMessage]
+
+      // 保存对话到 localStorage
+      if (currentConversationId) {
+        const conversation = loadConversationFromStorage(currentConversationId)
+        if (conversation) {
+          conversation.messages = newMessages
+          conversation.timestamp = new Date()
+          saveConversationToStorage(conversation)
+        }
+      }
+
+      return newMessages
+    })
+    setStreamingMessage("")
+    setIsLoading(false)
+    setShowSuggestedQuestions(true)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setUploadedFiles(Array.from(e.target.files))
+    }
+  }
+
+  const handleQuickAction = (text: string) => {
+    setMessage(text)
+    if (textareaRef.current) {
+      textareaRef.current.focus()
+      setTimeout(() => {}, 0)
+    }
+  }
+
+  const handleRenameConversation = (nextTitle: string) => {
+    setConversationTitle(nextTitle)
+    setIsAutoTitleActive(false)
+
+    // 更新 localStorage 中的对话标题
+    if (currentConversationId) {
+      const conversation = loadConversationFromStorage(currentConversationId)
+      if (conversation) {
+        conversation.title = nextTitle
+        saveConversationToStorage(conversation)
+      }
+    }
+  }
+
+  const handlePinToggle = () => {
+    setIsConversationPinned((prev) => {
+      const newPinned = !prev
+
+      // 更新 localStorage 中的固定状态
+      if (currentConversationId) {
+        const conversation = loadConversationFromStorage(currentConversationId)
+        if (conversation) {
+          conversation.isPinned = newPinned
+          saveConversationToStorage(conversation)
+        }
+      }
+
+      return newPinned
+    })
+  }
+
+  const resetConversationMeta = () => {
+    setConversationTitle(DEFAULT_CONVERSATION_TITLE)
+    setIsConversationPinned(false)
+    setIsAutoTitleActive(true)
+    setConversationSummary(DEFAULT_CONVERSATION_SUMMARY)
+    setDisplayedSummary(DEFAULT_CONVERSATION_SUMMARY)
+  }
+
+  const handleNewConversation = () => {
+    // 创建新对话ID
+    const newConversationId = `conv-${Date.now()}`
+
+    // 保存新对话到 localStorage
+    const newConversation: StoredConversation = {
+      id: newConversationId,
+      title: DEFAULT_CONVERSATION_TITLE,
+      summary: DEFAULT_CONVERSATION_SUMMARY,
+      messages: [],
+      timestamp: new Date(),
+      isPinned: false,
+    }
+    saveConversationToStorage(newConversation)
+    setCurrentConversationId(newConversationId)
+
+    // 重置所有状态
+    setMessages([])
+    setMessage("")
+    setUploadedFiles([])
+    setStreamingMessage("")
+    setIsLoading(false)
+    setShowSuggestedQuestions(false)
+    setAgentStatus("idle")
+    setActiveAgentIndex(-1)
+    setGraphData({ nodes: [], links: [] })
+    setIsGraphAnimating(false)
+    setIsInitialState(true)
+    resetConversationMeta()
+    router.push("/chat")
+  }
+
+  const handleDeleteConversation = () => {
+    const shouldDelete =
+      typeof window === "undefined" ? true : window.confirm("确定删除当前对话吗？\n删除后内容将无法恢复。")
+    if (!shouldDelete) return
+
+    // 从 localStorage 删除当前对话
+    if (currentConversationId) {
+      deleteConversationFromStorage(currentConversationId)
+    }
+
+    handleNewConversation()
+  }
+
+  const handleSuggestedQuestionClick = (question: string) => {
+    populateInput(question)
+  }
+
+  const handleConversationSelect = (id: string) => {
+    console.log("Selected conversation:", id)
+
+    // 从 localStorage 加载对话数据
+    const conversation = loadConversationFromStorage(id)
+    if (!conversation) {
+      console.error("Conversation not found:", id)
+      return
+    }
+
+    // 更新当前对话ID
+    setCurrentConversationId(id)
+
+    // 加载对话消息
+    setMessages(conversation.messages)
+
+    // 更新对话元数据
+    setConversationTitle(conversation.title)
+    setConversationSummary(conversation.summary || DEFAULT_CONVERSATION_SUMMARY)
+    setDisplayedSummary(conversation.summary || DEFAULT_CONVERSATION_SUMMARY)
+    setIsConversationPinned(conversation.isPinned)
+
+    // 如果有消息，则不是初始状态
+    setIsInitialState(conversation.messages.length === 0)
+
+    // 重置其他状态
+    setMessage("")
+    setUploadedFiles([])
+    setStreamingMessage("")
+    setIsLoading(false)
+    setShowSuggestedQuestions(false)
+    setAgentStatus("idle")
+    setActiveAgentIndex(-1)
+    setGraphData({ nodes: [], links: [] })
+    setIsGraphAnimating(false)
+
+    console.log("Loaded conversation:", conversation.title, "with", conversation.messages.length, "messages")
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, ease: "easeOut" }}
+      className="relative w-full h-screen flex flex-col overflow-hidden"
+    >
+      <div className="absolute inset-0 z-0">
+        <EtherealShadow
+          color="rgba(255, 255, 255, 0.35)"
+          animation={{ scale: 100, speed: 30 }}
+          noise={{ opacity: 0.3, scale: 1.5 }}
+          sizing="fill"
+        />
+        <div className="absolute inset-0 bg-black" style={{ zIndex: -1 }} />
+      </div>
+
+      <div className="relative z-10 flex h-full">
+        {/* Conversation History Sidebar */}
+        <ConversationSidebar
+          isCollapsed={isSidebarCollapsed}
+          onCollapsedChange={setIsSidebarCollapsed}
+          onNewConversation={handleNewConversation}
+          currentConversationId={currentConversationId}
+          onConversationSelect={handleConversationSelect}
+        />
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 relative">
+          <AnimatePresence mode="wait">
+            {isInitialState ? (
+              <div key="initial-state" className="flex-1 flex flex-col h-full">
+                <InitialChatState
+                  onQuickAction={populateInput}
+                  textareaRef={textareaRef}
+                  message={message}
+                  setMessage={setMessage}
+                  handleSendMessage={() => handleSendMessageWithText()}
+                  uploadedFiles={uploadedFiles}
+                  setUploadedFiles={setUploadedFiles}
+                  fileInputRef={fileInputRef}
+                  handleFileChange={handleFileChange}
+                  adjustHeight={adjustHeight}
+                />
+              </div>
+            ) : (
+              <div key="chat-interface" className="flex-1 flex flex-col h-full overflow-hidden relative">
+                {messages.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="fixed top-4 right-4 z-40 lg:hidden"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                      className="text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-300"
+                      aria-label={isSidebarCollapsed ? "显示侧边栏" : "隐藏侧边栏"}
+                    >
+                      {isSidebarCollapsed ? <PanelRightOpen className="h-5 w-5" /> : <PanelRightClose className="h-5 w-5" />}
+                    </Button>
+                  </motion.div>
+                )}
+
+                <div className="sticky top-0 z-20">
+                  <ConversationTopBar
+                    title={conversationTitle}
+                    summary={displayedSummary}
+                    isPinned={isConversationPinned}
+                    onPinToggle={handlePinToggle}
+                    onRename={handleRenameConversation}
+                    onDelete={handleDeleteConversation}
+                  />
+                </div>
+
+                <div className="flex-1 flex flex-col min-h-0 px-2 lg:px-6">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
+                    className="flex-1 grid min-h-0 gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] py-6"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, x: -40 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      className="flex flex-col min-h-0 overflow-hidden max-w-5xl w-full mx-auto"
+                    >
+                      <div className="flex-1 overflow-y-auto px-2 space-y-6">
+                        {messages.map((msg, index) => (
+                          msg.role === "assistant" && (msg.sources || msg.images) ? (
+                            <MessageWithSources
+                              key={msg.id}
+                              content={msg.content}
+                              sources={msg.sources}
+                              images={msg.images}
+                            />
+                          ) : (
+                            <motion.div
+                              key={msg.id}
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.4, delay: index * 0.1 }}
+                              className={`flex gap-4 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                            >
+                              {msg.role === "assistant" && (
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                                  <Bot className="w-5 h-5 text-white" />
+                                </div>
+                              )}
+
+                              <div
+                                className={`max-w-[60%] rounded-2xl px-4 py-3 ${
+                                  msg.role === "user"
+                                    ? "bg-white/90 backdrop-blur-sm text-black"
+                                    : "bg-black/60 backdrop-blur-md text-white border border-white/20"
+                                }`}
+                              >
+                                {msg.role === "assistant" ? (
+                                  <MarkdownContent content={msg.content} images={msg.images || []} />
+                                ) : (
+                                  <>
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                                    {msg.files && msg.files.length > 0 && (
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        {msg.files.map((file, idx) => (
+                                          <div
+                                            key={idx}
+                                            className="flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-1.5 text-xs"
+                                          >
+                                            {file.type.startsWith("image/") ? (
+                                              <ImageIcon className="w-3 h-3" />
+                                            ) : (
+                                              <FileText className="w-3 h-3" />
+                                            )}
+                                            <span className="truncate max-w-[150px]">{file.name}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              {msg.role === "user" && (
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white text-black flex items-center justify-center">
+                                  <User className="w-5 h-5" />
+                                </div>
+                              )}
+                            </motion.div>
+                          )
+                        ))}
+
+                        {isThinking && activeAgentIndex >= 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex gap-4 justify-start"
+                          >
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                              <Bot className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="max-w-[75%] bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20 text-white">
+                              <div className="mb-2">
+                                <ShiningText text={`${agents[activeAgentIndex]} 正在思考...`} />
+                              </div>
+                              <div className="flex items-start gap-2 text-sm">
+                                <span className="text-gray-400">💭 思路：</span>
+                                <AnimatePresence mode="wait">
+                                  <motion.span
+                                    key={currentThought}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -10 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="text-gray-300"
+                                  >
+                                    {currentThought}
+                                  </motion.span>
+                                </AnimatePresence>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {isLoading && streamingMessage && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex gap-4 justify-start"
+                          >
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                              <Bot className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="max-w-[75%] bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20 text-white">
+                              <MarkdownContent content={streamingMessage} images={[]} />
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {isLoading && !streamingMessage && !isThinking && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex gap-4 justify-start"
+                          >
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                              <Bot className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20">
+                              <div className="flex gap-1">
+                                <div
+                                  className="w-2 h-2 rounded-full bg-white/60 animate-bounce"
+                                  style={{ animationDelay: "0ms" }}
+                                />
+                                <div
+                                  className="w-2 h-2 rounded-full bg-white/60 animate-bounce"
+                                  style={{ animationDelay: "150ms" }}
+                                />
+                                <div
+                                  className="w-2 h-2 rounded-full bg-white/60 animate-bounce"
+                                  style={{ animationDelay: "300ms" }}
+                                />
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+
+                        {showSuggestedQuestions && !isLoading && messages.length > 0 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="flex justify-start"
+                          >
+                            <div className="max-w-[75%]">
+                              <SuggestedQuestions
+                                questions={suggestedQuestions}
+                                onQuestionClick={handleSuggestedQuestionClick}
+                              />
+                            </div>
+                          </motion.div>
+                        )}
+
+                        <div ref={messagesEndRef} />
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="relative bg-black/60 backdrop-blur-md rounded-xl border border-neutral-700">
+                          <Textarea
+                            ref={textareaRef}
+                            value={message}
+                            onChange={(e) => {
+                              setMessage(e.target.value)
+                              adjustHeight()
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault()
+                                handleSendMessageWithText()
+                              }
+                            }}
+                            placeholder="继续对话..."
+                            className={cn(
+                              "w-full px-4 py-3 resize-none border-none",
+                              "bg-transparent text-white text-sm",
+                              "focus-visible:ring-0 focus-visible:ring-offset-0",
+                              "placeholder:text-neutral-400 min-h-[48px]",
+                              "[&::-webkit-scrollbar]:w-2",
+                              "[&::-webkit-scrollbar-track]:bg-transparent",
+                              "[&::-webkit-scrollbar-thumb]:bg-white/20",
+                              "[&::-webkit-scrollbar-thumb]:rounded-full",
+                              "[&::-webkit-scrollbar-thumb]:hover:bg-white/30",
+                            )}
+                          />
+
+                          {uploadedFiles.length > 0 && (
+                            <div className="px-4 pb-2 flex flex-wrap gap-2">
+                              {uploadedFiles.map((file, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center gap-2 bg-neutral-700/50 rounded-lg px-3 py-1.5 text-xs text-white"
+                                >
+                                  {file.type.startsWith("image/") ? (
+                                    <ImageIcon className="w-3 h-3" />
+                                  ) : (
+                                    <FileText className="w-3 h-3" />
+                                  )}
+                                  <span className="truncate max-w-[150px]">{file.name}</span>
+                                  <button
+                                    onClick={() => setUploadedFiles(uploadedFiles.filter((_, i) => i !== idx))}
+                                    className="hover:text-red-400"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between p-3">
+                            <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="text-white hover:bg-neutral-700"
+                            >
+                              <Paperclip className="w-4 h-4" />
+                            </Button>
+
+                            <Button
+                              disabled={!message.trim() && uploadedFiles.length === 0}
+                              onClick={() => handleSendMessageWithText()}
+                              className={cn(
+                                "flex items-center gap-1 px-3 py-2 rounded-lg transition-colors",
+                                message.trim() || uploadedFiles.length > 0
+                                  ? "bg-white text-black hover:bg-neutral-200"
+                                  : "bg-neutral-700 text-neutral-400 cursor-not-allowed",
+                              )}
+                            >
+                              <ArrowUpIcon className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <p className="text-center text-[11px] text-gray-400">{RESPONSE_WARNING_COPY}</p>
+                      </div>
+                    </motion.div>
+
+                    <div className="hidden lg:flex flex-col min-h-0 gap-4">
+                      <div className="min-h-[220px]">
+                        <AgentThinkingPanel
+                          activeAgentIndex={activeAgentIndex}
+                          agents={agents}
+                          agentStatus={agentStatus}
+                          currentThought={currentThought}
+                          isThinking={isThinking}
+                        />
+                      </div>
+                      <div className="flex-1 min-h-[280px]">
+                        <KnowledgeGraphPanel graphData={graphData} isAnimating={isGraphAnimating} />
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  )
+}

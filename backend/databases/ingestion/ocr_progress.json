@@ -1,0 +1,422 @@
+{
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\《建筑设计资料集 第6册 医疗》.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\《建筑设计资料集 第6册 医疗》.pdf",
+    "file_name": "《建筑设计资料集 第6册 医疗》.pdf",
+    "category": "书籍报告",
+    "total_pages": 174,
+    "scanned_pages": 174,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-22T21:41:25.653461",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\《建筑设计资料集 第6册 医疗》.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\《建筑设计资料集 第6册 医疗》.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\《建筑设计资料集 第6册 医疗》.pdf'}}",
+    "mongo_doc_id": "69494a2b818c5afeb13ce2ad",
+    "total_chunks": 1604,
+    "done_ranges": [
+      [
+        1,
+        174
+      ]
+    ],
+    "last_ocr_at": "2025-12-22T21:34:14.837433",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医疗功能房间详图集3.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医疗功能房间详图集3.pdf",
+    "file_name": "医疗功能房间详图集3.pdf",
+    "category": "书籍报告",
+    "total_pages": 234,
+    "scanned_pages": 234,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:46:19.657401",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医疗功能房间详图集3.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\医疗功能房间详图集3.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\医疗功能房间详图集3.pdf'}}",
+    "mongo_doc_id": "6944bc6e0e5acfd26a8508bd",
+    "total_chunks": 270,
+    "done_ranges": [
+      [
+        1,
+        234
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:46:03.618797",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医院建筑设计指南.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医院建筑设计指南.pdf",
+    "file_name": "医院建筑设计指南.pdf",
+    "category": "书籍报告",
+    "total_pages": 277,
+    "scanned_pages": 277,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:49:35.234379",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\书籍报告\\医院建筑设计指南.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\医院建筑设计指南.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\书籍报告\\\\医院建筑设计指南.pdf'}}",
+    "mongo_doc_id": "6944bd320e5acfd26a8509cc",
+    "total_chunks": 753,
+    "done_ranges": [
+      [
+        1,
+        277
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:49:19.234838",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf",
+    "file_name": "“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf",
+    "category": "参考论文",
+    "total_pages": 4,
+    "scanned_pages": 4,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:40:42.102784",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\“医疗办公大楼”——国外医院发展的新趋势_沈晋明.pdf'}}",
+    "mongo_doc_id": "6944bb280e5acfd26a850257",
+    "total_chunks": 13,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:40:39.950908",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf",
+    "file_name": "人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf",
+    "category": "参考论文",
+    "total_pages": 4,
+    "scanned_pages": 4,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:40:52.515457",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\人性化与健康防疫视角下的护理单元设计探析_张春阳.pdf'}}",
+    "mongo_doc_id": "6944bb320e5acfd26a850265",
+    "total_chunks": 34,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:40:50.332453",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医疗门诊建筑的空间导向性_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医疗门诊建筑的空间导向性_龙灏.pdf",
+    "file_name": "医疗门诊建筑的空间导向性_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": 5,
+    "scanned_pages": 5,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:02.419349",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医疗门诊建筑的空间导向性_龙灏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\医疗门诊建筑的空间导向性_龙灏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\医疗门诊建筑的空间导向性_龙灏.pdf'}}",
+    "mongo_doc_id": "6944bb3d0e5acfd26a850288",
+    "total_chunks": 17,
+    "done_ranges": [
+      [
+        1,
+        5
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:01.782464",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医院住院部室内环境评价方法初探_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医院住院部室内环境评价方法初探_龙灏.pdf",
+    "file_name": "医院住院部室内环境评价方法初探_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": 2,
+    "scanned_pages": 2,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:12.501600",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\医院住院部室内环境评价方法初探_龙灏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\医院住院部室内环境评价方法初探_龙灏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\医院住院部室内环境评价方法初探_龙灏.pdf'}}",
+    "mongo_doc_id": "6944bb460e5acfd26a85029a",
+    "total_chunks": 9,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:10.367842",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于人工智能的未来医疗建筑发展思考_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于人工智能的未来医疗建筑发展思考_龙灏.pdf",
+    "file_name": "基于人工智能的未来医疗建筑发展思考_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": 1,
+    "scanned_pages": 1,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:24.128782",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于人工智能的未来医疗建筑发展思考_龙灏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\基于人工智能的未来医疗建筑发展思考_龙灏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\基于人工智能的未来医疗建筑发展思考_龙灏.pdf'}}",
+    "mongo_doc_id": "6944bb4f0e5acfd26a8502a4",
+    "total_chunks": 2,
+    "done_ranges": [
+      [
+        1,
+        1
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:19.025254",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf",
+    "file_name": "基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": 4,
+    "scanned_pages": 4,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:33.444427",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\基于医疗工艺流程的综合医院日间手术中心设计初探_龙灏.pdf'}}",
+    "mongo_doc_id": "6944bb5b0e5acfd26a8502a7",
+    "total_chunks": 37,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:31.261981",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室布局优化与气流控制_刘燕敏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室布局优化与气流控制_刘燕敏.pdf",
+    "file_name": "多联手术室布局优化与气流控制_刘燕敏.pdf",
+    "category": "参考论文",
+    "total_pages": 5,
+    "scanned_pages": 5,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:44.055590",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室布局优化与气流控制_刘燕敏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\多联手术室布局优化与气流控制_刘燕敏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\多联手术室布局优化与气流控制_刘燕敏.pdf'}}",
+    "mongo_doc_id": "6944bb660e5acfd26a8502cd",
+    "total_chunks": 27,
+    "done_ranges": [
+      [
+        1,
+        5
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:42.880029",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室的研发与实施_刘燕敏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室的研发与实施_刘燕敏.pdf",
+    "file_name": "多联手术室的研发与实施_刘燕敏.pdf",
+    "category": "参考论文",
+    "total_pages": 4,
+    "scanned_pages": 4,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:41:53.619540",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\多联手术室的研发与实施_刘燕敏.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\多联手术室的研发与实施_刘燕敏.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\多联手术室的研发与实施_刘燕敏.pdf'}}",
+    "mongo_doc_id": "6944bb700e5acfd26a8502e9",
+    "total_chunks": 18,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:41:51.996581",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\手术室设计新思维、新分类与新措施_沈晋明.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\手术室设计新思维、新分类与新措施_沈晋明.pdf",
+    "file_name": "手术室设计新思维、新分类与新措施_沈晋明.pdf",
+    "category": "参考论文",
+    "total_pages": 8,
+    "scanned_pages": 8,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:42:05.383918",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\手术室设计新思维、新分类与新措施_沈晋明.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\手术室设计新思维、新分类与新措施_沈晋明.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\手术室设计新思维、新分类与新措施_沈晋明.pdf'}}",
+    "mongo_doc_id": "6944bb780e5acfd26a8502fc",
+    "total_chunks": 22,
+    "done_ranges": [
+      [
+        1,
+        8
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:42:00.244788",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf",
+    "file_name": "既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf",
+    "category": "参考论文",
+    "total_pages": 5,
+    "scanned_pages": 5,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:42:14.451784",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf'}}",
+    "mongo_doc_id": "6944bb850e5acfd26a850313",
+    "total_chunks": 30,
+    "done_ranges": [
+      [
+        1,
+        5
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:42:13.283255",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf",
+    "file_name": "结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": 4,
+    "scanned_pages": 4,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T11:09:23.545152",
+    "error_message": "('Connection aborted.', ConnectionResetError(10054, '远程主机强迫关闭了一个现有的连接。', None, 10054, None))",
+    "mongo_doc_id": "6944c1e22c61f83b01bb8cb4",
+    "total_chunks": 30,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T11:09:22.079373",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\综合医院医疗功能规模循证设计_崔怡卓.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\综合医院医疗功能规模循证设计_崔怡卓.pdf",
+    "file_name": "综合医院医疗功能规模循证设计_崔怡卓.pdf",
+    "category": "参考论文",
+    "total_pages": 6,
+    "scanned_pages": 6,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:42:42.769005",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\综合医院医疗功能规模循证设计_崔怡卓.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\综合医院医疗功能规模循证设计_崔怡卓.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\综合医院医疗功能规模循证设计_崔怡卓.pdf'}}",
+    "mongo_doc_id": "6944bba10e5acfd26a850332",
+    "total_chunks": 22,
+    "done_ranges": [
+      [
+        1,
+        6
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:42:41.643625",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf",
+    "file_name": "防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf",
+    "category": "参考论文",
+    "total_pages": 6,
+    "scanned_pages": 6,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:42:52.662159",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\参考论文\\防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\参考论文\\\\防疫常态化背景下综合医院门诊部优化设计探讨_张春阳.pdf'}}",
+    "mongo_doc_id": "6944bbaa0e5acfd26a850349",
+    "total_chunks": 40,
+    "done_ranges": [
+      [
+        1,
+        6
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:42:50.474658",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\医疗机构设置规划指导原则（2021-2025）.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\医疗机构设置规划指导原则（2021-2025）.pdf",
+    "file_name": "医疗机构设置规划指导原则（2021-2025）.pdf",
+    "category": "政策文件",
+    "total_pages": 21,
+    "scanned_pages": 21,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:49:46.561402",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\医疗机构设置规划指导原则（2021-2025）.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\政策文件\\\\医疗机构设置规划指导原则（2021-2025）.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\政策文件\\\\医疗机构设置规划指导原则（2021-2025）.pdf'}}",
+    "mongo_doc_id": "6944bd450e5acfd26a850cbe",
+    "total_chunks": 21,
+    "done_ranges": [
+      [
+        1,
+        21
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:49:41.933289",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\国家医学中心和国家区域医疗中心设置实施方案.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\国家医学中心和国家区域医疗中心设置实施方案.pdf",
+    "file_name": "国家医学中心和国家区域医疗中心设置实施方案.pdf",
+    "category": "政策文件",
+    "total_pages": 10,
+    "scanned_pages": 10,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:49:58.074034",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\政策文件\\国家医学中心和国家区域医疗中心设置实施方案.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\政策文件\\\\国家医学中心和国家区域医疗中心设置实施方案.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\政策文件\\\\国家医学中心和国家区域医疗中心设置实施方案.pdf'}}",
+    "mongo_doc_id": "6944bd500e5acfd26a850cd4",
+    "total_chunks": 13,
+    "done_ranges": [
+      [
+        1,
+        10
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:49:52.974042",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB 51039-2014 综合医院建筑设计规范.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB 51039-2014 综合医院建筑设计规范.pdf",
+    "file_name": "GB 51039-2014 综合医院建筑设计规范.pdf",
+    "category": "标准规范",
+    "total_pages": 66,
+    "scanned_pages": 66,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:40:02.402941",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB 51039-2014 综合医院建筑设计规范.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\标准规范\\\\GB 51039-2014 综合医院建筑设计规范.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\标准规范\\\\GB 51039-2014 综合医院建筑设计规范.pdf'}}",
+    "mongo_doc_id": "6944bb000e5acfd26a8500ad",
+    "total_chunks": 191,
+    "done_ranges": [
+      [
+        1,
+        66
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:40:00.428858",
+    "engine": "mineru"
+  },
+  "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB51039-2014综合医院建筑设计标准.pdf": {
+    "file_path": "E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB51039-2014综合医院建筑设计标准.pdf",
+    "file_name": "GB51039-2014综合医院建筑设计标准.pdf",
+    "category": "标准规范",
+    "total_pages": 178,
+    "scanned_pages": 178,
+    "status": "completed",
+    "start_time": null,
+    "end_time": "2025-12-19T10:40:32.642736",
+    "error_message": "E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\MyPrograms\\250804-MediArch System\\backend\\databases\\documents\\标准规范\\GB51039-2014综合医院建筑设计标准.pdf\" }, full error: {'index': 0, 'code': 11000, 'errmsg': 'E11000 duplicate key error collection: mediarch.documents index: document_id_unique dup key: { document_id: \"E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\标准规范\\\\GB51039-2014综合医院建筑设计标准.pdf\" }', 'keyPattern': {'document_id': 1}, 'keyValue': {'document_id': 'E:\\\\MyPrograms\\\\250804-MediArch System\\\\backend\\\\databases\\\\documents\\\\标准规范\\\\GB51039-2014综合医院建筑设计标准.pdf'}}",
+    "mongo_doc_id": "6944bb130e5acfd26a85016d",
+    "total_chunks": 233,
+    "done_ranges": [
+      [
+        1,
+        178
+      ]
+    ],
+    "last_ocr_at": "2025-12-19T10:40:19.622146",
+    "engine": "mineru"
+  }
+}

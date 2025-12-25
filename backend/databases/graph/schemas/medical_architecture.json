@@ -1,0 +1,530 @@
+{
+  
+  "AttributeDefinitions": {
+    "name": { "type": "string", "description": "标准名称" },
+    "level": {
+      "type": "string",
+      "description": "医院等级 (建议值: 三甲, 二甲, 一甲, 未定级)"
+    },
+    "area_m2": { "type": "number", "description": "面积数值", "unit": "m²" },
+    "floor": { "type": "string", "description": "楼层描述 (如: F1, B1, 3-5层)" },
+    "service_capacity": {
+      "type": "string",
+      "description": "服务能力描述 (如: 日门诊量2000人次, 床位500张)"
+    },
+    "staff_count": { "type": "number", "description": "医护人数" },
+    "regulatory_requirements": {
+      "type": "array[string]",
+      "description": "规范要求要点列表"
+    },
+    "typical_layout": {
+      "type": "string",
+      "description": "布局形态 (如: 鱼骨式, 集中式, 街区式)"
+    },
+    "is_physical": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为物理实体区域"
+    },
+    "zone_type": {
+      "type": "string",
+      "description": "区域功能类型 (建议值: 洁净区, 污染区, 半污染区, 公共区, 医护区)"
+    },
+    "required_adjacencies": {
+      "type": "array[string]",
+      "description": "必须毗邻的功能单元名称列表"
+    },
+    "max_travel_distance": {
+      "type": "number",
+      "description": "最大步行距离",
+      "unit": "m"
+    },
+    "design_standard_ref": {
+      "type": "string",
+      "description": "设计依据条款 (如: GB 51039-2014 5.1.2)"
+    },
+    "clear_size": {
+      "type": "string",
+      "description": "净尺寸描述 (建议格式: 开间x进深, 或 净高≥Xm)"
+    },
+    "media_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" },
+          "caption": { "type": "string" },
+          "source_id": { "type": "string" }
+        }
+      },
+      "description": "关联的图纸或图片引用"
+    },
+    "code": { "type": "string", "description": "编号/代码" },
+    "clean_level": {
+      "type": "string",
+      "description": "洁净度等级 (建议值: I级, II级, III级, IV级, 100级, 10万级)"
+    },
+    "pressure_class": {
+      "type": "string",
+      "description": "压力梯度 (建议值: 正压, 负压, +5Pa, -10Pa, 梯度压差)"
+    },
+    "title": { "type": "string", "description": "标题" },
+    "category": {
+      "type": "array[string]",
+      "description": "分类标签"
+    },
+    "priority": {
+      "type": "string",
+      "description": "优先级 (建议值: 强制, 推荐, 可选)"
+    },
+    "description": { "type": "text", "description": "详细文本描述" },
+    "project": { "type": "string", "description": "所属项目名称" },
+    "year": { "type": "number", "description": "年份" },
+    "summary": { "type": "text", "description": "摘要/总结" },
+    "source_type": {
+      "type": "string",
+      "description": "资料类型 (建议值: 规范标准, 政策文件, 学术文献, 图集书籍, 项目文档, 会议纪要)"
+    },
+    "url": { "type": "string", "description": "文件链接/路径" },
+    "effective_date": { "type": "string", "description": "生效日期 (格式: YYYY-MM-DD)" },
+    "status": {
+      "type": "string",
+      "description": "状态 (建议值: 现行, 废止, 征求意见, 内部草案)"
+    },
+    "credibility": { "type": "number", "description": "可信度评分 (1-5)" },
+    "service_type": { "type": "string", "description": "医疗服务类型" },
+    "target_population": { "type": "string", "description": "适用人群" },
+    "equipment_type": { "type": "string", "description": "设备类型" },
+    "specifications": { "type": "string", "description": "规格参数" },
+    "indications": { "type": "string", "description": "适用场景/适应症" },
+    "is_concept": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为概念节点（全局唯一的类型节点，用于预注入骨架）"
+    },
+    "seed_version": {
+      "type": "string",
+      "description": "预注入版本号（仅概念节点）"
+    },
+    "seed_source": {
+      "type": "string",
+      "description": "预注入来源（仅概念节点）"
+    },
+    "chunk_ids": {
+      "type": "array[string]",
+      "description": "关联的chunk ID列表（双向链接），用于从实体快速查询原文"
+    },
+    "quality_score": {
+      "type": "number",
+      "description": "知识质量评分（0-1），>=0.7才入库"
+    },
+    "has_media": {
+      "type": "boolean",
+      "description": "是否关联图片/图纸（案例质量指标）"
+    },
+    "has_detailed_params": {
+      "type": "boolean",
+      "description": "是否包含详细参数（案例质量指标）"
+    },
+    "has_innovation": {
+      "type": "boolean",
+      "description": "是否包含创新点（案例质量指标）"
+    },
+    "content_length": {
+      "type": "number",
+      "description": "内容长度（字符数，案例质量指标）"
+    },
+    "applicable_spaces": {
+      "type": "array[string]",
+      "description": "设计方法适用的空间类型列表"
+    },
+    "applicability": {
+      "type": "string",
+      "description": "设计方法适用性（强制、推荐、可选、特定条件）"
+    },
+    "design_phase": {
+      "type": "string",
+      "description": "适用设计阶段（方案设计、初步设计、施工图设计、全阶段）"
+    },
+    "effectiveness": {
+      "type": "number",
+      "description": "设计方法有效性评分（0-1）"
+    },
+    "methodology_type": {
+      "type": "string",
+      "description": "方法类型（划分法、布局法、控制法、优化法等）"
+    },
+    "relationship_type": {
+      "type": "string",
+      "description": "设计方法间关系类型（互补、冲突、依赖、替代）"
+    }
+  },
+
+  "NodeConcepts": [
+    {
+      "concept": "医院",
+      "label": "Hospital",
+      "attributes": ["name", "level", "area_m2", "description"],
+      "required": ["name"]
+    },
+    {
+      "concept": "部门",
+      "label": "DepartmentGroup",
+      "description": "医院的一级组织单元 (如门诊部、急诊部)",
+      "attributes": ["name", "service_capacity", "staff_count", "typical_layout", "regulatory_requirements"],
+      "required": ["name"]
+    },
+    {
+      "concept": "功能分区",
+      "label": "FunctionalZone",
+      "description": "部门内的逻辑或物理区块 (如手术部, 急救区, 医技区)",
+      "attributes": ["name", "is_physical", "area_m2", "floor", "zone_type", "required_adjacencies", "design_standard_ref"],
+      "required": ["name"]
+    },
+    {
+      "concept": "空间",
+      "label": "Space",
+      "description": "最小物理房间单元 (如手术间, 诊室, 护士站)",
+      "attributes": ["name", "clear_size", "area_m2", "floor", "clean_level", "pressure_class", "media_refs", "code"],
+      "required": ["name"]
+    },
+    {
+      "concept": "设计方法分类",
+      "label": "DesignMethodCategory",
+      "description": "设计方法的上层分类（如流线设计方法、空间布局方法、感染控制方法）",
+      "attributes": ["name", "description", "is_concept", "seed_version", "chunk_ids"],
+      "required": ["name"]
+    },
+    {
+      "concept": "设计方法",
+      "label": "DesignMethod",
+      "description": "抽象的设计原则、流程或策略 (如三区划分、流线设计)",
+      "attributes": ["title", "category", "priority", "description", "applicable_spaces", "methodology_type", "is_concept", "chunk_ids", "quality_score"],
+      "required": ["title"]
+    },
+    {
+      "concept": "医疗服务",
+      "label": "MedicalService",
+      "description": "具体的诊疗服务 (如手术切除, 血液透析)",
+      "attributes": ["name", "service_type", "target_population", "description"],
+      "required": ["name"]
+    },
+    {
+      "concept": "医疗设备",
+      "label": "MedicalEquipment",
+      "description": "用于诊疗的设备仪器",
+      "attributes": ["name", "equipment_type", "specifications", "description"],
+      "required": ["name"]
+    },
+    {
+      "concept": "治疗方法",
+      "label": "TreatmentMethod",
+      "description": "治疗手段或流程",
+      "attributes": ["name", "indications", "description"],
+      "required": ["name"]
+    },
+    {
+      "concept": "案例",
+      "label": "Case",
+      "description": "具体的项目实践案例",
+      "attributes": ["title", "project", "year", "summary", "media_refs", "quality_score", "has_media", "has_detailed_params", "has_innovation", "content_length", "chunk_ids"],
+      "required": ["title"]
+    },
+    {
+      "concept": "资料来源",
+      "label": "Source",
+      "description": "统一的知识来源节点（包括规范、论文、项目文件、图片等）",
+      "attributes": ["title", "source_type", "year", "code", "status", "url", "summary", "effective_date", "credibility"],
+      "required": ["title", "source_type"]
+    }
+  ],
+
+  "Relations": [
+    {
+      "name": "MENTIONED_IN",
+      "chinese": "提及于",
+      "symmetric": false,
+      "subjectTypes": [
+        "Hospital",
+        "DepartmentGroup",
+        "FunctionalZone",
+        "Space",
+        "DesignMethod",
+        "MedicalService",
+        "MedicalEquipment",
+        "TreatmentMethod",
+        "Case"
+      ],
+      "objectTypes": ["Source"],
+      "description": "核心溯源关系：实体出现在某资料中，用于多视角对比",
+      "properties": {
+        "perspective": {
+          "type": "string",
+          "description": "视角/语境 (建议值: 规范要求, 设计指导, 实践案例, 研究洞察)"
+        },
+        "summary": {
+          "type": "text",
+          "description": "该资料对该实体的具体描述摘要"
+        },
+        "media_refs": {
+          "type": "array",
+          "description": "与该实体在该资料中关联的图片、图纸或表格等锚点",
+          "items": {
+            "type": "string"
+          }
+        },
+        "is_compliance": {
+          "type": "boolean",
+          "description": "是否明确表示符合/遵循该资料"
+        },
+        "quote": {
+          "type": "text",
+          "description": "原文引用"
+        },
+        "page": {
+          "type": "number",
+          "description": "页码"
+        },
+        "score": {
+          "type": "number",
+          "description": "相关度/置信度 (0-1)"
+        }
+      }
+    },
+    {
+      "name": "CONTAINS",
+      "chinese": "包含",
+      "symmetric": false,
+      "subjectTypes": ["Hospital", "DepartmentGroup", "FunctionalZone"],
+      "objectTypes": ["DepartmentGroup", "FunctionalZone", "Space"],
+      "description": "层级包含关系",
+      "properties": {
+        "matched_by": {
+          "type": "string",
+          "description": "自动挂载时命中的关键词，用于追溯匹配逻辑"
+        },
+        "auto_generated": {
+          "type": "boolean",
+          "description": "关系是否由脚本自动创建"
+        },
+        "script_ver": {
+          "type": "string",
+          "description": "自动处理脚本版本号（如 v5.0）"
+        },
+        "run_id": {
+          "type": "string",
+          "description": "批次追踪 ID，便于回滚和审计"
+        },
+        "created_at": {
+          "type": "string",
+          "description": "关系建立时间 (ISO 8601 时间戳)"
+        }
+      }
+    },
+    {
+      "name": "CONNECTED_TO",
+      "chinese": "连接",
+      "symmetric": true,
+      "subjectTypes": ["Space", "FunctionalZone"],
+      "objectTypes": ["Space", "FunctionalZone"],
+      "description": "物理或逻辑上的直接连通",
+      "properties": {
+        "connection_type": {
+          "type": "string",
+          "description": "连接方式 (如: 气密门, 走廊, 传递窗, 专用电梯)"
+        },
+        "distance": { "type": "number", "unit": "m" },
+        "flow_type": {
+          "type": "string",
+          "description": "允许的流线 (建议值: 医护, 患者, 洁净, 污物)"
+        }
+      }
+    },
+    {
+      "name": "ADJACENT_TO",
+      "chinese": "毗邻",
+      "symmetric": true,
+      "subjectTypes": ["Space", "FunctionalZone"],
+      "objectTypes": ["Space", "FunctionalZone"],
+      "description": "相邻但未必连通，强调位置关系",
+      "properties": {
+        "shared_wall": { "type": "boolean" },
+        "barrier_type": {
+          "type": "string",
+          "description": "分隔介质 (如: 实体墙, 玻璃隔断)"
+        }
+      }
+    },
+    {
+      "name": "REQUIRES",
+      "chinese": "依赖",
+      "symmetric": false,
+      "subjectTypes": ["Space", "FunctionalZone", "MedicalService"],
+      "objectTypes": ["Space", "FunctionalZone", "MedicalEquipment"],
+      "description": "功能上的依赖关系 (如: 急诊部依赖放射科, 手术依赖麻醉机)",
+      "properties": {
+        "is_critical": { "type": "boolean" },
+        "distance_max": { "type": "number", "unit": "m" }
+      }
+    },
+    {
+      "name": "PROVIDES",
+      "chinese": "提供",
+      "symmetric": false,
+      "subjectTypes": ["DepartmentGroup", "FunctionalZone", "Space"],
+      "objectTypes": ["MedicalService"],
+      "description": "空间提供某项医疗服务"
+    },
+    {
+      "name": "PERFORMED_IN",
+      "chinese": "开展于",
+      "symmetric": false,
+      "subjectTypes": ["MedicalService"],
+      "objectTypes": ["FunctionalZone", "Space"],
+      "description": "医疗服务具体在哪个空间开展"
+    },
+    {
+      "name": "USES",
+      "chinese": "使用",
+      "symmetric": false,
+      "subjectTypes": ["TreatmentMethod"],
+      "objectTypes": ["MedicalEquipment"],
+      "description": "治疗方法使用某种设备"
+    },
+    {
+      "name": "SUPPORTS",
+      "chinese": "支持",
+      "symmetric": false,
+      "subjectTypes": ["MedicalEquipment", "Space"],
+      "objectTypes": ["TreatmentMethod"],
+      "description": "设备或空间支持某治疗方法"
+    },
+    {
+      "name": "GUIDES",
+      "chinese": "指导",
+      "symmetric": false,
+      "subjectTypes": ["DesignMethod"],
+      "objectTypes": ["Space", "FunctionalZone", "DepartmentGroup"],
+      "description": "设计方法论指导具体空间的设计",
+      "properties": {
+        "applicability": {
+          "type": "string",
+          "description": "适用性（强制、推荐、可选、特定条件）"
+        },
+        "design_phase": {
+          "type": "string",
+          "description": "适用设计阶段（方案设计、初步设计、施工图设计、全阶段）"
+        },
+        "effectiveness": {
+          "type": "number",
+          "description": "有效性评分（0-1）"
+        },
+        "source_chunk_ids": {
+          "type": "array[string]",
+          "description": "支持该指导关系的原文chunk ID列表"
+        },
+        "conditions": {
+          "type": "text",
+          "description": "应用条件（如建筑规模、医院等级等）"
+        }
+      }
+    },
+    {
+      "name": "IS_TYPE_OF",
+      "chinese": "属于类别",
+      "symmetric": false,
+      "subjectTypes": ["DesignMethod"],
+      "objectTypes": ["DesignMethodCategory"],
+      "description": "设计方法属于某个上层分类",
+      "properties": {
+        "auto_classified": {
+          "type": "boolean",
+          "description": "是否由LLM自动分类"
+        }
+      }
+    },
+    {
+      "name": "RELATES_TO",
+      "chinese": "关联",
+      "symmetric": false,
+      "subjectTypes": ["DesignMethod"],
+      "objectTypes": ["DesignMethod"],
+      "description": "设计方法之间的关系（互补、冲突、依赖、替代）",
+      "properties": {
+        "relationship_type": {
+          "type": "string",
+          "description": "关系类型（互补、冲突、依赖、替代）"
+        },
+        "strength": {
+          "type": "number",
+          "description": "关系强度（0-1）"
+        },
+        "description": {
+          "type": "text",
+          "description": "关系描述"
+        }
+      }
+    },
+    {
+      "name": "REFERENCES",
+      "chinese": "引用",
+      "symmetric": false,
+      "subjectTypes": ["Source"],
+      "objectTypes": ["Source"],
+      "description": "文献间的引用关系 (如规范A引用了标准B)",
+      "properties": {
+        "target_section": {
+          "type": "string",
+          "description": "引用的目标章节 (如: 第3.2节, 附录A)"
+        },
+        "reference_type": {
+          "type": "string",
+          "description": "引用类型 (建议值: 正文引用, 参考文献, 条款引用, 图表引用)"
+        }
+      }
+    },
+    {
+      "name": "REFERS_TO",
+      "chinese": "参考",
+      "symmetric": false,
+      "subjectTypes": [
+        "Hospital",
+        "DepartmentGroup",
+        "FunctionalZone",
+        "Space",
+        "DesignMethod",
+        "MedicalService",
+        "MedicalEquipment",
+        "TreatmentMethod",
+        "Case"
+      ],
+      "objectTypes": [
+        "Hospital",
+        "DepartmentGroup",
+        "FunctionalZone",
+        "Space",
+        "DesignMethod",
+        "MedicalService",
+        "MedicalEquipment",
+        "TreatmentMethod",
+        "Case"
+      ],
+      "description": "实体间的跨章节引用关系 (如 '本节所述的手术间参见第3.2节的详细说明')",
+      "properties": {
+        "source_section": {
+          "type": "string",
+          "description": "引用来源章节 (当前chunk所在章节)"
+        },
+        "target_section": {
+          "type": "string",
+          "description": "引用目标章节 (被引用的章节)"
+        },
+        "reference_text": {
+          "type": "string",
+          "description": "引用的原文标记 (如: '参见第3.2节', '如前所述')"
+        }
+      }
+    }
+  ]
+ 
+}

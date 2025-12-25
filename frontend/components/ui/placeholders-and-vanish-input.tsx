@@ -1,0 +1,158 @@
+"use client"
+
+import type React from "react"
+
+import { AnimatePresence, motion } from "framer-motion"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { cn } from "@/lib/utils"
+
+export function PlaceholdersAndVanishInput({
+  placeholders,
+  onChange,
+  onSubmit,
+}: {
+  placeholders: string[]
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+}) {
+  const [currentPlaceholder, setCurrentPlaceholder] = useState(0)
+
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const startAnimation = () => {
+    intervalRef.current = setInterval(() => {
+      setCurrentPlaceholder((prev) => (prev + 1) % placeholders.length)
+    }, 3000)
+  }
+  const handleVisibilityChange = () => {
+    if (document.visibilityState !== "visible" && intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    } else if (document.visibilityState === "visible") {
+      startAnimation()
+    }
+  }
+
+  useEffect(() => {
+    startAnimation()
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [placeholders])
+
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const newDataRef = useRef<any[]>([])
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [value, setValue] = useState("")
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    console.log("[v0] Input form submitted")
+    
+    if (onSubmit) {
+      onSubmit(e)
+    }
+    
+    setValue("")
+  }
+
+  return (
+    <form
+      className={cn(
+        "w-full relative max-w-2xl mx-auto bg-gray-900/80 backdrop-blur-sm h-14 rounded-full overflow-hidden border border-gray-700/50 shadow-2xl transition duration-200",
+        value && "bg-gray-800/90",
+      )}
+      onSubmit={handleSubmit}
+    >
+      <input
+        onChange={(e) => {
+          setValue(e.target.value)
+          onChange && onChange(e)
+        }}
+        onKeyDown={handleKeyDown}
+        ref={inputRef}
+        value={value}
+        type="text"
+        className={cn(
+          "w-full relative text-sm sm:text-base z-50 border-none text-white bg-transparent h-full rounded-full focus:outline-none focus:ring-0 pl-6 sm:pl-12 pr-20",
+        )}
+      />
+
+      <button
+        disabled={!value}
+        type="submit"
+        className="absolute right-3 top-1/2 z-50 -translate-y-1/2 h-8 w-8 rounded-full disabled:bg-gray-700 bg-white text-black hover:bg-gray-200 transition duration-200 flex items-center justify-center"
+      >
+        <motion.svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <motion.path
+            d="M5 12l14 0"
+            initial={{
+              strokeDasharray: "50%",
+              strokeDashoffset: "50%",
+            }}
+            animate={{
+              strokeDashoffset: value ? 0 : "50%",
+            }}
+            transition={{
+              duration: 0.3,
+              ease: "linear",
+            }}
+          />
+          <path d="M13 18l6 -6" />
+          <path d="M13 6l6 6" />
+        </motion.svg>
+      </button>
+
+      <div className="absolute inset-0 flex items-center rounded-full pointer-events-none">
+        <AnimatePresence mode="wait">
+          {!value && (
+            <motion.p
+              initial={{
+                y: 5,
+                opacity: 0,
+              }}
+              key={`current-placeholder-${currentPlaceholder}`}
+              animate={{
+                y: 0,
+                opacity: 1,
+              }}
+              exit={{
+                y: -15,
+                opacity: 0,
+              }}
+              transition={{
+                duration: 0.3,
+                ease: "linear",
+              }}
+              className="text-sm sm:text-base font-normal text-gray-400 pl-6 sm:pl-12 text-left w-[calc(100%-2rem)] truncate"
+            >
+              {placeholders[currentPlaceholder]}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+    </form>
+  )
+}

@@ -1,0 +1,13 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "medi_arch_system": "backend.app.agents.supervisor_graph:graph",
+    "orchestrator_agent": "backend.app.agents.orchestrator_agent.agent:graph",
+    "neo4j_agent": "backend.app.agents.neo4j_agent.agent:graph",
+    "milvus_agent": "backend.app.agents.milvus_agent.agent:graph",
+    "mongodb_agent": "backend.app.agents.mongodb_agent.agent:graph",
+    "online_search_agent": "backend.app.agents.online_search_agent.agent:graph",
+    "result_synthesizer_agent": "backend.app.agents.result_synthesizer_agent.agent:graph"
+  },
+  "env": "./.env"
+}

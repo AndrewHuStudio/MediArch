@@ -1,0 +1,385 @@
+{
+  "_comment": "医疗建筑标准空间骨架 - 预注入数据",
+  "_version": "2.0",
+  "_source": "基于 医院功能分区图.md 和 GB 51039-2014",
+  "_description": "这是知识图谱的骨架，所有从文档中提取的实体都应该挂载到这些概念节点上",
+  "_update_log": "v2.0 增加设计方法分类体系和种子方法",
+
+  "hospital": {
+    "name": "综合医院",
+    "label": "Hospital",
+    "is_concept": true,
+    "description": "标准综合医院类型节点，全局唯一",
+    "level": "通用",
+    "source": "预注入知识",
+    "seed_version": "2.0",
+    "seed_source": "ontology_seed_data_v2"
+  },
+
+  "design_method_categories": [
+    {
+      "name": "流线设计方法",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "关于人流、物流、洁污流线组织的设计方法",
+      "seed_version": "2.0",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "空间布局方法",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "关于功能分区、空间组织、平面布置的设计方法",
+      "seed_version": "2.0",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "感染控制方法",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "关于洁净区划分、污染控制、消毒灭菌的设计方法",
+      "seed_version": "2.0",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "环境控制方法",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "关于空气净化、温湿度控制、声光环境的设计方法",
+      "seed_version": "2.0",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "效率优化方法",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "关于空间利用率、流程优化、运营效率提升的设计方法",
+      "seed_version": "2.0",
+      "seed_source": "ontology_seed_data_v2"
+    }
+  ],
+
+  "design_methods_seed": [
+    {
+      "title": "三区划分法",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "感染控制方法",
+      "description": "将医疗空间划分为清洁区、半污染区、污染区，通过物理分隔和压力梯度防止交叉感染",
+      "methodology_type": "划分法",
+      "applicable_spaces": ["手术部", "消毒供应室", "ICU", "传染病房"],
+      "applicability": "强制",
+      "design_phase": "全阶段",
+      "seed_version": "2.0",
+      "seed_source": "GB 51039-2014"
+    },
+    {
+      "title": "双走廊设计",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "流线设计方法",
+      "description": "设置洁净走廊和污染走廊，分离洁净物品和污物流线，避免交叉污染",
+      "methodology_type": "布局法",
+      "applicable_spaces": ["手术部", "产房", "重症监护室"],
+      "applicability": "推荐",
+      "design_phase": "方案设计",
+      "seed_version": "2.0",
+      "seed_source": "医院建筑设计规范"
+    },
+    {
+      "title": "单元式护理模式",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "空间布局方法",
+      "description": "以护理单元为基本模块，每个单元包含病房、护士站、治疗室等完整功能，便于管理和护理",
+      "methodology_type": "布局法",
+      "applicable_spaces": ["住院部", "护理单元"],
+      "applicability": "推荐",
+      "design_phase": "方案设计",
+      "seed_version": "2.0",
+      "seed_source": "医院建筑设计指南"
+    },
+    {
+      "title": "梯度压差控制",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "环境控制方法",
+      "description": "通过空调系统建立从洁净区到污染区的压力梯度，防止污染空气倒流",
+      "methodology_type": "控制法",
+      "applicable_spaces": ["手术部", "ICU", "传染病房", "负压隔离病房"],
+      "applicability": "强制",
+      "design_phase": "初步设计",
+      "seed_version": "2.0",
+      "seed_source": "医院洁净手术部建筑技术规范"
+    },
+    {
+      "title": "中心辐射式布局",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "效率优化方法",
+      "description": "将核心辅助功能（如护士站、药房、治疗室）置于中心，周边布置病房或诊室，缩短医护人员移动距离",
+      "methodology_type": "布局法",
+      "applicable_spaces": ["门诊部", "住院部", "急诊部"],
+      "applicability": "可选",
+      "design_phase": "方案设计",
+      "seed_version": "2.0",
+      "seed_source": "医院建筑设计优化研究"
+    }
+  ],
+
+  "departments": [
+    {
+      "name": "急诊部",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "急诊急救服务的一级组织单元",
+      "parent": "综合医院",
+      "functional_zones": [
+        {
+          "name": "公共区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "公共区",
+          "spaces": [
+            {"name": "门厅", "label": "Space", "is_concept": true},
+            {"name": "挂号收费厅", "label": "Space", "is_concept": true},
+            {"name": "护士站", "label": "Space", "is_concept": true},
+            {"name": "输液室", "label": "Space", "is_concept": true},
+            {"name": "污洗室", "label": "Space", "is_concept": true},
+            {"name": "观察室", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "急救区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "抢救室", "label": "Space", "is_concept": true},
+            {"name": "急诊手术室", "label": "Space", "is_concept": true},
+            {"name": "急诊监护室", "label": "Space", "is_concept": true},
+            {"name": "紧急处置室", "label": "Space", "is_concept": true},
+            {"name": "洗胃室", "label": "Space", "is_concept": true},
+            {"name": "抢救大厅", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "急诊区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "诊查室", "label": "Space", "is_concept": true},
+            {"name": "治疗室", "label": "Space", "is_concept": true},
+            {"name": "清创室", "label": "Space", "is_concept": true},
+            {"name": "换药室", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "医技区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "挂号室", "label": "Space", "is_concept": true},
+            {"name": "病历室", "label": "Space", "is_concept": true},
+            {"name": "药房", "label": "Space", "is_concept": true},
+            {"name": "收费室", "label": "Space", "is_concept": true},
+            {"name": "化验室", "label": "Space", "is_concept": true},
+            {"name": "X线诊断室", "label": "Space", "is_concept": true},
+            {"name": "功能检查室", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "门诊部",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "门诊医疗服务的一级组织单元",
+      "parent": "综合医院",
+      "functional_zones": [
+        {
+          "name": "门诊公共区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "公共区",
+          "spaces": [
+            {"name": "门诊门厅", "label": "Space", "is_concept": true},
+            {"name": "挂号厅", "label": "Space", "is_concept": true},
+            {"name": "问讯台", "label": "Space", "is_concept": true},
+            {"name": "预诊台", "label": "Space", "is_concept": true},
+            {"name": "分诊台", "label": "Space", "is_concept": true},
+            {"name": "收费窗口", "label": "Space", "is_concept": true},
+            {"name": "门诊药房", "label": "Space", "is_concept": true},
+            {"name": "候药厅", "label": "Space", "is_concept": true},
+            {"name": "门诊办公室", "label": "Space", "is_concept": true},
+            {"name": "公共卫生间", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "各科诊区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "外科诊室", "label": "Space", "is_concept": true},
+            {"name": "内科诊室", "label": "Space", "is_concept": true},
+            {"name": "妇科诊室", "label": "Space", "is_concept": true},
+            {"name": "产科诊室", "label": "Space", "is_concept": true},
+            {"name": "儿科诊室", "label": "Space", "is_concept": true},
+            {"name": "耳鼻喉诊室", "label": "Space", "is_concept": true},
+            {"name": "眼科诊室", "label": "Space", "is_concept": true},
+            {"name": "中医诊室", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "检查治疗区",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "检验室", "label": "Space", "is_concept": true},
+            {"name": "采血室", "label": "Space", "is_concept": true},
+            {"name": "注射室", "label": "Space", "is_concept": true},
+            {"name": "外科换药室", "label": "Space", "is_concept": true},
+            {"name": "外科创伤处置室", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "医技部",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "医疗技术支持部门",
+      "parent": "综合医院",
+      "functional_zones": [
+        {
+          "name": "手术部",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "洁净区",
+          "spaces": [
+            {"name": "患者准备区", "label": "Space", "is_concept": true},
+            {"name": "手术间", "label": "Space", "is_concept": true},
+            {"name": "医护辅助区", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "放射影像中心",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "患者候诊区", "label": "Space", "is_concept": true},
+            {"name": "医生诊断区", "label": "Space", "is_concept": true},
+            {"name": "CT室", "label": "Space", "is_concept": true},
+            {"name": "MRI室", "label": "Space", "is_concept": true},
+            {"name": "DR室", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "检验科",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "普通检验区", "label": "Space", "is_concept": true},
+            {"name": "微生物检验区", "label": "Space", "is_concept": true},
+            {"name": "真菌病毒检验区", "label": "Space", "is_concept": true},
+            {"name": "辅助用房", "label": "Space", "is_concept": true},
+            {"name": "储藏室", "label": "Space", "is_concept": true},
+            {"name": "医生办公区", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "透析室",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "洁净区",
+          "spaces": [
+            {"name": "透析准备区", "label": "Space", "is_concept": true},
+            {"name": "透析治疗区", "label": "Space", "is_concept": true},
+            {"name": "透析辅助区", "label": "Space", "is_concept": true},
+            {"name": "透析医护区", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "消毒供应室",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "洁净区",
+          "spaces": [
+            {"name": "去污区", "label": "Space", "is_concept": true, "zone_type": "污染区"},
+            {"name": "检查包装区", "label": "Space", "is_concept": true, "zone_type": "清洁区"},
+            {"name": "灭菌区", "label": "Space", "is_concept": true, "zone_type": "清洁区"},
+            {"name": "无菌物品存放区", "label": "Space", "is_concept": true, "zone_type": "无菌区"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "住院部",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "住院医疗服务单元",
+      "parent": "综合医院",
+      "functional_zones": [
+        {
+          "name": "出入院处",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "公共区",
+          "spaces": [
+            {"name": "出入院大厅", "label": "Space", "is_concept": true},
+            {"name": "手续办理柜台", "label": "Space", "is_concept": true},
+            {"name": "收费办理柜台", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "护理单元",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "医护区",
+          "spaces": [
+            {"name": "病房", "label": "Space", "is_concept": true},
+            {"name": "病房护士站", "label": "Space", "is_concept": true},
+            {"name": "医生办公室", "label": "Space", "is_concept": true},
+            {"name": "治疗室", "label": "Space", "is_concept": true},
+            {"name": "配药室", "label": "Space", "is_concept": true},
+            {"name": "污物间", "label": "Space", "is_concept": true},
+            {"name": "清洁间", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "重症监护室",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "洁净区",
+          "spaces": [
+            {"name": "ICU病房", "label": "Space", "is_concept": true},
+            {"name": "ICU护士站", "label": "Space", "is_concept": true},
+            {"name": "ICU医生值班室", "label": "Space", "is_concept": true},
+            {"name": "ICU家属等候区", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "hospital-qa-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "next lint",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@emotion/is-prop-valid": "latest",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-slot": "latest",
+    "@react-three/drei": "latest",
+    "@react-three/fiber": "latest",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/d3": "7.4.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "d3": "latest",
+    "expo": "latest",
+    "expo-asset": "latest",
+    "expo-file-system": "latest",
+    "expo-gl": "latest",
+    "framer-motion": "latest",
+    "geist": "latest",
+    "lucide-react": "^0.454.0",
+    "next": "16.0.3",
+    "pdfjs-dist": "5.4.296",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "latest",
+    "react-pdf": "^10.2.0",
+    "simplex-noise": "latest",
+    "tailwind-merge": "^2.5.5",
+    "tailwindcss-animate": "^1.0.7",
+    "three": "latest",
+    "tw-animate-css": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.3",
+    "postcss": "^8.5",
+    "tailwindcss": "^4.1.9",
+    "typescript": "^5"
+  }
+}
