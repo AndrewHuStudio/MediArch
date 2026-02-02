@@ -1,7 +1,7 @@
 {
   "dependencies": ["."],
   "graphs": {
-    "medi_arch_system": "backend.app.agents.supervisor_graph:graph",
+    "mediarch_graph": "backend.app.agents.mediarch_graph:graph",
     "orchestrator_agent": "backend.app.agents.orchestrator_agent.agent:graph",
     "neo4j_agent": "backend.app.agents.neo4j_agent.agent:graph",
     "milvus_agent": "backend.app.agents.milvus_agent.agent:graph",

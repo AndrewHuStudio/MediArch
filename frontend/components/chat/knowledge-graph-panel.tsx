@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { motion } from "framer-motion"
 import { Network } from "lucide-react"
 import { KnowledgeGraphD3, type GraphData } from "@/components/ui/knowledge-graph-d3"
@@ -10,6 +11,17 @@ interface KnowledgeGraphPanelProps {
 }
 
 export default function KnowledgeGraphPanel({ graphData, isAnimating }: KnowledgeGraphPanelProps) {
+  const queryPath = useMemo(() => {
+    if (!graphData?.nodes?.length) return ""
+    // 使用 schema 定义的节点类型
+    const hospital = graphData.nodes.find((n) => n.type === "Hospital")?.label
+    const department = graphData.nodes.find((n) => n.type === "DepartmentGroup")?.label
+    const zone = graphData.nodes.find((n) => n.type === "FunctionalZone")?.label
+    const space = graphData.nodes.find((n) => n.type === "Space")?.label
+    const parts = [hospital, department, zone, space].filter(Boolean) as string[]
+    return parts.length >= 2 ? parts.join(" → ") : ""
+  }, [graphData])
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -23,6 +35,15 @@ export default function KnowledgeGraphPanel({ graphData, isAnimating }: Knowledg
           <h3 className="text-sm font-semibold text-white">知识图谱</h3>
         </div>
       </div>
+
+      {queryPath && (
+        <div className="mb-3">
+          <div className="text-[11px] text-gray-300">
+            <span className="text-gray-400">查询路径：</span>
+            {queryPath}
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0">
         {graphData.nodes.length > 0 ? (

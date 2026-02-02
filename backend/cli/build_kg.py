@@ -4,24 +4,24 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 功能说明:
    从 MongoDB chunks 读取文本，使用 DeepSeek V3 抽取实体和关系，
-   写入 Neo4j 图数据库，并可选构建 Milvus 实体属性向量库
+   写入 Neo4j 图数据库
 
 涉及的主要文件:
    - backend/databases/graph/builders/kg_builder.py (核心构建器)
    - backend/databases/graph/schemas/medical_architecture.json (图谱 Schema)
 
 使用方法:
-   # 方法1: 直接运行模块
+   # 基础用法
    python -m backend.cli.build_kg
 
-   # 方法2: 禁用 Milvus 向量库
-   python -m backend.cli.build_kg --no-milvus
-
-   # 方法3: 指定自定义 Schema
+   # 指定自定义 Schema
    python -m backend.cli.build_kg --schema path/to/schema.json
 
-   # 方法4: 跳过磁盘检查
+   # 跳过磁盘检查
    python -m backend.cli.build_kg --skip-disk-check
+
+注意:
+   当前版本默认只构建 Neo4j 图谱，不包含 Milvus 向量库
 """
 
 from __future__ import annotations

@@ -14,6 +14,8 @@ import os
 import re
 import logging
 import asyncio  # ✅ 添加 asyncio 导入
+from functools import wraps
+from time import perf_counter
 from typing import Any, Dict, List, Optional, Literal
 from typing_extensions import TypedDict
 
@@ -35,7 +37,18 @@ from backend.app.services.graph_retriever import AsyncGraphRetriever
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ANALYSIS_MODEL = os.getenv("NEO4J_AGENT_MODEL", "gpt-4o-mini")
+DEFAULT_ANALYSIS_MODEL = os.getenv("NEO4J_AGENT_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+try:
+    from openai import RateLimitError as OpenAIRateLimitError
+except Exception:
+    OpenAIRateLimitError = None
+
+try:
+    import httpx
+    _HTTPX_ERRORS = (httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout)
+except Exception:
+    _HTTPX_ERRORS = ()
 
 
 # ============================================================================
@@ -146,13 +159,12 @@ async def get_retriever() -> AsyncGraphRetriever:
 
 def _init_analysis_llm():
     """初始化查询分析 LLM（同步版本）"""
-    api_key = os.getenv("NEO4J_AGENT_API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少 NEO4J_AGENT_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（neo4j_agent）")
 
-    base_url = os.getenv("NEO4J_AGENT_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    base_url = base_url.rstrip("/") if base_url else None
-    model_provider = os.getenv("NEO4J_AGENT_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     base_model = init_chat_model(
@@ -306,13 +318,76 @@ def merge_source_documents(*candidates: Any) -> List[str]:
     return docs
 
 
+def _coerce_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_transient_error(error: Exception) -> bool:
+    """判断是否为瞬时错误（网络、超时、限流等）"""
+    if isinstance(error, asyncio.TimeoutError):
+        return True
+    if OpenAIRateLimitError is not None and isinstance(error, OpenAIRateLimitError):
+        return True
+    if _HTTPX_ERRORS and isinstance(error, _HTTPX_ERRORS):
+        return True
+    message = str(error).lower()
+    return any(
+        keyword in message
+        for keyword in (
+            "timeout",
+            "timed out",
+            "temporarily",
+            "connection",
+            "network",
+            "rate limit",
+            "quota",
+            "overloaded",
+            "429",
+        )
+    )
+
+
+def monitor_performance(node_name: str):
+    """性能监控装饰器：记录节点耗时并写入 diagnostics"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(state: Neo4jState):
+            start_time = perf_counter()
+            try:
+                result = await func(state)
+            except Exception as e:
+                took_ms = int((perf_counter() - start_time) * 1000)
+                logger.error("[Neo4jAgent→%s] 失败，耗时: %sms, 错误: %s", node_name, took_ms, e)
+                raise
+
+            took_ms = int((perf_counter() - start_time) * 1000)
+            logger.info("[Neo4jAgent→%s] 耗时: %sms", node_name, took_ms)
+
+            if isinstance(result, dict):
+                diagnostics: Dict[str, Any] = {}
+                state_diag = state.get("diagnostics")
+                if isinstance(state_diag, dict):
+                    diagnostics.update(state_diag)
+                result_diag = result.get("diagnostics")
+                if isinstance(result_diag, dict):
+                    diagnostics.update(result_diag)
+                diagnostics[f"{node_name}_took_ms"] = took_ms
+                result["diagnostics"] = diagnostics
+
+            return result
+        return wrapper
+    return decorator
+
+
 async def analyse_query_with_llm(query: str) -> Optional[QueryAnalysisResult]:
     """
-    调用 LLM 获取查询意图与关键词（增强版 - 2025-12-09）
+    调用 LLM 获取查询意图与关键词（结构化输出优先 + 兼容兜底）
 
-    [FIX 2025-12-09] 移除 with_structured_output()，改用手动解析
-    - 原因：DeepSeek API 与 with_structured_output() 不兼容，导致 JSON 解析失败
-    - 修复：使用 llm_output_parser.parse_llm_output() 处理各种格式的 LLM 输出
+    - 优先尝试 LangChain Structured Output（与 Orchestrator 保持一致）
+    - Structured Output 失败时，回退到手动解析（兼容 DeepSeek 等不支持的 API）
     """
     from backend.app.utils.llm_output_parser import parse_llm_output
 
@@ -326,15 +401,17 @@ async def analyse_query_with_llm(query: str) -> Optional[QueryAnalysisResult]:
         "你是一名医院建筑知识图谱的查询分析助手。"
         "请判断用户问题的意图类型（entity / relation / community / mixed），"
         "并输出适合图谱检索的 search_terms。"
-        "\n\n**重要：你必须返回有效的 JSON 格式，不要包含任何其他文本。**"
-        "\n\n输出格式："
-        "\n```json"
+        "\n\n**重要：你必须返回有效的 JSON 格式，不要包含任何其他文本或注释。**"
+        "\n\n输出格式（必须是有效 JSON）："
         "\n{"
-        "\n  \"query_type\": \"entity\",  // 必须是: entity, relation, community, mixed 之一"
-        "\n  \"search_terms\": [\"手术室\", \"洁净手术部\", \"手术间\"],  // 关键词列表，至少3个"
+        "\n  \"query_type\": \"entity\","
+        "\n  \"search_terms\": [\"手术室\", \"洁净手术部\", \"手术间\"],"
         "\n  \"reasoning\": \"用户询问手术室的设计要点，属于实体查询\""
         "\n}"
-        "\n```"
+        "\n\n字段说明："
+        "\n- query_type: 必须是 entity, relation, community, mixed 之一"
+        "\n- search_terms: 关键词列表，至少3个"
+        "\n- reasoning: 意图判断理由"
         "\n\n示例："
         "\n问题：手术室的设计要点？"
         "\n-> {\"query_type\": \"entity\", \"search_terms\": [\"手术室\", \"洁净手术部\", \"手术间\"], \"reasoning\": \"实体查询\"}"
@@ -344,10 +421,46 @@ async def analyse_query_with_llm(query: str) -> Optional[QueryAnalysisResult]:
         "\n-> {\"query_type\": \"community\", \"search_terms\": [\"急诊科\", \"急诊部\"], \"reasoning\": \"社区查询\"}"
     )
 
+    # 1) Structured Output（带重试）
+    from langchain_core.messages import HumanMessage
+    max_attempts = 3
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result: QueryAnalysisResult = await call_structured_llm(
+                llm=llm,
+                pydantic_model=QueryAnalysisResult,
+                messages=[
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=f"用户问题：{query}\n\n请直接返回 JSON，不要包含其他文本。"),
+                ],
+            )
+
+            logger.info(
+                f"[Neo4jAgent] LLM 结构化分析成功: "
+                f"query_type={result.query_type}, "
+                f"terms={result.search_terms[:5] if len(result.search_terms) > 5 else result.search_terms}"
+            )
+            return result
+        except Exception as e:
+            last_error = e
+            if attempt < max_attempts and _is_transient_error(e):
+                delay = min(2.0 * attempt, 6.0)
+                logger.warning(
+                    "[Neo4jAgent] 结构化输出瞬时错误，%s/%s 次重试后等待 %.1fs: %s",
+                    attempt,
+                    max_attempts,
+                    delay,
+                    e,
+                )
+                await asyncio.sleep(delay)
+                continue
+            logger.warning("[Neo4jAgent] 结构化输出失败，降级为手动解析: %s", e)
+            break
+
     try:
         # [FIX 2025-12-09] LLM 不再绑定 with_structured_output()
         # 需要手动解析返回的内容
-        from langchain_core.messages import HumanMessage
         raw_result = await llm.ainvoke([
             SystemMessage(content=system_prompt),
             HumanMessage(content=f"用户问题：{query}\n\n请直接返回 JSON，不要包含其他文本。")
@@ -379,6 +492,8 @@ async def analyse_query_with_llm(query: str) -> Optional[QueryAnalysisResult]:
 
     except Exception as e:
         logger.error(f"[Neo4jAgent] LLM 查询分析异常: {e}，将使用启发式逻辑", exc_info=True)
+        if last_error is not None:
+            logger.debug("[Neo4jAgent] Structured Output 最后一次错误: %s", last_error)
         return None
 
 
@@ -478,6 +593,7 @@ def calculate_quality(items: List[AgentItem], query: str) -> float:
 # 节点函数
 # ============================================================================
 
+@monitor_performance("QueryAnalysis")
 async def node_query_analysis(state: Neo4jState) -> Dict[str, Any]:
     """查询分析节点：理解用户意图和提取关键词"""
     query = state.get("query", "")
@@ -501,6 +617,7 @@ async def node_query_analysis(state: Neo4jState) -> Dict[str, Any]:
     return analysis
 
 
+@monitor_performance("EntityMatch")
 async def node_entity_match(state: Neo4jState) -> Dict[str, Any]:
     """
     实体匹配：精确匹配医院建筑实体
@@ -684,6 +801,7 @@ async def node_entity_match(state: Neo4jState) -> Dict[str, Any]:
     return {"entity_results": final_results}
 
 
+@monitor_performance("RelationReasoning")
 async def node_relation_reasoning(state: Neo4jState) -> Dict[str, Any]:
     """
     关系推理：查找实体间的关系路径
@@ -761,6 +879,7 @@ async def node_relation_reasoning(state: Neo4jState) -> Dict[str, Any]:
     return {"relation_results": results}
 
 
+@monitor_performance("CommunityFilter")
 async def node_community_filter(state: Neo4jState) -> Dict[str, Any]:
     """
     社区过滤：查找子系统和功能分区
@@ -835,6 +954,7 @@ async def node_community_filter(state: Neo4jState) -> Dict[str, Any]:
     return {"community_results": results}
 
 
+@monitor_performance("MergeResults")
 async def node_merge_results(state: Neo4jState) -> Dict[str, Any]:
     """
     融合结果：合并多个检索结果并去重
@@ -1002,44 +1122,54 @@ async def node_merge_results(state: Neo4jState) -> Dict[str, Any]:
     }
 
 
+@monitor_performance("Reflection")
 async def node_reflection(state: Neo4jState) -> Dict[str, Any]:
     """反思：评估检索质量，决定是否重试"""
     quality_score = state.get("quality_score", 0.0)
     merged_items = state.get("merged_items", [])
     retry_count = state.get("retry_count", 0)
     max_retries = state.get("max_retries", 1)
-    
+
+    # [FIX 2026-01-27] 默认值与 init_params 保持一致
+    DEFAULT_DEPTH = _coerce_int(os.getenv("NEO4J_DEPTH", "3"), 3)
+    DEFAULT_K_EDGES = _coerce_int(os.getenv("NEO4J_K_EDGES", "200"), 200)
+
+    current_depth = state.get("depth", DEFAULT_DEPTH)
+    current_k_edges = state.get("k_edges", DEFAULT_K_EDGES)
+
     reflection = {
         "quality": "good" if quality_score >= 0.4 else "low",
         "score": quality_score,
         "items_count": len(merged_items),
     }
-    
+
     # 决定是否重试
     if quality_score < 0.4 and retry_count < max_retries and len(merged_items) == 0:
         reflection["action"] = "retry"
         reflection["reason"] = f"质量分数 {quality_score:.2f} 低于阈值"
-        logger.warning(f"[Neo4jAgent→Reflection] 质量不足，准备重试 (retry={retry_count})")
+        logger.warning(f"[Neo4jAgent->Reflection] 质量不足，准备重试 (retry={retry_count})")
     else:
         reflection["action"] = "finish"
-        logger.info(f"[Neo4jAgent→Reflection] 质量合格，完成检索")
-    
+        logger.info(f"[Neo4jAgent->Reflection] 质量合格，完成检索")
+
     return {
         "reflection": reflection,
         "retry_count": retry_count + (1 if reflection["action"] == "retry" else 0),
-        "depth": state.get("depth", 2) + 1 if reflection["action"] == "retry" else state.get("depth", 2),
-        "k_edges": state.get("k_edges", 100) + 100 if reflection["action"] == "retry" else state.get("k_edges", 100),
+        "depth": current_depth + 1 if reflection["action"] == "retry" else current_depth,
+        "k_edges": current_k_edges + 100 if reflection["action"] == "retry" else current_k_edges,
     }
 
 
+@monitor_performance("AddCitations")
 async def node_add_citations(state: Neo4jState) -> Dict[str, Any]:
     """
-    添加规范引用（优化版本 - 2025-12-09）
+    添加规范引用（优化版本 - 2025-12-09, 2026-01-27修复）
 
     改进：
     - 使用统一的 citation_builder 工具函数
     - 确保所有 citations 包含必填字段
     - 提高代码可维护性
+    - [FIX 2026-01-27] 将循环内的重复查询移到循环外，避免性能浪费
     """
     from backend.app.utils.citation_builder import build_kg_citation, build_spec_citation
 
@@ -1048,6 +1178,10 @@ async def node_add_citations(state: Neo4jState) -> Dict[str, Any]:
 
     retriever = await get_retriever()
 
+    # [FIX 2026-01-27] 预先查询规范文档（只查询一次，避免循环内重复查询）
+    fallback_specs = None
+    items_needing_fallback = []
+
     for item in merged_items:
         source_docs = merge_source_documents(
             item.attrs.get("source_document"),
@@ -1055,7 +1189,7 @@ async def node_add_citations(state: Neo4jState) -> Dict[str, Any]:
         )
 
         if source_docs:
-            # ✅ 使用统一的 build_kg_citation 函数
+            # 使用统一的 build_kg_citation 函数
             item.citations = [
                 build_kg_citation(
                     source=doc,
@@ -1068,29 +1202,47 @@ async def node_add_citations(state: Neo4jState) -> Dict[str, Any]:
                 )
                 for idx, doc in enumerate(source_docs[:3])
             ]
-            continue
+        elif not item.citations:
+            # 记录需要兜底引用的 item
+            items_needing_fallback.append(item)
 
-        if not item.citations:
+    # [FIX 2026-01-27] 只有在需要时才查询规范文档（一次查询，多次使用）
+    if items_needing_fallback:
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
             try:
-                # ✅ 使用 search_nodes 查找相关规范文档
-                specs = await retriever.search_nodes(
+                fallback_specs = await retriever.search_nodes(
                     query=f"{query} 规范 标准",
                     k=3,
                 )
-                # ✅ 使用统一的 build_spec_citation 函数
-                item.citations = [
-                    build_spec_citation(
-                        source=spec.get("name", "规范"),
-                        spec_label=spec.get("label", "DesignSpec"),
-                        spec_name=spec.get("name", ""),
-                        snippet=f"{spec.get('label', '')} - {spec.get('name', '')}",
-                        slug=spec.get("slug", ""),
-                        id=idx,
-                    )
-                    for idx, spec in enumerate(specs or [])
-                ]
+                break
             except Exception as e:
-                logger.warning(f"[Neo4jAgent→AddCitations] 获取规范引用失败: {e}")
+                logger.warning(
+                    "[Neo4jAgent->AddCitations] 获取规范引用失败（%s/%s）：%s",
+                    attempt,
+                    max_attempts,
+                    e,
+                )
+                if attempt < max_attempts:
+                    await asyncio.sleep(0.5 * attempt)
+                fallback_specs = []
+
+        # 为所有需要兜底的 item 添加相同的规范引用
+        if fallback_specs:
+            fallback_citations = [
+                build_spec_citation(
+                    source=spec.get("name", "规范"),
+                    spec_label=spec.get("label", "DesignSpec"),
+                    spec_name=spec.get("name", ""),
+                    snippet=f"{spec.get('label', '')} - {spec.get('name', '')}",
+                    slug=spec.get("slug", ""),
+                    id=idx,
+                )
+                for idx, spec in enumerate(fallback_specs)
+            ]
+            for item in items_needing_fallback:
+                # 避免共享同一 list/dict，防止后续原地修改互相影响
+                item.citations = [dict(citation) for citation in fallback_citations]
 
     return {"items": merged_items}
 
@@ -1110,12 +1262,32 @@ def build_neo4j_graph():
     builder = StateGraph(Neo4jState)
 
     # ✅ [UPGRADED 2025-01-17] 初始化节点 - 增强检索深度
+    @monitor_performance("InitParams")
     async def init_params(state: Neo4jState) -> Dict[str, Any]:
+        request = state.get("request")
+        metadata = request.metadata if request else {}
+
+        env_max_retries = _coerce_int(os.getenv("NEO4J_MAX_RETRIES", "1"), 1)
+        env_depth = _coerce_int(os.getenv("NEO4J_DEPTH", "3"), 3)
+        env_k_edges = _coerce_int(os.getenv("NEO4J_K_EDGES", "200"), 200)
+
+        max_retries = _coerce_int(metadata.get("neo4j_max_retries"), env_max_retries)
+        depth = _coerce_int(metadata.get("neo4j_depth"), env_depth)
+        k_edges = _coerce_int(metadata.get("neo4j_k_edges"), env_k_edges)
+        default_top_k = 10
+        if request:
+            default_top_k = request.top_k
+        elif "top_k" in state and state["top_k"] is not None:
+            default_top_k = state["top_k"]
+
+        top_k = _coerce_int(metadata.get("neo4j_top_k"), default_top_k)
+
         return {
-            "max_retries": 1,
+            "max_retries": max_retries,
             "retry_count": 0,
-            "depth": 3,  # ✅ [2025-12-18] 优化：从4降低到3，减少遍历开销
-            "k_edges": 200,  # ✅ [2025-12-18] 优化：从500降低到200，提升检索效率
+            "depth": depth,  # ✅ [2025-12-18] 优化：从4降低到3，减少遍历开销
+            "k_edges": k_edges,  # ✅ [2025-12-18] 优化：从500降低到200，提升检索效率
+            "top_k": top_k,
         }
 
     # 添加所有节点

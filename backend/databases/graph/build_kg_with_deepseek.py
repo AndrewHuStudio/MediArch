@@ -11,7 +11,6 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from rich.panel import Panel
 from rich.table import Table
 from rich import box
-from pymilvus import connections
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent.parent.parent
@@ -90,7 +89,7 @@ def check_disk_space():
 def estimate_deepseek_cost(total_chunks: int) -> tuple[float, dict]:
     """
     根据 deepseek-v3 的实际计费参数估算构建成本。
-    
+
     默认假设：
       - 每个 chunk 的提示词 ~1500 tokens，输出 JSON ~620 tokens（可通过环境变量覆盖）
       - deepseek-v3 结算：提示价 $0.25/百万 tokens，补全价 $1.00/百万 tokens
@@ -98,22 +97,22 @@ def estimate_deepseek_cost(total_chunks: int) -> tuple[float, dict]:
     """
     if total_chunks <= 0:
         return 0.0, {}
-    
+
     avg_prompt_tokens = float(os.getenv("KG_AVG_PROMPT_TOKENS", "1500"))
     avg_completion_tokens = float(os.getenv("KG_AVG_COMPLETION_TOKENS", "620"))
     prompt_multiplier = float(os.getenv("KG_PROMPT_TOKEN_MULTIPLIER", "0.125"))
     completion_multiplier = float(os.getenv("KG_COMPLETION_TOKEN_MULTIPLIER", "4.0"))
     prompt_price_per_million = float(os.getenv("KG_PROMPT_PRICE_PER_MTOK", "0.25"))
     completion_price_per_million = float(os.getenv("KG_COMPLETION_PRICE_PER_MTOK", "1.0"))
-    
+
     billable_prompt_tokens = avg_prompt_tokens * prompt_multiplier
     billable_completion_tokens = avg_completion_tokens * completion_multiplier
-    
+
     prompt_cost_per_chunk = (billable_prompt_tokens / 1_000_000) * prompt_price_per_million
     completion_cost_per_chunk = (billable_completion_tokens / 1_000_000) * completion_price_per_million
     cost_per_chunk = prompt_cost_per_chunk + completion_cost_per_chunk
     total_cost = total_chunks * cost_per_chunk
-    
+
     details = {
         "prompt_tokens": avg_prompt_tokens,
         "completion_tokens": avg_completion_tokens,
@@ -123,8 +122,58 @@ def estimate_deepseek_cost(total_chunks: int) -> tuple[float, dict]:
         "completion_price_per_million": completion_price_per_million,
         "cost_per_chunk": cost_per_chunk,
     }
-    
+
     return total_cost, details
+
+
+def check_and_clear_failed_cache(builder):
+    """自动检查并清除失败的缓存记录和空结果的缓存"""
+    try:
+        # 清除标记为失败的缓存
+        failed_count = builder.extractions_collection.count_documents({
+            "version": builder.extraction_version,
+            "status": "failed"
+        })
+
+        if failed_count > 0:
+            console.print(f"[yellow][INFO] 发现 {failed_count} 条失败的缓存记录，正在清除...[/yellow]")
+            result = builder.extractions_collection.delete_many({
+                "version": builder.extraction_version,
+                "status": "failed"
+            })
+            console.print(f"[green][OK] 已清除 {result.deleted_count} 条失败的缓存记录[/green]")
+
+        # 清除空结果的缓存（entities为空的）
+        empty_count = builder.extractions_collection.count_documents({
+            "version": builder.extraction_version,
+            "status": "success",
+            "$or": [
+                {"result.entities": {}},
+                {"result.entities": {"$exists": False}},
+                {"result.entities": None}
+            ]
+        })
+
+        if empty_count > 0:
+            console.print(f"[yellow][INFO] 发现 {empty_count} 条空结果的缓存记录，正在清除...[/yellow]")
+            result = builder.extractions_collection.delete_many({
+                "version": builder.extraction_version,
+                "status": "success",
+                "$or": [
+                    {"result.entities": {}},
+                    {"result.entities": {"$exists": False}},
+                    {"result.entities": None}
+                ]
+            })
+            console.print(f"[green][OK] 已清除 {result.deleted_count} 条空结果的缓存记录[/green]")
+
+        if failed_count == 0 and empty_count == 0:
+            console.print("[green][OK] 没有需要清除的缓存记录[/green]")
+
+        console.print()  # 空行
+
+    except Exception as e:
+        console.print(f"[red][WARN] 清除缓存时出错: {e}[/red]\n")
 
 
 def main():
@@ -139,90 +188,61 @@ def main():
 
     console.print()  # 空行
 
-    # 验证环境变量
-    required_vars = [
-        "KG_OPENAI_API_KEY",
-        "KG_OPENAI_BASE_URL", 
-        "KG_OPENAI_MODEL",
-        "MONGODB_URI",
-        "NEO4J_URI",
-        "MILVUS_HOST"
-    ]
-    
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
+    # 验证环境变量（支持两种前缀：KG_OPENAI_* 或 OPENAI_*）
+    api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+    base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+    model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL")
+
+    required_vars = {
+        "API Key": api_key,
+        "API Base URL": base_url,
+        "Model": model,
+        "MongoDB URI": os.getenv("MONGODB_URI"),
+        "Neo4j URI": os.getenv("NEO4J_URI"),
+    }
+
+    missing_vars = [name for name, value in required_vars.items() if not value]
+
     if missing_vars:
-        console.print(f"[red]✗ 缺少环境变量：{', '.join(missing_vars)}[/red]")
+        console.print(f"[red]✗ 缺少以下配置：{', '.join(missing_vars)}[/red]")
+        console.print("\n[yellow]请在 .env 文件中配置以下变量：[/yellow]")
+        if "API Key" in missing_vars:
+            console.print("  OPENAI_API_KEY=your-api-key")
+        if "API Base URL" in missing_vars:
+            console.print("  OPENAI_BASE_URL=https://api.openai.com/v1")
+        if "Model" in missing_vars:
+            console.print("  OPENAI_MODEL=deepseek-v3")
+        if "MongoDB URI" in missing_vars:
+            console.print("  MONGODB_URI=mongodb://...")
+        if "Neo4j URI" in missing_vars:
+            console.print("  NEO4J_URI=bolt://localhost:7687")
         return
-    
-    # 可选配置：从环境变量读取 use_milvus 与 schema 路径
-    # 默认启用 Milvus（构建 entity_attributes 向量库）
-    use_milvus_from_env = os.getenv("KG_USE_MILVUS", "").lower()
+
+    # Schema 路径
     schema_path = os.getenv("KG_SCHEMA_PATH", "backend/databases/graph/schemas/medical_architecture.json")
-    
-    # 如果环境变量未设置，提供交互式选择
-    if not use_milvus_from_env:
-        console.print("\n[bold yellow]Milvus 配置[/bold yellow]")
-        console.print("是否启用 Milvus 向量库（entity_attributes）？")
-        console.print("  [dim]- 启用：将构建实体属性向量库，支持向量检索[/dim]")
-        console.print("  [dim]- 禁用：只构建 Neo4j 图谱，不构建向量库[/dim]")
-        
-        try:
-            choice = input("\n启用 Milvus？(Y/n, 默认 Y): ").strip().lower()
-            use_milvus_env = choice in {"", "y", "yes", "1", "true"}
-        except (EOFError, KeyboardInterrupt):
-            console.print("[yellow]输入中断，默认启用 Milvus[/yellow]")
-            use_milvus_env = True
-    else:
-        # 从环境变量读取
-        use_milvus_env = use_milvus_from_env in {"1", "true", "yes"}
-    
+
     # 配置表格
     config_table = Table(show_header=False, box=box.SIMPLE, padding=(0, 1))
     config_table.add_column("Key", style="cyan")
     config_table.add_column("Value", style="white")
-    config_table.add_row("LLM模型", os.getenv('KG_OPENAI_MODEL'))
-    config_table.add_row("API Base", os.getenv('KG_OPENAI_BASE_URL'))
+    config_table.add_row("LLM模型", model)
+    config_table.add_row("API Base", base_url)
     config_table.add_row("MongoDB", os.getenv('MONGODB_URI').split('@')[0]+'@...')
     config_table.add_row("Neo4j", os.getenv('NEO4J_URI'))
-    milvus_status = "启用" if use_milvus_env else "禁用"
-    config_table.add_row("Milvus", f"{os.getenv('MILVUS_HOST')}:{os.getenv('MILVUS_PORT', '19530')} ({milvus_status})")
     console.print(Panel(config_table, title="[bold]配置信息[/bold]", border_style="blue"))
-    
-    # 显示 Milvus 配置状态
-    if use_milvus_env:
-        console.print("[green]✓ Milvus 已启用[/green] - 将构建 entity_attributes 向量库")
-    else:
-        console.print("[yellow]⚠ Milvus 已禁用[/yellow] - 不会构建 entity_attributes 向量库")
-        console.print("[dim]提示：如需启用，可在运行时选择 Y，或设置环境变量 KG_USE_MILVUS=true[/dim]")
     
     start_time = datetime.now()
     
     try:
-        # ================== 🟢 修复代码开始 ==================
-        # 在初始化构建器之前，显式建立全局连接，解决 ConnectionNotExistException
-        if use_milvus_env:
-            console.print("\n[dim]正在预建立 Milvus 连接...[/dim]")
-            try:
-                milvus_host = os.getenv("MILVUS_HOST", "localhost")
-                milvus_port = os.getenv("MILVUS_PORT", "19530")
-                connections.connect(
-                    alias="default", 
-                    host=milvus_host, 
-                    port=milvus_port
-                )
-                console.print(f"[green]✓ Milvus 全局连接已建立 ({milvus_host}:{milvus_port})[/green]")
-            except Exception as e:
-                # 如果这里失败，不阻断流程，让 Builder 内部尝试重连
-                console.print(f"[yellow]⚠ 预连接 Milvus 失败 (将尝试在 Builder 内部重连): {e}[/yellow]")
-        # ================== 🟢 修复代码结束 ==================
-
         # 步骤0：先初始化构建器（这会触发构建策略选择）
         # 必须在 Progress 之前完成，以确保用户输入正常工作
         console.print("\n[dim]正在初始化构建器...[/dim]")
-        builder = MedicalKGBuilder(use_milvus=use_milvus_env, schema_path=schema_path)
-        console.print("[green]✓ 构建器初始化完成[/green]\n")
-        
+        builder = MedicalKGBuilder(schema_path=schema_path)
+        console.print("[green][OK] 构建器初始化完成[/green]\n")
+
+        # 步骤0.5：检查并清除失败的缓存
+        check_and_clear_failed_cache(builder)
+
         total_chunks = builder.chunks_collection.count_documents({})
         existing_processed = builder.extractions_collection.count_documents(
             {"version": builder.extraction_version}
@@ -274,7 +294,7 @@ def main():
             progress.update(chunk_task, completed=max(total_chunks, 1), description="[green]✓ 实体关系抽取完成")
             
             # 步骤3：写入数据库
-            write_task = progress.add_task("[cyan]写入Neo4j和Milvus...", total=1)
+            write_task = progress.add_task("[cyan]写入Neo4j...", total=1)
             builder.write_to_databases()
             progress.update(write_task, advance=1, description="[green]✓ 数据写入完成")
         
@@ -298,8 +318,6 @@ def main():
         if write_summary:
             stats_table.add_row("Neo4j节点数", str(write_summary.get('neo4j_nodes', '未知')))
             stats_table.add_row("Neo4j边数", str(write_summary.get('neo4j_edges', '未知')))
-            if builder.use_milvus:
-                stats_table.add_row("Milvus向量(本次)", str(write_summary.get('milvus_vectors_written', 0)))
         
         console.print(stats_table)
         

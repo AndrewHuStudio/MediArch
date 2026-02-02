@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -32,7 +33,7 @@ from backend.app.services.mongodb_search import get_retriever
 
 logger = logging.getLogger("mongodb_agent")
 
-DEFAULT_REWRITE_MODEL = os.getenv("MONGODB_AGENT_MODEL", "gpt-4o-mini")
+DEFAULT_REWRITE_MODEL = os.getenv("MONGODB_AGENT_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 
 # ============================================================================
@@ -80,13 +81,12 @@ class MongoDBState(TypedDict, total=False):
 
 def _init_rewrite_llm():
     """初始化查询改写 LLM"""
-    api_key = os.getenv("MONGODB_AGENT_API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少 MONGODB_AGENT_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（mongodb_agent）")
 
-    base_url = os.getenv("MONGODB_AGENT_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    base_url = base_url.rstrip("/") if base_url else None
-    model_provider = os.getenv("MONGODB_AGENT_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     base_model = init_chat_model(
@@ -207,7 +207,7 @@ def _want_images(text: str) -> bool:
     """判断用户是否“明确想要图片/图纸/图示”。尽量用短语而不是单字，避免误触发。"""
     q = (text or "").strip().lower()
     if not q:
-        return False
+        return True
     triggers = [
         "平面图",
         "剖面图",
@@ -232,7 +232,75 @@ def _want_images(text: str) -> bool:
         "plan",
         "section",
     ]
-    return any(t in q for t in triggers)
+    if any(neg in q for neg in ("不要图", "不需要图", "不看图", "不要图片", "不需要图片")):
+        return False
+    return True
+
+
+def _is_room_norm_query(text: str) -> bool:
+    """判断是否属于“某房间/空间的设计规范/要求”类问题（用于多资料兜底）。"""
+    q = (text or "").strip()
+    if not q:
+        return False
+
+    has_room = any(k in q for k in ("手术室", "手术部", "手术间", "洁净手术", "洁净手术部"))
+    has_norm = any(k in q for k in ("设计规范", "设计标准", "规范", "标准", "要求", "怎么设计", "布置原则"))
+    return bool(has_room and has_norm)
+
+
+def _should_auto_include_diagrams(text: str) -> bool:
+    """
+    即便用户未明确说“要图”，也对“规范 + 空间”类问题补充少量图示资料。
+
+    目标：让回答既有权威条文，也有可落地的布置示例（避免只靠单一文字资料）。
+    """
+    q = (text or "").strip()
+    if not q:
+        return False
+
+    # 明确拒绝图片时不补
+    if any(k in q for k in ("不要图", "不需要图", "不要图片", "不看图")):
+        return False
+
+    # “规范/要求/布置/配置”类提问，适合补图
+    has_norm = any(k in q for k in ("设计规范", "设计标准", "规范", "标准", "要求", "配置", "布置"))
+    has_space = any(k in q for k in ("手术室", "手术部", "手术间", "房间", "用房", "空间"))
+    return bool(has_norm and has_space)
+
+
+def _count_doc_distribution(chunks: List[Dict[str, Any]]) -> Dict[str, int]:
+    dist: Dict[str, int] = {}
+    for ch in chunks or []:
+        doc_name = (
+            ch.get("doc_title")
+            or ch.get("source_document")
+            or ch.get("doc_category")
+            or "unknown"
+        )
+        dist[doc_name] = dist.get(doc_name, 0) + 1
+    return dist
+
+
+def _dedup_chunks_by_id(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for ch in chunks or []:
+        cid = str(ch.get("chunk_id") or "").strip()
+        key = cid or json.dumps(
+            {
+                "doc": ch.get("doc_title") or ch.get("source_document"),
+                "page": (ch.get("page_range") or [None])[0],
+                "section": ch.get("section"),
+                "image_url": ch.get("image_url"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(ch)
+    return out
 
 
 def _collect_doc_page_hints(
@@ -626,6 +694,7 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
     doc_distribution: Dict[str, int] = {}
     retriever_diag: Dict[str, Any] = {}
     images_added = 0
+    priority_docs_added = 0
 
     # 执行搜索
     try:
@@ -664,15 +733,111 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
                 )
             chunks = balanced_chunks
 
+        # 资料优先级兜底：对“手术室设计规范”类问题，确保覆盖“规范/标准 + 详图/图集”等高价值资料
+        # - 避免只命中《建筑设计资料集…》等单一来源
+        # - 若调用方已限制资料范围（doc_ids/source_documents），则尊重限制，不做外扩
+        if chunks and (not doc_ids) and (not source_documents) and _is_room_norm_query(query):
+            existing_dist = _count_doc_distribution(chunks)
+
+            def _norm(s: str) -> str:
+                return str(s or "").replace("《", "").replace("》", "").replace(" ", "").lower()
+
+            existing_norm = {_norm(k) for k in existing_dist.keys()}
+            need_standard = not any("gb51039" in k or ("综合医院建筑设计" in k and ("规范" in k or "标准" in k)) for k in existing_norm)
+            need_atlas = not any("医疗功能房间详图集3" in k or ("详图集" in k and "医疗功能房间" in k) for k in existing_norm)
+
+            # 关键词：优先用已有 search_terms，再补充领域关键短语
+            priority_terms = deduplicate_terms(
+                list(search_terms)
+                + [
+                    "手术室",
+                    "手术部",
+                    "洁净手术部",
+                    "净化",
+                    "刷手",
+                    "更衣",
+                    "缓冲间",
+                    "无菌",
+                    "正压",
+                    "气密",
+                    "平面",
+                    "布置",
+                    "配置",
+                ]
+            )[:12]
+
+            priority_added: List[Dict[str, Any]] = []
+
+            async def _search_in_doc(doc_title: str, *, per_doc_limit: int, prefer_images: bool) -> None:
+                nonlocal priority_added
+                if not doc_title:
+                    return
+                normalized_title = _norm(doc_title)
+                if any(normalized_title in k for k in existing_norm):
+                    return
+                try:
+                    candidates = await asyncio.to_thread(
+                        retriever.search_by_any_keywords,
+                        priority_terms,
+                        max(per_doc_limit * 2, 4),
+                        False,
+                        None,
+                        [doc_title],
+                    )
+                except Exception as e:
+                    logger.info("[MongoDB→Search] PriorityDoc 搜索失败: %s (%s)", doc_title, e)
+                    return
+
+                def _rank(ch: Dict[str, Any]) -> tuple[int, int]:
+                    is_img = bool(ch.get("image_url")) or (ch.get("content_type") == "image")
+                    page = 10**6
+                    pr = ch.get("page_range") or []
+                    if isinstance(pr, list) and pr:
+                        try:
+                            page = int(pr[0])
+                        except Exception:
+                            page = 10**6
+                    # prefer_images=True 时图片优先，否则文本优先
+                    img_score = 1 if is_img else 0
+                    if prefer_images:
+                        img_score = 1 if is_img else 0
+                    else:
+                        img_score = 1 if (not is_img) else 0
+                    return (img_score, -page)
+
+                picked = sorted(candidates or [], key=_rank, reverse=True)[:per_doc_limit]
+                if picked:
+                    priority_added.extend(picked)
+
+            # 1) 先补“标准/规范”
+            if need_standard:
+                await _search_in_doc("GB 51039-2014 综合医院建筑设计规范.pdf", per_doc_limit=1, prefer_images=False)
+                await _search_in_doc("GB51039-2014综合医院建筑设计标准.pdf", per_doc_limit=1, prefer_images=False)
+
+            # 2) 再补“详图集/图集”（偏图片）
+            if need_atlas:
+                await _search_in_doc("医疗功能房间详图集3.pdf", per_doc_limit=2, prefer_images=True)
+
+            if priority_added:
+                before = len(chunks)
+                chunks = _dedup_chunks_by_id(chunks + priority_added)
+                priority_docs_added = max(0, len(chunks) - before)
+                doc_distribution = _count_doc_distribution(chunks)
+                logger.info("[MongoDB→Search] PriorityDoc 兜底: +%s 条, 资料数=%s", priority_docs_added, len(doc_distribution))
+
         # 额外补图：当用户明确“要图”，即使主检索命中的是文本，也补充同文档附近图片
-        if chunks and _want_images(query):
+        want_images = _want_images(query)
+        auto_diagrams = _should_auto_include_diagrams(query)
+        if chunks and (want_images or auto_diagrams):
             extra_images: List[Dict[str, Any]] = []
 
             # 当调用方显式限制页码（且 page_window=0）时，不再做“±1页补图”，避免引入非目标页图片。
             if explicit_page_numbers and explicit_page_window == 0:
                 logger.info("[MongoDB→Search] 检测到 filters.page_numbers 且 page_window=0，跳过补图")
             else:
-                img_k = max(2, min(5, max(int(top_k) // 3, 2)))
+                # 自动补图时更克制，避免“图过多淹没正文”
+                img_k_base = max(2, min(8, max(int(top_k) // 3, 2)))
+                img_k = max(5, img_k_base) if want_images else min(2, img_k_base)
                 hints = _collect_doc_page_hints(chunks, max_docs=3, max_pages_per_doc=4)
                 existing_chunk_ids = {c.get("chunk_id") for c in chunks if c.get("chunk_id")}
 
@@ -726,6 +891,7 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
             "doc_distribution": doc_distribution,
             "retriever_attempts": retriever_diag.get("attempts") if retriever_diag else None,
             "images_added": images_added,
+            "priority_docs_added": priority_docs_added,
         },
     }
 

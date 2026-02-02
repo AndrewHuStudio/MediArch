@@ -127,6 +127,14 @@ def get_neo4j_driver():
         driver.close()
 
 
+def get_neo4j_database():
+    """获取 Neo4j 数据库名称"""
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    return os.getenv("NEO4J_DATABASE", "neo4j")
+
+
 # ============================================================================
 # 辅助函数
 # ============================================================================
@@ -230,7 +238,8 @@ def generate_layout_hints(nodes: List[NodeData], edges: List[EdgeData],
 @router.post("/kg/subgraph", response_model=SubgraphResponse, summary="获取搜索适应性子图")
 async def get_adaptive_subgraph(
     request: SubgraphRequest,
-    driver = Depends(get_neo4j_driver)
+    driver = Depends(get_neo4j_driver),
+    database: str = Depends(get_neo4j_database)
 ):
     """
     根据查询自动提取适应性子图，支持多层级深度展示
@@ -260,10 +269,6 @@ async def get_adaptive_subgraph(
         nodes = []
         edges = []
         focus_node_id = None
-
-        # 获取数据库名称
-        import os
-        database = os.getenv("NEO4J_DATABASE", "neo4j")
 
         with driver.session(database=database) as session:
 
@@ -569,7 +574,8 @@ async def get_adaptive_subgraph(
 @router.get("/kg/node/{node_id}", response_model=NodeDetailResponse, summary="获取节点详情")
 async def get_node_detail(
     node_id: str,
-    driver = Depends(get_neo4j_driver)
+    driver = Depends(get_neo4j_driver),
+    database: str = Depends(get_neo4j_database)
 ):
     """
     获取单个节点的详细信息，包括：
@@ -579,9 +585,6 @@ async def get_node_detail(
     - 邻居节点（按关系类型分组）
     """
     try:
-        import os
-        database = os.getenv("NEO4J_DATABASE", "neo4j")
-
         with driver.session(database=database) as session:
             # 查询节点及其邻居
             result = session.run("""
@@ -671,15 +674,13 @@ async def get_node_detail(
 
 @router.get("/kg/statistics", response_model=GraphStatistics, summary="获取图谱统计")
 async def get_graph_statistics(
-    driver = Depends(get_neo4j_driver)
+    driver = Depends(get_neo4j_driver),
+    database: str = Depends(get_neo4j_database)
 ):
     """
     获取知识图谱的统计信息
     """
     try:
-        import os
-        database = os.getenv("NEO4J_DATABASE", "neo4j")
-
         with driver.session(database=database) as session:
             # 统计节点和关系数量
             result = session.run("""

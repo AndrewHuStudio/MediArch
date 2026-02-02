@@ -8,7 +8,6 @@ import type * as THREE from "three"
 import type { BookParams, MaterialProps } from "./types"
 import { BookModel } from "./book-canvas"
 import { BookDetails } from "./book-details"
-import { DebugPanel } from "./debug-panel"
 import { booksData } from "./book-data"
 import { WavyBackground } from "@/components/ui/wavy-background"
 
@@ -139,19 +138,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
 
   const [params, setParams] = useState<BookParams>(initialParams)
   const [materialProps, setMaterialProps] = useState<MaterialProps>(defaultMaterialProps)
-  const [debugMode, setDebugMode] = useState(false)
   const object2MeshRef = useRef<THREE.Mesh | null>(null)
-
-  const isDebugAllowed = process.env.NODE_ENV !== "production"
-
-  const resetParams = () => {
-    setParams(defaultParams)
-    setMaterialProps(defaultMaterialProps)
-  }
-
-  const copyParams = () => {
-    console.log("Copying parameters:", params, materialProps)
-  }
 
   const triggerHighlight = useCallback(() => {
     setHighlightTrigger((prev) => prev + 1)
@@ -599,39 +586,6 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
           </div>
         </div>
 
-        {isDebugAllowed && (
-          <>
-            <DebugPanel
-              debugMode={debugMode}
-              params={params}
-              materialProps={materialProps}
-              defaultMaterialProps={defaultMaterialProps}
-              object2MeshRef={object2MeshRef}
-              setParams={setParams}
-              setMaterialProps={setMaterialProps}
-              resetParams={resetParams}
-              copyParams={copyParams}
-            />
-            <footer className="absolute bottom-6 right-6 z-50 flex items-center gap-3">
-              <a
-                href="https://v0.app/community/book-rendering-design-xELoDknVbmM"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:opacity-80 underline transition-all duration-700 text-xs"
-                style={{ color: textColor === "black" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)" }}
-              >
-                Credits
-              </a>
-              <button
-                onClick={() => setDebugMode(!debugMode)}
-                className="hover:opacity-80 underline transition-all duration-700 text-xs"
-                style={{ color: textColor === "black" ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.6)" }}
-              >
-                Debug
-              </button>
-            </footer>
-          </>
-        )}
       </WavyBackground>
     </div>
   )

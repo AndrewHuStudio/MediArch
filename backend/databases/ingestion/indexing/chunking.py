@@ -45,6 +45,7 @@ class ChunkStrategy:
         self.merge_small_chunks = bool(merge_small_chunks)
         self.chunk_overlap = max(int(chunk_overlap), 0)
         self.normalize_positions = bool(normalize_positions)
+        self._page_sizes_cache: Dict[int, tuple] = {}  # 缓存页面尺寸 {page: (width, height)}
 
     # ---------- 公共 API ----------
     def chunk_by_hierarchy(self, textin_result: Dict, doc_metadata: Dict) -> List[Dict]:
@@ -88,6 +89,13 @@ class ChunkStrategy:
             doc_metadata.get("source_directory")
             or doc_metadata.get("file_path")
             or ""
+        )
+
+        # [FIX 2025-12-27] 获取 PDF 路径用于提取真实页面尺寸
+        pdf_path = (
+            doc_metadata.get("source_path")
+            or doc_metadata.get("file_path")
+            or doc_metadata.get("document_path")
         )
 
         # 尝试从标题提取年份（用于后续检索过滤）
@@ -178,7 +186,7 @@ class ChunkStrategy:
             - 多位置：positions 数组
             """
             # 归一化坐标
-            normalized_pos = self._normalize_position(position, page_id) if position else []
+            normalized_pos = self._normalize_position(position, page_id, pdf_path) if position else []
 
             return {
                 "chunk_id": str(uuid.uuid4()),
@@ -381,7 +389,7 @@ class ChunkStrategy:
 
                 # [FIX 2025-01-22] 累积位置信息（修复缺失）
                 if position:
-                    normalized_pos = self._normalize_position(position, page_id)
+                    normalized_pos = self._normalize_position(position, page_id, pdf_path)
                     if normalized_pos and len(normalized_pos) >= 5:
                         # normalized_pos 格式: [page, x0_ratio, y0_ratio, x1_ratio, y1_ratio]
                         accumulated_positions.append({
@@ -426,7 +434,7 @@ class ChunkStrategy:
 
                 if full_content:
                     flush_current_chunk()
-                    normalized_pos = self._normalize_position(position, page_id) if position else []
+                    normalized_pos = self._normalize_position(position, page_id, pdf_path) if position else []
                     chunks.append({
                         "chunk_id": str(uuid.uuid4()),
                         "sequence": len(chunks) + 1,
@@ -459,6 +467,17 @@ class ChunkStrategy:
             if item_type == "image":
                 image_url = item.get("image_url") or item.get("image_path") or item.get("path")
                 if image_url:
+                    # Guard: some OCR outputs may provide a directory-like placeholder (e.g. "mineru_outputs")
+                    # instead of a concrete image file path; skip such entries to avoid broken image chunks.
+                    try:
+                        from pathlib import Path
+
+                        raw_image_url = str(image_url).strip()
+                        filename = Path(raw_image_url.split("?", 1)[0].split("#", 1)[0]).name
+                        if Path(filename).suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
+                            continue
+                    except Exception:
+                        pass
                     caption_text = (
                         text
                         or (item.get("caption") if isinstance(item.get("caption"), str) else "")
@@ -486,43 +505,49 @@ class ChunkStrategy:
                             image_url_norm = image_url
                     flush_current_chunk()
                     # [FIX 2025-01-17] 增强图片chunk的元数据
-                    normalized_pos = self._normalize_position(position, page_id) if position else []
-                    chunks.append(
-                        {
-                            "chunk_id": str(uuid.uuid4()),
-                            "sequence": len(chunks) + 1,
+                    # [FIX 2025-12-27] 同时添加 positions 数组字段（与 text chunk 保持一致）
+                    normalized_pos = self._normalize_position(position, page_id, pdf_path) if position else []
+                    img_chunk = {
+                        "chunk_id": str(uuid.uuid4()),
+                        "sequence": len(chunks) + 1,
+                        "section": current_section or "图片",
+                        "page_range": [page_id, page_id],
+                        "content": f"[图片: {caption_display}]",
+                        "content_type": "image",
+                        "image_url": image_url_norm,
+                        "image_url_abs": image_url_abs,
+                        "position": normalized_pos,
+                        "parent_chunk_id": last_text_chunk_id,  # [FIX 2025-01-22] 添加图文关联
+                        "source_document": source_document,
+                        "source_category": source_category,
+                        "source_directory": source_directory,
+                        "metadata": {
+                            "paragraph_ids": (
+                                [paragraph_id] if paragraph_id is not None else []
+                            ),
+                            # [NEW] 图片也需要页码信息
+                            "page_number": page_id,
+                            "page": page_id,
+                            # [NEW] 图片的章节信息
                             "section": current_section or "图片",
-                            "page_range": [page_id, page_id],
-                            "content": f"[图片: {caption_display}]",
-                            "content_type": "image",
-                            "image_url": image_url_norm,
-                            "image_url_abs": image_url_abs,
-                            "position": normalized_pos,
-                            "parent_chunk_id": last_text_chunk_id,  # [FIX 2025-01-22] 添加图文关联
-                            "source_document": source_document,
-                            "source_category": source_category,
-                            "source_directory": source_directory,
-                            "metadata": {
-                                "paragraph_ids": (
-                                    [paragraph_id] if paragraph_id is not None else []
-                                ),
-                                # [NEW] 图片也需要页码信息
-                                "page_number": page_id,
-                                "page": page_id,
-                                # [NEW] 图片的章节信息
-                                "section": current_section or "图片",
-                                # [NEW] 图片说明文字
-                                "caption": caption_for_meta if caption_for_meta else None,
-                                # [FIX 2025-01-22] 冗余字段，便于查询
-                                "parent_text_chunk": last_text_chunk_id,
-                            },
-                            "doc_type": doc_metadata.get("type"),
-                            "doc_title": doc_metadata.get("title"),
-                            "doc_category": doc_metadata.get("category"),
-                            "doc_source_category": source_category,
-                            "outline_level": -1,
-                        }
-                    )
+                            # [NEW] 图片说明文字
+                            "caption": caption_for_meta if caption_for_meta else None,
+                            # [FIX 2025-01-22] 冗余字段，便于查询
+                            "parent_text_chunk": last_text_chunk_id,
+                        },
+                        "doc_type": doc_metadata.get("type"),
+                        "doc_title": doc_metadata.get("title"),
+                        "doc_category": doc_metadata.get("category"),
+                        "doc_source_category": source_category,
+                        "outline_level": -1,
+                    }
+                    # [FIX 2025-12-27] 添加 positions 数组（与 text chunk 保持一致）
+                    if normalized_pos and len(normalized_pos) >= 5:
+                        img_chunk["positions"] = [{
+                            "page": page_id,
+                            "bbox": normalized_pos[1:5]  # [x0, y0, x1, y1] ratios
+                        }]
+                    chunks.append(img_chunk)
                 continue
 
         # 收尾
@@ -661,35 +686,139 @@ class ChunkStrategy:
         return merged
 
     # ---------- 辅助方法 ----------
-    def _normalize_position(self, position: List, page_id: int) -> List:
+    def _get_page_size(self, page_id: int, pdf_path: Optional[str] = None) -> tuple:
+        """获取 PDF 页面的真实尺寸（宽度, 高度）
+
+        Args:
+            page_id: 页码（从1开始）
+            pdf_path: PDF 文件路径
+
+        Returns:
+            (width, height) 或 (595.0, 842.0) 默认 A4 尺寸
+        """
+        # 先从缓存获取
+        if page_id in self._page_sizes_cache:
+            return self._page_sizes_cache[page_id]
+
+        # 默认 A4 尺寸
+        default_size = (595.0, 842.0)
+
+        if not pdf_path:
+            return default_size
+
+        try:
+            # 尝试使用 PyMuPDF (fitz)
+            try:
+                import fitz
+                doc = fitz.open(pdf_path)
+                if 0 <= page_id - 1 < len(doc):
+                    page = doc[page_id - 1]
+                    rect = page.rect
+                    size = (float(rect.width), float(rect.height))
+                    self._page_sizes_cache[page_id] = size
+                    doc.close()
+                    return size
+                doc.close()
+            except ImportError:
+                pass
+            except Exception:
+                pass
+
+            # 尝试使用 pypdf
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(pdf_path)
+                if 0 <= page_id - 1 < len(reader.pages):
+                    page = reader.pages[page_id - 1]
+                    box = page.mediabox
+                    size = (float(box.width), float(box.height))
+                    self._page_sizes_cache[page_id] = size
+                    return size
+            except ImportError:
+                pass
+            except Exception:
+                pass
+
+            # 尝试使用 PyPDF2
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(pdf_path)
+                if 0 <= page_id - 1 < len(reader.pages):
+                    page = reader.pages[page_id - 1]
+                    box = page.mediabox
+                    size = (float(box.width), float(box.height))
+                    self._page_sizes_cache[page_id] = size
+                    return size
+            except ImportError:
+                pass
+            except Exception:
+                pass
+
+        except Exception:
+            pass
+
+        return default_size
+
+    def _normalize_position(self, position: List, page_id: int, pdf_path: Optional[str] = None) -> List:
         """归一化 bbox 坐标为 [0, 1] 比例坐标
 
         输入: [x0, y0, x1, y1] (OCR 像素坐标)
         输出: [page, x0_ratio, y0_ratio, x1_ratio, y1_ratio]
+
+        [FIX 2025-12-27] 基于真实 PDF 页面尺寸归一化，添加越界保护和诊断日志
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         if not self.normalize_positions or not position or len(position) < 4:
             return position or []
 
-        # 注意：这里需要页面尺寸信息才能归一化
-        # 由于 OCR 结果中可能没有明确的页面尺寸，这里做简化处理：
-        # 假设 A4 纸（210mm x 297mm）在 72dpi 下的像素尺寸
-        # 实际应从 PDF metadata 获取真实页面尺寸
-
-        # TODO: 从 textin_result 或 PDF 获取真实页面尺寸
-        # 这里使用常见值：A4 @ 72dpi ≈ 595 x 842 points
-        page_width = 595.0
-        page_height = 842.0
+        # 获取真实页面尺寸
+        page_width, page_height = self._get_page_size(page_id, pdf_path)
 
         try:
             x0, y0, x1, y1 = float(position[0]), float(position[1]), float(position[2]), float(position[3])
+
+            # 归一化
+            x0_ratio = x0 / page_width
+            y0_ratio = y0 / page_height
+            x1_ratio = x1 / page_width
+            y1_ratio = y1 / page_height
+
+            # 检查越界并记录日志
+            out_of_bounds = False
+            if not (0 <= x0_ratio <= 1 and 0 <= y0_ratio <= 1 and 0 <= x1_ratio <= 1 and 0 <= y1_ratio <= 1):
+                out_of_bounds = True
+                logger.warning(
+                    "[bbox_out_of_bounds] page=%d raw=[%.1f,%.1f,%.1f,%.1f] page_size=(%.1f,%.1f) "
+                    "normalized=[%.4f,%.4f,%.4f,%.4f]",
+                    page_id, x0, y0, x1, y1, page_width, page_height,
+                    x0_ratio, y0_ratio, x1_ratio, y1_ratio
+                )
+
+            # Clamp 到 [0, 1] 范围
+            x0_ratio = max(0.0, min(1.0, x0_ratio))
+            y0_ratio = max(0.0, min(1.0, y0_ratio))
+            x1_ratio = max(0.0, min(1.0, x1_ratio))
+            y1_ratio = max(0.0, min(1.0, y1_ratio))
+
+            # 确保 x0 < x1, y0 < y1
+            if x0_ratio >= x1_ratio:
+                logger.warning("[bbox_invalid_x] page=%d x0=%.4f >= x1=%.4f, swapping", page_id, x0_ratio, x1_ratio)
+                x0_ratio, x1_ratio = min(x0_ratio, x1_ratio), max(x0_ratio, x1_ratio)
+            if y0_ratio >= y1_ratio:
+                logger.warning("[bbox_invalid_y] page=%d y0=%.4f >= y1=%.4f, swapping", page_id, y0_ratio, y1_ratio)
+                y0_ratio, y1_ratio = min(y0_ratio, y1_ratio), max(y0_ratio, y1_ratio)
+
             return [
                 page_id,
-                round(x0 / page_width, 4),
-                round(y0 / page_height, 4),
-                round(x1 / page_width, 4),
-                round(y1 / page_height, 4)
+                round(x0_ratio, 4),
+                round(y0_ratio, 4),
+                round(x1_ratio, 4),
+                round(y1_ratio, 4)
             ]
-        except Exception:
+        except Exception as e:
+            logger.warning("[bbox_normalize_failed] page=%d position=%s error=%s", page_id, position, e)
             return position or []
 
     def _extract_year(self, text: str) -> Optional[int]:

@@ -31,7 +31,7 @@ class AgentRequest(BaseModel):
     """标准化的 Agent 请求"""
     query: str = ""
     filters: Dict[str, Any] = Field(default_factory=dict)
-    top_k: int = Field(default=8, ge=1, le=100)
+    top_k: int = Field(default=20, ge=1, le=100)  # [FIX 2026-01-14] 从8增加到20
     lang: str = Field(default="zh")
     timeout_ms: int = Field(default=1500, ge=100, le=120000)
     trace_id: Optional[str] = None
@@ -90,7 +90,7 @@ def add_items_with_dedup(existing: List[AgentItem] | None, new: List[AgentItem] 
     """
     合并并去重 items（基于 entity_id）
 
-    用于 Supervisor 收集所有 Worker 的结果
+    用于 MediArch Graph 收集所有 Worker 的结果
     """
     existing = existing or []
     new = new or []
@@ -231,18 +231,18 @@ class BaseWorkerState(TypedDict, total=False):
     """
     Worker Agent 的标准状态基类
 
-    所有 Worker 都应继承此状态，确保与 Supervisor 兼容
+    所有 Worker 都应继承此状态，确保与 MediArch Graph 兼容
 
     示例：
     class MilvusState(BaseWorkerState):
         search_terms: List[str]  # Worker 特定字段
         retrieval_results: List[Dict[str, Any]]
     """
-    # 输入字段（从 Supervisor 传递）
+    # 输入字段（从 MediArch Graph 传递）
     request: RequestAnnotated
     query: str
 
-    # 输出字段（返回给 Supervisor）
+    # 输出字段（返回给 MediArch Graph）
     items: ItemsAnnotated
     diagnostics: DiagnosticsAnnotated
 

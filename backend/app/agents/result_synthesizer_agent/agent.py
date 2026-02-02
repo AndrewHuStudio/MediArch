@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from urllib.parse import quote
 from collections import defaultdict, deque
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from typing_extensions import TypedDict
 
 from langchain.chat_models import init_chat_model
@@ -41,14 +41,13 @@ def _init_synthesizer_llm():
     """
         初始化 Synthesizer LLM
     """
-    api_key = os.getenv("RESULT_SYNTHESIZER_AGENT_API_KEY") or os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("RESULT_SYNTHESIZER_AGENT_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1"
-    base_url = base_url.rstrip("/") if base_url else None
-    model_provider = os.getenv("RESULT_SYNTHESIZER_AGENT_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
-    model = os.getenv("RESULT_SYNTHESIZER_AGENT_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
-
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少 API KEY，请设置 RESULT_SYNTHESIZER_AGENT_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（result_synthesizer_agent）")
+
+    base_url = (os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     return init_chat_model(
@@ -64,16 +63,14 @@ def _init_synthesizer_llm():
 
 def _init_evaluator_llm():
     """初始化评估 LLM（可以使用不同的模型）"""
-    api_key = os.getenv("EVALUATOR_API_KEY") or os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("EVALUATOR_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1"
-    base_url = base_url.rstrip("/") if base_url else None
-    model_provider = os.getenv("EVALUATOR_MODEL_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
-    model = os.getenv("EVALUATOR_MODEL", "gpt-4o-mini")
-
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少评估器 API KEY，请设置 EVALUATOR_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（result_synthesizer_evaluator）")
 
-    # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
+    base_url = (os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    model = os.getenv("EVALUATOR_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+
     return init_chat_model(
         model=model,
         model_provider=model_provider,
@@ -84,13 +81,6 @@ def _init_evaluator_llm():
         timeout=30,       # 添加30秒超时，避免长时间等待
     )
 
-
-# ============================================================================
-# 辅助函数
-# ============================================================================
-
-# [FIX 2025-12-09] 增加超时时间，从 45 秒增加到 180 秒（3 分钟）
-# 原因：复杂查询需要更多时间进行综合分析，避免频繁超时导致输出质量下降
 SYNTHESIZER_TIMEOUT = int(os.getenv("RESULT_SYNTHESIZER_TIMEOUT", "180"))
 
 
@@ -479,67 +469,99 @@ def _build_rule_based_answer(
     notes: List[str],
     documents_view: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """基于规则的兜底答案生成（优化版 2025-01-17）"""
-    lines = [f"## 查询：{query}\n"]
+    """基于规则的兜底答案生成（优化版 2026-01-12）
 
+    关键改进：
+    - 移除内部调试信息（agent来源、分数）
+    - 统一引用格式为 [n]
+    - 将推荐问题移到最后
+    - 添加清晰的结构分隔
+    """
+    lines = []
+
+    # 1. 核心答案部分
     if aggregated_items:
-        lines.append("### [综] 综合结果\n")
-        for idx, item in enumerate(aggregated_items[:10], 1):
+        lines.append(f"## {query}\n")
+        lines.append("### 核心要点\n")
+
+        # 提取前5个最重要的结果作为要点
+        for idx, item in enumerate(aggregated_items[:5], 1):
             title = item.name or item.label or item.entity_id or "未命名"
-            source = item.source or "unknown"
-            score = f"{item.score:.2f}" if item.score else "N/A"
+            snippet = (item.snippet or "")[:150].strip()
 
-            lines.append(f"{idx}. **{title}** (来源: {source}, 分数: {score})")
-
-            if item.snippet:
-                lines.append(f"   > {item.snippet[:200]}")
-
-            if item.citations:
-                cite_texts = []
-                for cite in item.citations[:3]:
-                    if isinstance(cite, dict):
-                        source_name = cite.get("source", "引用")
-                        cite_texts.append(source_name)
-                if cite_texts:
-                    lines.append(f"   引用: {', '.join(cite_texts)}")
+            if snippet:
+                lines.append(f"{idx}. **{title}**：{snippet}")
+            else:
+                lines.append(f"{idx}. **{title}**")
 
             lines.append("")
     else:
-        lines.append("[提示] 未找到相关结果，建议调整查询或加载更多数据。")
+        lines.append(f"## {query}\n")
+        lines.append("### 查询结果\n")
+        lines.append("未找到相关结果。建议：")
+        lines.append("- 调整查询关键词")
+        lines.append("- 检查资料库是否已加载相关文档")
+        lines.append("- 尝试使用在线深度搜索\n")
 
+    # 2. 参考资料部分
     if documents_view:
-        lines.append("\n### [档] 资料链路")
-        for doc in documents_view[:4]:
-            page_hint = ""
+        lines.append("\n## 参考资料\n")
+
+        # 去重：同一资料只列出一次
+        seen_docs = set()
+        citation_idx = 1
+
+        for doc in documents_view[:6]:
+            doc_name = doc.get('doc_name', '未标注资料')
+
+            # 跳过重复资料
+            if doc_name in seen_docs:
+                continue
+            seen_docs.add(doc_name)
+
+            # 构建位置信息
+            location_parts = []
             if doc.get("pages"):
-                page_hint = f"（页码: {', '.join(doc['pages'][:3])}）"
-
-            lines.append(f"#### {doc.get('doc_name', '未标注资料')}{page_hint}")
-
-            highlight = (doc.get("highlights") or [{}])[0]
-            snippet = highlight.get("snippet") or ""
-            if snippet:
-                lines.append(snippet)
+                pages = doc['pages'][:3]
+                if len(pages) == 1:
+                    location_parts.append(f"第{pages[0]}页")
+                else:
+                    location_parts.append(f"第{pages[0]}-{pages[-1]}页")
 
             if doc.get("locations"):
-                lines.append(f"- 位置: {', '.join(doc['locations'][:3])}")
-            if doc.get("agents"):
-                lines.append(f"- 数据来源: {', '.join(doc['agents'])}")
+                location_parts.append(doc['locations'][0])
 
-            image = (doc.get("images") or [{}])[0]
-            image_url = image.get("image_url")
-            if image_url:
-                caption = image.get("caption") or doc.get("doc_name", "配图")
-                lines.append(f"![{caption}]({image_url})")
+            location_str = " | ".join(location_parts) if location_parts else ""
+
+            # 输出引用
+            if location_str:
+                lines.append(f"[{citation_idx}] {doc_name} | {location_str}")
+            else:
+                lines.append(f"[{citation_idx}] {doc_name}")
+
+            # 添加摘要（如果有）
+            highlight = (doc.get("highlights") or [{}])[0]
+            snippet = (highlight.get("snippet") or "").strip()
+            if snippet:
+                # 清理snippet，移除多余空格和换行
+                snippet = " ".join(snippet.split())[:200]
+                lines.append(f"   {snippet}")
 
             lines.append("")
+            citation_idx += 1
 
+    # 3. 诊断信息（仅在有重要提示时显示）
     if notes:
-        lines.append("\n### [诊] 诊断信息")
-        for note in notes:
-            lines.append(f"- {note}")
+        important_notes = [n for n in notes if not any(
+            skip in n for skip in ["聚合了", "个智能体", "agent", "分数"]
+        )]
+        if important_notes:
+            lines.append("\n## 提示信息\n")
+            for note in important_notes:
+                lines.append(f"- {note}")
+            lines.append("")
 
-    # 默认推荐问题（优化版）
+    # 4. 推荐问题（移到最后）
     recommended_questions: List[str] = []
     if aggregated_items:
         topics: List[str] = []
@@ -547,19 +569,19 @@ def _build_rule_based_answer(
             topic = item.name or item.label
             if topic and topic not in topics:
                 topics.append(topic)
+
         for topic in topics[:2]:
             recommended_questions.append(f"关于「{topic}」的详细规范和标准是什么？")
             recommended_questions.append(f"「{topic}」在实际项目中的应用案例？")
 
     recommended_questions.append(f"[深度搜索] 是否需要对「{query}」进行在线深度搜索？")
-    recommended_questions.append(f"「{query}」的常见设计挑战和解决方案？")
 
     # 去重并限制到5个
     recommended_questions = list(dict.fromkeys(recommended_questions))[:5]
 
     if recommended_questions:
         lines.append("\n---\n")
-        lines.append("### [问] 进一步探索\n")
+        lines.append("## 延伸探索\n")
         for idx, question in enumerate(recommended_questions, 1):
             lines.append(f"{idx}. {question}")
 
@@ -664,22 +686,18 @@ async def node_aggregate(state: SynthesizerState) -> Dict[str, Any]:
     for worker_resp in worker_responses:
         agent_name = worker_resp.get("agent_name", "unknown")
         items = worker_resp.get("items", [])
-        
+
         for item in items:
             # 标记来源
             if not item.source:
                 item.source = agent_name
             all_items.append(item)
-    
-    # 去重（基于 entity_id）
-    seen = set()
-    unique_items = []
-    for item in all_items:
-        key = item.entity_id or id(item)
-        if key not in seen:
-            seen.add(key)
-            unique_items.append(item)
-    
+
+    # [FIX P0-Step1] 使用 MediArch Graph 的 add_items_with_dedup 替代简单去重
+    # 这样可以保留 MongoDB 的 rich citations (positions, pdf_url, file_path)
+    from backend.app.agents.base_agent import add_items_with_dedup
+    unique_items = add_items_with_dedup([], all_items)
+
     # 按分数排序
     unique_items.sort(key=lambda x: x.score or 0.0, reverse=True)
     
@@ -693,10 +711,17 @@ async def node_aggregate(state: SynthesizerState) -> Dict[str, Any]:
         worker_stats[agent_name] = item_count
     
     logger.info(f"[Synthesizer→Aggregate] Worker 统计: {worker_stats}")
-    
+
+    # ✅ [FIX 2026-01-12] 移除内部实现细节，改为用户友好的提示
+    notes = []
+    if len(unique_items) == 0:
+        notes.append("未找到相关结果，建议调整查询条件")
+    elif len(unique_items) < 3:
+        notes.append("检索结果较少，建议扩大查询范围或使用在线搜索")
+
     return {
         "aggregated_items": unique_items,
-        "notes": [f"聚合了 {len(worker_responses)} 个智能体的响应"],
+        "notes": notes,
     }
 
 
@@ -715,6 +740,78 @@ def _normalize_str_list(value: Any) -> List[str]:
         return out
     cleaned = str(value).strip()
     return [cleaned] if cleaned else []
+
+
+_IMAGE_QUERY_TRIGGERS = (
+    "平面图",
+    "剖面图",
+    "立面图",
+    "总平面",
+    "图纸",
+    "图示",
+    "示意图",
+    "流程图",
+    "结构图",
+    "配图",
+    "附图",
+    "带图",
+    "带图片",
+    "给图",
+    "看图",
+    "图片",
+    "image",
+    "figure",
+    "diagram",
+    "plan",
+    "section",
+)
+
+_IMAGE_QUERY_NEGATIONS = (
+    "不要图",
+    "不需要图",
+    "不看图",
+    "不要图片",
+    "不需要图片",
+)
+
+
+def _wants_images(query: str) -> bool:
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
+        return False
+    return True
+
+
+def _is_image_item(item: AgentItem) -> bool:
+    attrs = item.attrs or {}
+    content_type = str(attrs.get("content_type") or "").lower()
+    if content_type == "image" or attrs.get("image_url"):
+        return True
+
+    snippet = (item.snippet or "").strip()
+    if snippet.startswith("[图片"):
+        return True
+
+    citations = item.citations or []
+    if citations:
+        image_hits = sum(
+            1
+            for c in citations
+            if c.get("image_url") or str(c.get("content_type") or "").lower() == "image"
+        )
+        if image_hits == len(citations):
+            return True
+
+    return False
+
+
+def _filter_text_items(items: List[AgentItem], query: str) -> List[AgentItem]:
+    if not items:
+        return []
+    filtered = [item for item in items if not _is_image_item(item)]
+    return filtered or items
 
 
 def _is_strict_cross_doc_request(query: str, request: Optional[AgentRequest]) -> bool:
@@ -911,6 +1008,466 @@ def _validate_strict_cross_doc_answer(answer: str, citations_count: int) -> List
     return violations
 
 
+def _normalize_inline_citation_groups(text: str) -> str:
+    """
+    将 `[1,2]` / `[1，2]` / `[1、2]` 等合并写法，规范化为前端可解析的 `[1][2]` 形式。
+    """
+    if not text:
+        return text
+
+    def _repl(match: re.Match) -> str:
+        raw = match.group(1)
+        nums = re.findall(r"\d+", raw or "")
+        return "".join(f"[{n}]" for n in nums)
+
+    return re.sub(r"\[(\d+(?:\s*[,，、]\s*\d+)+)\]", _repl, text)
+
+
+def _expand_citation_ranges(text: str) -> str:
+    """将范围引用展开为逐条引用，避免出现 [1-4] 形式。"""
+    if not text:
+        return text
+
+    def _repl(match: re.Match) -> str:
+        start = int(match.group(1))
+        end = int(match.group(2))
+        if start == end:
+            return f"[{start}]"
+        if start > end:
+            start, end = end, start
+        if end - start > 30:
+            return f"[{start}][{end}]"
+        return "".join(f"[{n}]" for n in range(start, end + 1))
+
+    return re.sub(r"\[(\d+)\s*[-–—~～]\s*(\d+)\]", _repl, text)
+
+
+_DECORATIVE_SYMBOLS_RE = re.compile(r"[\u2600-\u27BF\uFE0F\U0001F000-\U0001FAFF]")
+_LEADING_BULLET_RE = re.compile(r"(?m)^\s*[•·●◦▪■]\s+")
+_HEADING_LINE_RE = re.compile(r"^\s*#{1,6}\s+")
+
+
+def _strip_decorative_symbols(text: str) -> str:
+    """移除装饰性符号与 emoji（保留正文标点与单位）。"""
+    if not text:
+        return text
+    text = _DECORATIVE_SYMBOLS_RE.sub("", text)
+    text = _LEADING_BULLET_RE.sub("- ", text)
+    return text
+
+
+def _split_heading_lines(text: str) -> str:
+    """确保标题独立成行，避免标题与正文混在同一行。"""
+    if not text:
+        return text
+
+    lines = text.split("\n")
+    out: List[str] = []
+
+    for line in lines:
+        match = re.match(r"^\s*(#{1,6})\s+(.+)$", line)
+        if not match:
+            out.append(line)
+            continue
+
+        marker = match.group(1)
+        content = match.group(2).strip()
+        split_match = re.split(r"[:：]", content, maxsplit=1)
+        if len(split_match) == 2:
+            heading = split_match[0].strip()
+            body = split_match[1].strip()
+            out.append(f"{marker} {heading}")
+            if body:
+                out.append("")
+                out.append(body)
+            continue
+
+        out.append(line)
+
+    return "\n".join(out)
+
+
+def _attach_citations_to_sentence(text: str, citations: str) -> str:
+    if not citations:
+        return text
+    if not text.strip():
+        return citations
+    match = re.search(r"[。！？.!?；;]", text)
+    if match:
+        idx = match.end()
+        return f"{text[:idx]}{citations}{text[idx:]}"
+    return f"{text.rstrip()}{citations}"
+
+
+def _relocate_heading_citations(text: str) -> str:
+    """移除标题中的引用，并附加到下一条正文句末。"""
+    if not text:
+        return text
+
+    lines = text.split("\n")
+    out: List[str] = []
+    pending = ""
+
+    for line in lines:
+        stripped = line.strip()
+        if _HEADING_LINE_RE.match(stripped):
+            nums = re.findall(r"\[(\d+)\]", line)
+            if nums:
+                pending += "".join(f"[{n}]" for n in nums)
+                line = re.sub(r"\[(\d+)\]", "", line).rstrip()
+            out.append(line)
+            continue
+
+        if pending and stripped and not _HEADING_LINE_RE.match(stripped):
+            line = _attach_citations_to_sentence(line, pending)
+            pending = ""
+
+        out.append(line)
+
+    if pending:
+        out.append(pending)
+
+    return "\n".join(out)
+
+
+def _relocate_leading_citations(text: str) -> str:
+    """把段首/分点开头的引用移到该句末尾。"""
+    if not text:
+        return text
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return text
+
+    for part in parts:
+        if part["type"] != "text":
+            continue
+
+        lines = part["value"].split("\n")
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or _HEADING_LINE_RE.match(stripped):
+                continue
+
+            list_match = re.match(r"^(\s*(?:[-*+]|(\d+)[.、])\s+)(\[\d+\]\s*)+(.*)$", line)
+            if list_match:
+                prefix = list_match.group(1)
+                rest = list_match.group(4)
+                nums = re.findall(r"\[(\d+)\]", line)
+                citations = "".join(f"[{n}]" for n in nums)
+                if citations:
+                    lines[i] = f"{prefix}{_attach_citations_to_sentence(rest, citations)}"
+                continue
+
+            lead_match = re.match(r"^(\s*)(\[\d+\]\s*)+(.*)$", line)
+            if lead_match:
+                nums = re.findall(r"\[(\d+)\]", line)
+                citations = "".join(f"[{n}]" for n in nums)
+                remainder = lead_match.group(3)
+                lines[i] = f"{lead_match.group(1)}{_attach_citations_to_sentence(remainder, citations)}"
+
+        part["value"] = "\n".join(lines)
+
+    return "".join(p["value"] for p in parts)
+
+
+def _strip_citations_in_tables(text: str) -> str:
+    """移除表格单元格内的引用，并将引用移到表格后的注释行。"""
+    if not text:
+        return text
+
+    def _is_table_row(line: str) -> bool:
+        stripped = line.strip()
+        if not stripped:
+            return False
+        if "|" not in stripped:
+            return False
+        return stripped.startswith("|") or stripped.endswith("|") or stripped.count("|") >= 2
+
+    def _is_separator(line: str) -> bool:
+        stripped = line.strip()
+        return bool(re.match(r"^\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?$", stripped))
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return text
+
+    for part in parts:
+        if part["type"] != "text":
+            continue
+
+        lines = part["value"].split("\n")
+        out: List[str] = []
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            if _is_table_row(line) and i + 1 < len(lines) and _is_separator(lines[i + 1]):
+                table_lines = [line, lines[i + 1]]
+                removed: List[int] = []
+                i += 2
+                while i < len(lines) and _is_table_row(lines[i]):
+                    row = lines[i]
+                    removed.extend(int(n) for n in re.findall(r"\[(\d+)\]", row))
+                    cleaned = re.sub(r"\[(\d+)\]", "", row)
+                    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+                    table_lines.append(cleaned)
+                    i += 1
+                out.extend(table_lines)
+                if removed:
+                    seen: set[int] = set()
+                    ordered = [n for n in removed if not (n in seen or seen.add(n))]
+                    note = f"注：表格数据来源见相关说明。{''.join(f'[{n}]' for n in ordered)}"
+                    out.append("")
+                    out.append(note)
+                    out.append("")
+                continue
+            out.append(line)
+            i += 1
+
+        part["value"] = "\n".join(out)
+
+    return "".join(p["value"] for p in parts)
+
+
+def _split_fenced_code_blocks(text: str) -> List[Dict[str, str]]:
+    """将文本切分为 code/non-code 段，避免对 ``` code ``` 内做引用重排。"""
+    parts: List[Dict[str, str]] = []
+    if not text:
+        return parts
+
+    last = 0
+    for m in re.finditer(r"```[\s\S]*?```", text):
+        if m.start() > last:
+            parts.append({"type": "text", "value": text[last:m.start()]})
+        parts.append({"type": "code", "value": m.group(0)})
+        last = m.end()
+
+    if last < len(text):
+        parts.append({"type": "text", "value": text[last:]})
+
+    return parts
+
+
+def _ensure_all_citations_mentioned(text: str, citations_count: int) -> str:
+    """
+    如果 citations_count > 0，确保正文至少出现一次 `[1]..[N]`：
+    - 仅在缺失时补齐
+    - 补齐位置：第一段末尾（更符合“总结段落一次性标注”）
+    - 跳过 fenced code blocks
+    """
+    if not text or citations_count <= 0:
+        return text
+
+    used: set[int] = set()
+    for m in re.finditer(r"\[(\d+)\]", text):
+        n = int(m.group(1))
+        if 1 <= n <= citations_count:
+            used.add(n)
+
+    missing = [n for n in range(1, citations_count + 1) if n not in used]
+    if not missing:
+        return text
+
+    inject = "".join(f"[{n}]" for n in missing)
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return f"{text.rstrip()}{inject}"
+
+    for part in parts:
+        if part["type"] != "text":
+            continue
+
+        seg = part["value"]
+        m = re.search(r"\n{2,}", seg)
+        if m:
+            head = seg[: m.start()].rstrip()
+            tail = seg[m.start() :]
+            part["value"] = f"{head}{inject}{tail}"
+        else:
+            part["value"] = f"{seg.rstrip()}{inject}"
+        break
+
+    return "".join(p["value"] for p in parts)
+
+
+def _compact_citations_in_block(block: str) -> str:
+    """
+    段落/列表块级引用压缩：
+    - 收集块内所有 `[n]`
+    - 移除块内散落的 `[n]`
+    - 在块末尾追加去重后的 `[n]`（保持出现顺序）
+    """
+    if not block:
+        return block
+
+    # 兼容：引用被单独换行时，先合并到上一行，避免产生空行破坏列表结构
+    block = re.sub(r"\n+\s*(\[\d+\])", r"\1", block)
+
+    citation_nums: List[int] = []
+    seen: set[int] = set()
+    for m in re.finditer(r"\[(\d+)\]", block):
+        n = int(m.group(1))
+        if n not in seen:
+            seen.add(n)
+            citation_nums.append(n)
+
+    if not citation_nums:
+        return block
+
+    # 移除块内所有引用标记（保留换行，避免破坏列表）
+    cleaned = re.sub(r"\[(\d+)\]", "", block)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = cleaned.rstrip()
+
+    tail = "".join(f"[{n}]" for n in citation_nums)
+    if not cleaned:
+        return tail
+
+    return f"{cleaned}{tail}"
+
+
+def _compact_citations_paragraph_level(text: str) -> str:
+    """
+    将引用从“每句话/每分点后面”压缩为“每段/每个列表块末尾一次”。
+    - 以空行（\\n\\n+）划分块，保持与前端段落解析一致
+    - 跳过 fenced code blocks
+    """
+    if not text:
+        return text
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return text
+
+    for part in parts:
+        if part["type"] != "text":
+            continue
+
+        seg = part["value"]
+        out: List[str] = []
+        last = 0
+        for m in re.finditer(r"\n{2,}", seg):
+            block = seg[last:m.start()]
+            sep = m.group(0)
+            out.append(_compact_citations_in_block(block))
+            out.append(sep)
+            last = m.end()
+        out.append(_compact_citations_in_block(seg[last:]))
+        part["value"] = "".join(out)
+
+    return "".join(p["value"] for p in parts)
+
+
+def _tighten_citation_spacing(text: str) -> str:
+    """清理引用之间的多余空白（例如把 `[1] [2]` 变成 `[1][2]`）。"""
+    if not text:
+        return text
+    text = re.sub(r"\]\s*\n\s*\[", "][", text)
+    text = re.sub(r"\]\s+\[", "][", text)
+    return text
+
+
+def _sort_adjacent_citation_groups(text: str) -> str:
+    """
+    将连续引用组（例如 `[3][1][2]` 或 `[3] [1] [2]`）排序为升序并去重。
+    仅处理相邻引用，避免影响正文结构。
+    """
+    if not text:
+        return text
+
+    def _repl(match: re.Match) -> str:
+        nums = [int(n) for n in re.findall(r"\[(\d+)\]", match.group(0))]
+        ordered = sorted(dict.fromkeys(nums))  # preserve uniqueness while sorting
+        return "".join(f"[{n}]" for n in ordered)
+
+    # 允许组内有空白，但不跨越非空白字符
+    return re.sub(r"(?:\[\d+\]\s*){2,}", _repl, text)
+
+
+def _convert_consecutive_citations_to_range(text: str) -> str:
+    """
+    [NEW 2026-01-17] 将连续的引用标记转换为范围格式
+    - [1][2][3][4][5] → [1-5]
+    - [1][2][3] → [1-3]
+    - [1][3][5] → [1][3][5]（不连续，保持原样）
+
+    关键逻辑：
+    1. 检测连续的 [n] 标记（允许中间有空格）
+    2. 判断数字是否连续（差值为1）
+    3. 如果连续且数量≥3，转换为范围格式
+    4. 如果不连续或数量<3，保持原样
+    """
+    if not text:
+        return text
+
+    def _repl(match: re.Match) -> str:
+        # 提取所有数字
+        nums = [int(n) for n in re.findall(r"\[(\d+)\]", match.group(0))]
+        if not nums:
+            return match.group(0)
+
+        # 去重并排序
+        nums = sorted(set(nums))
+
+        # 如果只有1-2个引用，保持原样
+        if len(nums) <= 2:
+            return "".join(f"[{n}]" for n in nums)
+
+        # 检查是否连续
+        is_consecutive = all(nums[i+1] - nums[i] == 1 for i in range(len(nums) - 1))
+
+        if is_consecutive:
+            # 连续引用：转换为范围格式
+            return f"[{nums[0]}-{nums[-1]}]"
+        else:
+            # 不连续引用：保持原样
+            return "".join(f"[{n}]" for n in nums)
+
+    # 匹配连续的 [n] 标记（允许中间有空格）
+    return re.sub(r"(?:\[\d+\]\s*){2,}", _repl, text)
+
+
+
+def _remap_citations_by_first_appearance(
+    answer: str,
+    citations: List[Dict[str, Any]],
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """
+    让“正文引用编号”与“侧边PDF/参考资料列表”的顺序更符合阅读直觉：
+    - 以正文中引用首次出现顺序重新编号（第一处出现 -> [1]）
+    - 同步重排 citations 列表，使 `[n]` 始终指向正确资料
+    """
+    if not answer or not citations:
+        return answer, citations
+
+    max_idx = len(citations)
+    order: List[int] = []
+    seen: set[int] = set()
+
+    for m in re.finditer(r"\[(\d+)\]", answer):
+        n = int(m.group(1))
+        if 1 <= n <= max_idx and n not in seen:
+            seen.add(n)
+            order.append(n)
+
+    if not order:
+        return answer, citations
+
+    remap = {old: new for new, old in enumerate(order, start=1)}
+
+    def _repl(m: re.Match) -> str:
+        old = int(m.group(1))
+        new = remap.get(old)
+        # out-of-range / unmapped citations should not exist after前置过滤；兜底直接移除
+        return f"[{new}]" if new is not None else ""
+
+    new_answer = re.sub(r"\[(\d+)\]", _repl, answer)
+    new_citations = [citations[i - 1] for i in order if 1 <= i <= max_idx]
+
+    return new_answer, new_citations
+
+
 async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     """
     合成最终答案（优先使用 LLM，失败时回退到规则）
@@ -932,9 +1489,18 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     notes = state.get("notes", [])
     retry_count = state.get("retry_count", 0)
     feedback_message = state.get("feedback_message", "")
-    document_views = _build_document_views(aggregated_items)
+    wants_images = _wants_images(query)
+    text_items = _filter_text_items(aggregated_items, query)
+    image_items_count = sum(1 for item in aggregated_items if _is_image_item(item))
+    document_views = _build_document_views(text_items)
 
-    logger.info(f"[Synthesizer→Synthesize] 合成答案，共 {len(aggregated_items)} 条结果 (retry={retry_count})")
+    logger.info(
+        "[Synthesizer→Synthesize] 合成答案，共 %d 条结果（文本=%d，图片=%d，retry=%d）",
+        len(aggregated_items),
+        len(text_items),
+        image_items_count,
+        retry_count,
+    )
 
     # 如果有反馈，记录
     if feedback_message:
@@ -943,7 +1509,9 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     # 无数据时返回兜底答案
     if not aggregated_items:
         logger.info("[Synthesizer→Synthesize] 无数据可用，返回默认提示")
-        fallback = _build_rule_based_answer(query, aggregated_items, notes, document_views)
+        fallback = _build_rule_based_answer(query, text_items, notes, document_views)
+        if not wants_images:
+            fallback["image_references"] = []
         return fallback
 
     # ============================================================================
@@ -979,10 +1547,26 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                     if location and location != "位置未知":
                         # 提取文本chunk引用
                         if citation.get("content_type") != "image":
+                            # [FIX P0-Step2] 补全 MongoDB citations 的所有关键字段
+                            # 确保 positions, pdf_url, file_path 等精确引用信息不丢失
                             mongodb_citations.append({
                                 "source": citation.get("source", ""),
                                 "location": location,
                                 "snippet": citation.get("snippet", "")[:100],
+                                # 新增：精确定位字段
+                                "positions": citation.get("positions", []),
+                                "pdf_url": citation.get("pdf_url"),
+                                "file_path": citation.get("file_path"),
+                                "document_path": citation.get("document_path"),
+                                "page_number": citation.get("page_number"),
+                                "page_range": citation.get("page_range"),
+                                "chapter": citation.get("chapter"),
+                                "chapter_title": citation.get("chapter_title"),
+                                "sub_section": citation.get("sub_section"),
+                                "content_type": citation.get("content_type", "text"),
+                                "chunk_id": citation.get("chunk_id"),
+                                "doc_id": citation.get("doc_id"),
+                                "highlight_text": citation.get("highlight_text", ""),
                             })
                         # ✅ [NEW] 提取图片chunk
                         else:
@@ -1039,8 +1623,21 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         if len(document_images) >= 10:
             break
 
-    if document_images:
-        image_citations = document_images
+    if wants_images:
+        if document_images:
+            merged_images: List[Dict[str, Any]] = []
+            seen_urls: set[str] = set()
+            for img in list(image_citations) + list(document_images):
+                url = str(img.get("image_url") or "").strip()
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                merged_images.append(img)
+                if len(merged_images) >= 12:
+                    break
+            image_citations = merged_images
+    else:
+        image_citations = []
 
     # 资料角色视图（用于跨资料逻辑串联）
     doc_roles = []
@@ -1073,6 +1670,140 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         answer_graph_data = request.metadata.get("answer_graph_data", {})
         unified_hints = request.metadata.get("unified_hints", {})
 
+    # ============================================================================
+    # [FIX 2026-01-14] 构建"最终 citations"（用于：LLM 严格对齐 [n] + API/前端点击一致）
+    # - 仅保留文本 citations（图片通过 [image:i] 机制单独处理）
+    # - 支持跨章节引用：同一资料的不同章节/页码视为不同引用
+    # - 提高引用限额到 50，确保支持10+份资料，每份资料多个页码
+    # ============================================================================
+    max_citations = 50
+    try:
+        if isinstance(request, AgentRequest):
+            max_citations = int((request.metadata or {}).get("max_citations") or 50)
+    except Exception:
+        max_citations = 50
+
+    from backend.app.utils.citation_builder import normalize_citations
+
+    def _cite_score(c: Dict[str, Any]) -> int:
+        """
+        [FIX 2026-01-13] 优化引用评分权重，确保跨文档关联质量
+
+        评分策略：
+        - PDF 可预览性（1000分）：优先展示有 PDF 的引用
+        - 精确定位能力（100分）：positions 字段支持黄色高亮
+        - 文本类型（10分）：文本优于图片（图片通过 [image:i] 单独处理）
+        """
+        content_type = str(c.get("content_type") or "").lower()
+        is_image = bool(c.get("image_url")) or content_type == "image"
+        is_text = not is_image
+        has_positions = bool(c.get("positions"))
+        has_pdf = bool(c.get("pdf_url")) or bool(c.get("document_path")) or bool(c.get("file_path"))
+
+        # 新权重：PDF(1000) > positions(100) > text(10)
+        return (1000 if has_pdf else 0) + (100 if has_positions else 0) + (10 if is_text else 0)
+
+    # [FIX 2026-01-14] 优化去重逻辑：更宽松的去重策略
+    # 关键改进：
+    # 1. 如果 chunk_id 为空，使用 (doc_id, page_num) 作为key（允许同一页的不同chunk）
+    # 2. 优先保留有 PDF URL 和 positions 的引用
+    # 3. 记录去重统计，便于调试
+    # 4. 目标：保留10+条有效引用
+    citation_best: Dict[tuple, Dict[str, Any]] = {}
+    citation_order: List[tuple] = []
+
+    # 统计：有多少个item有citations
+    items_with_citations = 0
+    total_citations_found = 0
+    skipped_no_source = 0
+    skipped_image = 0
+
+    for item in aggregated_items:
+        if item.citations and len(item.citations) > 0:
+            items_with_citations += 1
+            total_citations_found += len(item.citations)
+
+        for cite in (item.citations or []):
+            data = _citation_to_dict(cite)
+            if not data or not data.get("source"):
+                skipped_no_source += 1
+                continue
+            # 跳过图片（图片通过 [image:i] 机制单独处理）
+            if data.get("image_url") or str(data.get("content_type") or "").lower() == "image":
+                skipped_image += 1
+                continue
+
+            # Composite key: 优化策略
+            doc_id = str(data.get("doc_id") or data.get("source") or "").strip()
+            page_num = data.get("page_number")
+            chunk_id = str(data.get("chunk_id") or "").strip()
+
+            if not doc_id:
+                skipped_no_source += 1
+                continue
+
+            # [FIX 2026-01-14] 更宽松的去重策略：
+            # - 如果有 chunk_id，使用 (doc_id, page_num, chunk_id)
+            # - 如果没有 chunk_id，使用 (doc_id, page_num, content_type, snippet_hash)
+            #   这样同一页的不同内容可以有多个引用
+            # - 特别处理：图片和文字即使在同一页也应该分开显示
+            content_type = str(data.get("content_type") or "text").lower()
+            if chunk_id:
+                cite_key = (doc_id, page_num, chunk_id)
+            else:
+                # 使用 content_type + snippet 的前50个字符作为区分
+                snippet_hash = str(data.get("snippet", ""))[:50]
+                cite_key = (doc_id, page_num, content_type, snippet_hash)
+
+            if cite_key not in citation_best:
+                citation_order.append(cite_key)
+                citation_best[cite_key] = data
+                continue
+
+            # 如果重复，保留分数更高的
+            if _cite_score(data) > _cite_score(citation_best[cite_key]):
+                citation_best[cite_key] = data
+
+    # [FIX 2026-01-14] 调试日志：追踪citations的来源
+    logger.info(
+        f"[Synthesizer→Citations] 统计：{len(aggregated_items)} 个items，"
+        f"{items_with_citations} 个有citations，"
+        f"共 {total_citations_found} 条原始citations，"
+        f"跳过 {skipped_no_source} 条（无source），"
+        f"跳过 {skipped_image} 条（图片），"
+        f"去重后 {len(citation_best)} 条"
+    )
+
+    final_citations = normalize_citations([citation_best[k] for k in citation_order][:max_citations])
+
+    # [FIX 2026-01-14] 验证final_citations的PDF URL完整性
+    citations_with_pdf = sum(1 for c in final_citations if c.get("pdf_url") or c.get("file_path") or c.get("document_path"))
+    citations_without_pdf = len(final_citations) - citations_with_pdf
+    if citations_without_pdf > 0:
+        logger.warning(
+            f"[Synthesizer→Citations] 警告：{citations_without_pdf}/{len(final_citations)} 条引用缺少PDF URL，"
+            f"这些引用在前端无法预览PDF"
+        )
+
+    # [FIX 2026-01-14] 关键修复：确保 citations_catalog 包含足够多的引用
+    # 问题：LLM看到了 document_citations (10条) 和 attribute_citations (10条)，
+    # 但 final_citations 可能只有4条，导致LLM生成 [5][6][7][8] 等无效引用
+    #
+    # 解决方案：
+    # 1. 记录 final_citations 的实际数量
+    # 2. 在 System Prompt 中明确告知LLM只能使用 [1] 到 [N] 的引用
+    # 3. 如果 final_citations 少于10条，记录警告
+
+    citations_count = len(final_citations)
+    citations_catalog = _format_citations_catalog(final_citations, max_snippet_chars=180) if final_citations else ""
+
+    # 警告：如果引用数量不足
+    if citations_count < 10:
+        logger.warning(
+            f"[Synthesizer→Citations] 引用数量不足：只有 {citations_count} 条引用，"
+            f"但用户期望10+条。可能原因：去重过度、检索结果不足、或citations字段缺失"
+        )
+
     enhanced_context = {
         "query": query,
         "total_results": len(aggregated_items),
@@ -1080,7 +1811,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         "document_citations": mongodb_citations[:10],  # MongoDB引用（增加到10个）
         "attribute_citations": milvus_citations[:10],  # Milvus引用（增加到10个）
         "online_supplements": online_search_results,  # 在线补充（5-10条，已排序）
-        "related_images": image_citations[:10],  # ✅ [NEW] 相关图片（增加到10个）
+        "related_images": image_citations[:10] if wants_images else [],  # ✅ [NEW] 相关图片（增加到10个）
         "knowledge_graph_citations": neo4j_citations[:10],  # ✅ [NEW] Neo4j来源引用
         "documents_view": top_documents,
         "doc_roles": doc_roles,
@@ -1088,12 +1819,13 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         "documents_total": len(document_views),
         "items_summary": [],
         "key_takeaways": [],
-        # ✅ [2025-11-25] 添加 unified_hints 供 LLM 参考
         "unified_hints": unified_hints if unified_hints else None,
+        "citations_catalog": citations_catalog,
+        "citations_count": citations_count,  # [FIX] 使用实际数量
     }
 
     # 提取items的简要信息
-    top_items = aggregated_items[:6]
+    top_items = text_items[:6]
     for item in top_items:
         source_doc = item.attrs.get("source_document") or (
             (item.attrs.get("source_documents") or [None])[0]
@@ -1172,35 +1904,57 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         _attach_pdf_metadata(citation)
         citation["link_placeholder"] = True
 
+    # [FIX 2026-01-14] 关键修复：确保 final_citations 也有 PDF metadata
+    for citation in final_citations:
+        _attach_pdf_metadata(citation)
+
     # ============================================================================
-    # [OPTIMIZED 2025-12-03] 优化的 System Prompt（增强可读性）
+    # [FIX 2026-01-17] 全面优化 System Prompt：解决视觉拥挤、引用干扰、规范模糊三大问题
+    # [UPDATE 2026-01-17-v2] 调整策略：全面详细、图片嵌入段落、保持专业深度
     # ============================================================================
-    system_prompt = """你是 MediArch 综合医院建筑顾问。结合 key_takeaways、items_summary、documents_view 提供的事实，输出结构清晰、可执行且让人愿意阅读的答案。
+    system_prompt = """你是 MediArch 综合医院建筑顾问。你的任务是生成全面、详细、专业的答案。
 
-写作要求：
-1. 采用中文，语气温和但专业，避免堆砌 bullet，优先使用完整段落。
-2. 每段控制 2~4 句话，说明“发现 → 原因/证据 → 对设计的影响”。
-3. 对关键信息添加引用，按 `[n]` 对应 citations。
-4. 在结尾提供【设计建议】与【下一步行动】，让读者立即落实。
+## 核心原则（必须严格遵守）
+1. 内容全面详细、学术严谨，基于检索资料展开
+2. 结构清晰：必须提供“目录”，并使用 Markdown 分级标题与分点
+3. 标题与正文分行：标题单独成行，正文另起一行
+4. 核心数据表格化：涉及尺寸、间距、配比、流程指标等信息时必须用 Markdown 表格呈现
+5. 图文并茂：若 `related_images` 充足（>=5），至少嵌入 5 张图片（`[image:i]`）；若不足 5 张，则全部嵌入，放在相关段落下方并配斜体说明
+6. 引用精准投放：引用标记紧跟被支持的具体句子之后
 
-推荐结构：
-### 开场概览
-- 用一段话概述用户问题与整体答案走向。
+## 输出结构（灵活但有目录）
+- 开头输出 `## 目录`，列出 3-6 个将要展开的 `##` 标题
+- 正文使用 `##` 作为主标题，`###` 作为子标题；标题名称根据问题动态命名
+- 每个 `##` 下至少 1 个 `###`；每个 `###` 下至少 2 条分点
+- 标题后换行再写正文
+- 表格前后留空行；表格如需引用，在表格后单独写“注：...”并标注引用
+- 图片用 `[image:i]` 嵌入相关段落下方，并使用斜体说明（不超过40字）
+- Markdown 列表仅使用 `-` 或 `1.`，不要使用装饰性符号
 
-### 关键洞察
-- 结合 key_takeaways 与 items_summary，写 2~3 段，从“功能/规范/场景”三个角度说明启发。
+## 引用规范（核心 - 必须严格遵守）
+**可用引用索引范围：仅 [1] 到 [{citations_count}]**
 
-### 资料印证
-- 将最重要的 3~4 份 documents_view 资料穿成故事，展示它们如何互补（无需把所有资料都铺开）。
+1. 引用必须紧跟该句末尾，不要出现在标题或段落开头
+2. 不使用范围写法：禁止 [1-4]、[1–4]、[1—4]
+3. 多个引用使用连续标记：[1][2][5]（不要加空格）
+4. 表格内禁止引用；在表格后用一行注释标注引用
+5. 不要在图片说明中添加引用索引
 
-### 设计建议
-- 至少 2 条，包含明确动作、参数或协作对象。
+## 文本风格
+- 去除装饰性符号与图标，不使用 emoji 或花哨分隔线
+- 只输出学术化、严谨、可直接用于文档的正文内容
 
-### 风险与注意
-- 提醒潜在红线、适用条件或需要进一步验证的内容。
+## 图片使用规范
+- 默认图文并茂，优先满足至少 5 张（若资源不足则全部展示）
+- 图片索引来自 `related_images`（从 0 开始），不要虚构
+- 图片标记 `[image:i]` 单独一行
+- 图片说明使用斜体 `*图1：...*`，不超过40字
 
-### 引用
-- 按 `- [n] 资料名称（页码/章节）` 格式列出引用，确保与正文标注一致。
+## 严格禁止的内容
+- 内部信息、评分、调试字段
+- 参考资料章节（系统自动生成）
+- 表格单元格内的引用
+- `| :--- | :--- |` 对齐语法（只用 `|---|---|`）
 """
 
     # ✅ [2025-12-03] 简化 user_prompt，移除冗余指令
@@ -1223,8 +1977,113 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         final_answer = response.content.strip()
 
         # ============================================================================
-        # [NEW] 生成智能推荐问题（优化版 2025-01-17）
+        # [FIX 2026-01-14] 关键修复：移除LLM生成的无效引用
+        # 问题：LLM可能生成 [5][6][7][8] 等超出 citations_count 范围的引用
+        # 解决方案：后处理验证，移除所有超出范围的引用标记
         # ============================================================================
+
+        logger.info(f"[Synthesizer→PostProcess] 开始后处理验证，citations_count={citations_count}")
+
+        # 1. 检测无效引用
+        invalid_citations = []
+        citation_pattern = re.compile(r'\[(\d+)\]')
+        all_citations_in_answer = []
+
+        for match in citation_pattern.finditer(final_answer):
+            cite_num = int(match.group(1))
+            all_citations_in_answer.append(cite_num)
+            if cite_num > citations_count:
+                invalid_citations.append(cite_num)
+
+        logger.info(
+            f"[Synthesizer→PostProcess] 答案中的所有引用: {sorted(set(all_citations_in_answer))}，"
+            f"无效引用: {sorted(set(invalid_citations))}"
+        )
+
+        # 2. 如果发现无效引用，记录警告并移除
+        if invalid_citations:
+            unique_invalid = sorted(set(invalid_citations))
+            logger.warning(
+                f"[Synthesizer→InvalidCitations] LLM生成了无效引用: {unique_invalid}，"
+                f"但 citations_count 只有 {citations_count}。将移除这些无效引用。"
+            )
+
+            # 移除无效引用（保留有效引用）
+            def replace_invalid_citation(match):
+                cite_num = int(match.group(1))
+                if cite_num > citations_count:
+                    logger.debug(f"[Synthesizer→PostProcess] 移除无效引用 [{cite_num}]")
+                    return ""  # 移除无效引用
+                return match.group(0)  # 保留有效引用
+
+            final_answer = citation_pattern.sub(replace_invalid_citation, final_answer)
+
+            # 验证：检查是否还有无效引用
+            remaining_invalid = []
+            for match in citation_pattern.finditer(final_answer):
+                cite_num = int(match.group(1))
+                if cite_num > citations_count:
+                    remaining_invalid.append(cite_num)
+
+            if remaining_invalid:
+                logger.error(
+                    f"[Synthesizer→PostProcess] 错误：移除后仍有无效引用 {remaining_invalid}！"
+                )
+            else:
+                logger.info(
+                    f"[Synthesizer→PostProcess] 成功移除所有无效引用，"
+                    f"剩余有效引用: {sorted(set([int(m.group(1)) for m in citation_pattern.finditer(final_answer)]))}"
+                )
+        else:
+            logger.info(f"[Synthesizer→PostProcess] 未发现无效引用，所有引用都在有效范围内")
+
+        # ============================================================================
+        # [FIX 2026-01-13] 文本清洗：移除引用前的换行符和系统干扰符号
+        # ============================================================================
+        # 1. 移除引用符号前的换行符（避免 `\n[1]` 导致前端解析为列表）
+        final_answer = re.sub(r'\n+\s*(\[\d+\])', r'\1', final_answer)
+
+        # 2. 移除系统级索引标记（如 `+1`、`🔗` 等）
+        final_answer = re.sub(r'\+\d+', '', final_answer)
+        final_answer = re.sub(r'🔗', '', final_answer)
+
+        # 3. 清理多余空格
+        final_answer = re.sub(r' +', ' ', final_answer)
+
+        # 4. 清理多余换行（保留段落间距）
+        final_answer = re.sub(r'\n{3,}', '\n\n', final_answer)
+
+        # 5. 移除装饰性符号
+        final_answer = _strip_decorative_symbols(final_answer)
+        final_answer = _split_heading_lines(final_answer)
+
+        # ============================================================================
+        # [FIX 2026-01-20] 引用位置校准 + 结构清理
+        # - 规范化引用格式（不使用范围）
+        # - 标题/表格内移除引用，并转移至正文句末
+        # - 重新编号：按"正文首次出现顺序"从 [1] 开始编号，并同步重排 citations 列表
+        # ============================================================================
+        if citations_count > 0:
+            before_answer = final_answer
+            before_count = len(final_citations) if isinstance(final_citations, list) else 0
+            final_answer = _normalize_inline_citation_groups(final_answer)
+            final_answer = _expand_citation_ranges(final_answer)
+            final_answer = _relocate_heading_citations(final_answer)
+            final_answer = _strip_citations_in_tables(final_answer)
+            final_answer = _relocate_leading_citations(final_answer)
+            final_answer = _tighten_citation_spacing(final_answer)
+            final_answer, final_citations = _remap_citations_by_first_appearance(final_answer, final_citations)
+            final_answer = _sort_adjacent_citation_groups(final_answer)
+            final_answer = _tighten_citation_spacing(final_answer)
+            after_count = len(final_citations) if isinstance(final_citations, list) else 0
+
+            if final_answer != before_answer or after_count != before_count:
+                logger.info(
+                    "[Synthesizer→PostProcess] 已应用引用校准/重排（citations=%d→%d）",
+                    before_count,
+                    after_count,
+                )
+
         recommended_questions = []
 
         # 策略1: 基于知识图谱扩展的实体生成深入问题（优先级最高）
@@ -1288,12 +2147,10 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "final_answer": final_answer,
             "recommended_questions": recommended_questions,
             "notes": notes,
-            # ✅ [2025-11-25] 输出 answer_graph_data 供前端可视化
             "answer_graph_data": answer_graph_data,
             "unified_hints": unified_hints,
-            # ✅ [FIX 2025-12-04] 添加图片引用返回，供前端显示
-            "image_references": image_citations[:10] if image_citations else [],
-            # ✅ [FIX 2025-12-04] 添加文档引用详情，供前端PDF跳转
+            "image_references": image_citations[:10] if wants_images and image_citations else [],
+            "final_citations": final_citations,
             "document_citations": {
                 "mongodb": mongodb_citations[:10],
                 "milvus": milvus_citations[:10],
@@ -1303,8 +2160,11 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 
     except Exception as err:
         logger.error(f"[Synthesizer→Synthesize] LLM 合成失败: {err}，使用规则兜底")
-        fallback = _build_rule_based_answer(query, aggregated_items, notes, document_views)
+        fallback = _build_rule_based_answer(query, text_items, notes, document_views)
         fallback["notes"] = notes
+        fallback["final_citations"] = final_citations
+        if not wants_images:
+            fallback["image_references"] = []
         return fallback
 
 
@@ -1462,12 +2322,7 @@ def node_request_retry(state: SynthesizerState) -> Dict[str, Any]:
 
 def build_synthesizer_graph():
     """
-    构建 Synthesizer 图 - 简化版本 (2025-12-03)
-
-    关键改进：
-    - ✅ 移除评估和重试循环（效果不佳且耗时）
-    - ✅ 简化流程：aggregate → synthesize → END
-    - ✅ 使用标准类型和 LLMManager
+    构建 Synthesizer 图 
     """
     builder = StateGraph(SynthesizerState)
 
@@ -1480,7 +2335,7 @@ def build_synthesizer_graph():
     builder.add_edge("aggregate", "synthesize")
     builder.add_edge("synthesize", END)
 
-    logger.info("[Synthesizer] 图构建完成（简化版本，无评估循环）")
+    logger.info("[Synthesizer] 图构建完成")
 
     return builder.compile()
 

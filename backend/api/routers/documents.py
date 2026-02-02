@@ -23,6 +23,8 @@ def _resolve_pdf_candidate(requested_path: str) -> Path | None:
     if not requested_path:
         return None
 
+    import glob
+
     normalized = requested_path.strip().lstrip("/").replace("\\", "/")
 
     # 1) Direct hit
@@ -54,20 +56,53 @@ def _resolve_pdf_candidate(requested_path: str) -> Path | None:
 
     # 3) Last resort: search by filename (only if it's unique)
     filename = parts[-1]
-    matches: list[Path] = []
-    for hit in DOCUMENTS_DIR.rglob(filename):
-        if not hit.is_file():
-            continue
-        resolved = hit.resolve()
-        try:
-            resolved.relative_to(DOCUMENTS_DIR)
-        except ValueError:
-            continue
-        matches.append(resolved)
-        if len(matches) > 1:
-            break
-    if len(matches) == 1:
-        return matches[0]
+    base = Path(filename).stem
+    suffix = Path(filename).suffix
+
+    variants: list[str] = []
+
+    def _add(name: str) -> None:
+        name = str(name or "").strip()
+        if not name or name in variants:
+            return
+        variants.append(name)
+
+    _add(filename)
+
+    # OCR/markdown indices sometimes point to .md; map to same-name PDF if available.
+    if suffix.lower() == ".md" and base:
+        _add(f"{base}.pdf")
+
+    # Tolerate Chinese book-title brackets mismatch: 《title》.pdf <-> title.pdf
+    stripped = base.replace("《", "").replace("》", "").strip() if base else ""
+    if stripped and stripped != base:
+        _add(f"{stripped}{suffix}")
+        _add(f"{stripped}.pdf")
+    elif base and suffix.lower() in (".pdf", ".md"):
+        _add(f"《{base}》.pdf" if suffix.lower() == ".md" else f"《{base}》{suffix}")
+
+    # Tolerate whitespace mismatch (some titles are stored without spaces).
+    if base and (" " in base):
+        compact = base.replace(" ", "")
+        _add(f"{compact}{suffix}")
+        _add(f"{compact}.pdf")
+        _add(f"《{compact}》.pdf")
+
+    for variant in variants:
+        matches: list[Path] = []
+        for hit in DOCUMENTS_DIR.rglob(glob.escape(variant)):
+            if not hit.is_file():
+                continue
+            resolved = hit.resolve()
+            try:
+                resolved.relative_to(DOCUMENTS_DIR)
+            except ValueError:
+                continue
+            matches.append(resolved)
+            if len(matches) > 1:
+                break
+        if len(matches) == 1:
+            return matches[0]
 
     return None
 

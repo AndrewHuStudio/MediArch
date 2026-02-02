@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import * as d3 from "d3"
 import { motion, AnimatePresence } from "framer-motion"
@@ -13,6 +13,8 @@ export interface GraphNode {
   type: string
   x?: number
   y?: number
+  vx?: number
+  vy?: number
   fx?: number | null
   fy?: number | null
 }
@@ -38,14 +40,53 @@ interface KnowledgeGraphD3Props {
 export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating = false }: KnowledgeGraphD3Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const fullscreenSvgRef = useRef<SVGSVGElement>(null)
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null)
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null)
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
+  const selectedNodeIdRef = useRef<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+
+  // 计算节点类型统计 - 包含所有可能的类型
+  const nodeTypeStats = useMemo(() => {
+    // 定义所有可能的节点类型
+    const allTypes = [
+      { type: "Hospital", label: "医院", color: "#8B7355" },
+      { type: "DepartmentGroup", label: "部门", color: "#5B7FA8" },
+      { type: "FunctionalZone", label: "功能分区", color: "#7B68A8" },
+      { type: "Space", label: "空间", color: "#5A9B7D" },
+      { type: "DesignMethod", label: "设计方法", color: "#C17A4F" },
+      { type: "DesignMethodCategory", label: "设计方法分类", color: "#A89968" },
+      { type: "Case", label: "案例", color: "#C97B9E" },
+      { type: "Source", label: "资料来源", color: "#B85C6F" },
+      { type: "KnowledgePoint", label: "知识点", color: "#5BA5A8" },
+      { type: "MedicalService", label: "医疗服务", color: "#8B7BA8" },
+      { type: "MedicalEquipment", label: "医疗设备", color: "#6B8BA8" },
+      { type: "TreatmentMethod", label: "治疗方法", color: "#9B7BA8" },
+    ]
+
+    // 统计当前图谱中的节点数量
+    const counts = new Map<string, number>()
+    data.nodes.forEach(node => {
+      counts.set(node.type, (counts.get(node.type) || 0) + 1)
+    })
+
+    // 返回所有类型及其数量（不存在的为0）
+    return allTypes.map(typeInfo => ({
+      ...typeInfo,
+      count: counts.get(typeInfo.type) || 0
+    }))
+  }, [data])
 
   useEffect(() => {
     setIsMounted(true)
     return () => setIsMounted(false)
   }, [])
+
+  useEffect(() => {
+    setHoveredNode(null)
+    setSelectedNode(null)
+    selectedNodeIdRef.current = null
+  }, [data])
 
   const renderGraph = (svgElement: SVGSVGElement, w: number, h: number, isFullscreenMode = false) => {
     const svg = d3.select(svgElement)
@@ -55,8 +96,8 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
     const actualHeight = svgElement.clientHeight || h
 
     const nodeRadius = isFullscreenMode ? 35 : 20
-    const linkDistance = isFullscreenMode ? 180 : 100
-    const chargeStrength = isFullscreenMode ? -600 : -300
+    const linkDistance = isFullscreenMode ? 250 : 150
+    const chargeStrength = isFullscreenMode ? -800 : -500
     const fontSize = isFullscreenMode ? "14px" : "11px"
     const labelOffset = isFullscreenMode ? 50 : 35
 
@@ -114,10 +155,34 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .force("x", d3.forceX(actualWidth / 2).strength(0.05))
       .force("y", d3.forceY(actualHeight / 2).strength(0.05))
 
-    const colorScale = d3
-      .scaleOrdinal<string>()
-      .domain(["concept", "entity", "attribute", "relation"])
-      .range(["#fbbf24", "#3b82f6", "#10b981", "#a855f7"])
+    const typeColors: Record<string, string> = {
+      // 科技感配色 - 柔和不浓重的颜色
+      Hospital: "#8B7355",              // 柔和金棕色 - 医院
+      DepartmentGroup: "#5B7FA8",       // 柔和蓝色 - 部门
+      FunctionalZone: "#7B68A8",        // 柔和紫色 - 功能分区
+      Space: "#5A9B7D",                 // 柔和绿色 - 空间
+      DesignMethod: "#C17A4F",          // 柔和橙色 - 设计方法
+      DesignMethodCategory: "#A89968",  // 柔和金色 - 设计方法分类
+      Case: "#C97B9E",                  // 柔和粉色 - 案例
+      Source: "#B85C6F",                // 柔和红色 - 资料来源
+      KnowledgePoint: "#5BA5A8",        // 柔和青色 - 知识点
+      MedicalService: "#8B7BA8",        // 柔和蓝紫色 - 医疗服务
+      MedicalEquipment: "#6B8BA8",      // 柔和钢蓝色 - 医疗设备
+      TreatmentMethod: "#9B7BA8",       // 柔和兰花紫 - 治疗方法
+
+      // 兼容旧的类型名称
+      hospital: "#8B7355",
+      room: "#5A9B7D",
+      spec: "#7B68A8",
+      document: "#B85C6F",
+
+      // 默认
+      entity: "#7A8A9A",
+      concept: "#B8A858",
+      relation: "#9B7BA8",
+    }
+
+    const getNodeColor = (type: string) => typeColors[type] || "#7A8A9A"
 
     svg
       .append("defs")
@@ -127,10 +192,10 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .append("marker")
       .attr("id", isFullscreenMode ? "arrow-fullscreen" : "arrow")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", nodeRadius + 10)
+      .attr("refX", nodeRadius + 5)
       .attr("refY", 0)
-      .attr("markerWidth", isFullscreenMode ? 8 : 7)
-      .attr("markerHeight", isFullscreenMode ? 8 : 7)
+      .attr("markerWidth", isFullscreenMode ? 5 : 4)
+      .attr("markerHeight", isFullscreenMode ? 5 : 4)
       .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-5L10,0L0,5")
@@ -143,7 +208,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .enter()
       .append("line")
       .attr("stroke", "#64748b")
-      .attr("stroke-width", isFullscreenMode ? 3 : 2.5)
+      .attr("stroke-width", isFullscreenMode ? 2 : 1.5)
       .attr("stroke-opacity", 0.7)
       .attr("marker-end", `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})`)
 
@@ -192,16 +257,21 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
     node
       .append("circle")
       .attr("r", nodeRadius)
-      .attr("fill", (d) => colorScale(d.type))
-      .attr("stroke", "#fff")
+      .attr("fill", (d) => {
+        const color = getNodeColor(d.type)
+        // 将颜色转换为半透明
+        return color + "CC" // 添加CC的透明度 (约80%不透明度)
+      })
+      .attr("stroke", (d) => getNodeColor(d.type))
       .attr("stroke-width", isFullscreenMode ? 3 : 2)
       .style("filter", "drop-shadow(0 0 8px rgba(0,0,0,0.3))")
       .on("mouseenter", function (event, d) {
-        setHoveredNode(d.id)
+        setHoveredNode(d)
         d3.select(this)
           .transition()
           .duration(200)
           .attr("r", nodeRadius * 1.25)
+          .attr("fill", (d: any) => getNodeColor(d.type) + "EE") // hover时增加不透明度
           .style("filter", "drop-shadow(0 0 12px currentColor)")
       })
       .on("mouseleave", function () {
@@ -210,8 +280,70 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
           .transition()
           .duration(200)
           .attr("r", nodeRadius)
+          .attr("fill", (d: any) => getNodeColor(d.type) + "CC")
           .style("filter", "drop-shadow(0 0 8px rgba(0,0,0,0.3))")
       })
+
+    // Build adjacency map for click-to-focus interaction
+    const neighborMap = new Map<string, Set<string>>()
+    for (const l of links as any[]) {
+      const s = typeof l.source === "string" ? l.source : l.source.id
+      const t = typeof l.target === "string" ? l.target : l.target.id
+      if (!s || !t) continue
+      if (!neighborMap.has(s)) neighborMap.set(s, new Set())
+      if (!neighborMap.has(t)) neighborMap.set(t, new Set())
+      neighborMap.get(s)?.add(t)
+      neighborMap.get(t)?.add(s)
+    }
+
+    const applySelection = (nodeId: string | null) => {
+      selectedNodeIdRef.current = nodeId
+      const neighbors = nodeId ? neighborMap.get(nodeId) || new Set<string>() : new Set<string>()
+      if (nodeId) neighbors.add(nodeId)
+
+      node
+        .selectAll("circle")
+        .attr("opacity", (d: any) => (nodeId ? (neighbors.has(d.id) ? 1 : 0.15) : 1))
+        .attr("stroke-width", (d: any) => (nodeId && d.id === nodeId ? (isFullscreenMode ? 5 : 4) : (isFullscreenMode ? 3 : 2)))
+
+      node.selectAll("text").attr("opacity", (d: any) => (nodeId ? (neighbors.has(d.id) ? 1 : 0.25) : 1))
+
+      link
+        .attr("stroke-opacity", (d: any) => {
+          if (!nodeId) return 0.7
+          const sid = d?.source?.id || d?.source
+          const tid = d?.target?.id || d?.target
+          return sid === nodeId || tid === nodeId ? 0.9 : 0.1
+        })
+        .attr("marker-end", (d: any) => {
+          if (!nodeId) return `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})`
+          const sid = d?.source?.id || d?.source
+          const tid = d?.target?.id || d?.target
+          return sid === nodeId || tid === nodeId ? `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})` : "none"
+        })
+
+      linkLabel.attr("opacity", (d: any) => {
+        if (!nodeId) return 1
+        const sid = d?.source?.id || d?.source
+        const tid = d?.target?.id || d?.target
+        return sid === nodeId || tid === nodeId ? 1 : 0.1
+      })
+    }
+
+    node.on("click", function (event: any, d: any) {
+      event.stopPropagation()
+      if (event.defaultPrevented) return
+      const current = selectedNodeIdRef.current
+      const next = current === d.id ? null : d.id
+      applySelection(next)
+      setSelectedNode(next ? d : null)
+    })
+
+    svg.on("click", function (event: any) {
+      if (event.defaultPrevented) return
+      applySelection(null)
+      setSelectedNode(null)
+    })
 
     node
       .append("text")
@@ -316,9 +448,20 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
           <Maximize2 className="w-4 h-4" />
         </Button>
 
-        {hoveredNode && (
+        {selectedNode && (
           <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
-            <p className="text-xs text-white">节点: {hoveredNode}</p>
+            <p className="text-xs text-white">
+              已选中: {selectedNode.label} <span className="text-gray-400">({selectedNode.type})</span>
+            </p>
+            <p className="text-[10px] text-gray-400">点击空白取消聚焦</p>
+          </div>
+        )}
+
+        {hoveredNode && !selectedNode && (
+          <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
+            <p className="text-xs text-white">
+              节点: {hoveredNode.label} <span className="text-gray-400">({hoveredNode.type})</span>
+            </p>
           </div>
         )}
       </motion.div>
@@ -357,6 +500,30 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                       <X className="w-6 h-6" />
                     </Button>
                   </div>
+
+                  {/* 节点类型统计图例 - 仅在全屏模式显示 */}
+                  {nodeTypeStats.length > 0 && (
+                    <div className="absolute top-24 left-8 z-10 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 p-4 max-w-xs">
+                      <h3 className="text-sm font-semibold text-white mb-3">节点类型统计</h3>
+                      <div className="space-y-2">
+                        {nodeTypeStats.map(stat => (
+                          <div key={stat.type} className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-3 h-3 rounded-full border-2"
+                                style={{
+                                  backgroundColor: stat.color + "40",
+                                  borderColor: stat.color
+                                }}
+                              />
+                              <span className="text-xs text-gray-300">{stat.label}</span>
+                            </div>
+                            <span className="text-xs font-medium text-white">{stat.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="w-full h-full pt-16">
                     <svg

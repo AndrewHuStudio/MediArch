@@ -41,10 +41,10 @@ class Settings(BaseSettings):
     ]
 
     # ====================
-    # LangGraph Supervisor 配置
+    # LangGraph MediArch Graph 配置
     # ====================
-    PRELOAD_SUPERVISOR: bool = True  # 启动时预热 Supervisor
-    SUPERVISOR_TIMEOUT_MS: int = 30000  # Supervisor 超时时间（毫秒）
+    PRELOAD_SUPERVISOR: bool = True  # 启动时预热 MediArch Graph
+    SUPERVISOR_TIMEOUT_MS: int = 30000  # MediArch Graph 超时时间（毫秒）
 
     # ====================
     # 会话管理配置
@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     # ====================
     # 数据库配置（可选，用于会话存储）
     # ====================
-    # PostgreSQL Checkpoint (来自 supervisor_graph)
+    # PostgreSQL Checkpoint (来自 mediarch_graph)
     POSTGRES_CHECKPOINT_URI: str = os.getenv(
         "POSTGRES_CHECKPOINT_URI",
         "postgresql://postgres:postgres@localhost:5432/mediarch_checkpoints?sslmode=disable"

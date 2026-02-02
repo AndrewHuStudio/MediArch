@@ -17,7 +17,7 @@
 
 ```
 MediArch 智能代理架构
-├── supervisor_graph.py         # 主调度器（Supervisor）
+├── mediarch_graph.py         # 主调度器（MediArch Graph）
 ├── base_agent.py              # 基础设施和公共组件
 ├── orchestrator_agent/        # 查询分析和意图理解
 ├── 工作代理 (Workers)
@@ -56,7 +56,7 @@ With LangGraph API, persistence is handled automatically by the platform.
 **解决方案**: 添加智能环境检测
 
 ```python
-# supervisor_graph.py
+# mediarch_graph.py
 is_langgraph_api = os.getenv("LANGGRAPH_API_VERSION") is not None or os.getenv("LANGGRAPH_RUNTIME") == "api"
 
 if is_langgraph_api:
@@ -140,7 +140,7 @@ async def analyse_query_with_llm(query: str) -> Optional[QueryAnalysisResult]:
 
 | 代理名称                | 编译状态 | LangChain 1.0 兼容性 | Structured Output | 环境适配    |
 | ----------------------- | -------- | -------------------- | ----------------- | ----------- |
-| **Supervisor Graph**    | ✅ 正常  | ✅ 完全兼容          | ➖ 不适用         | ✅ 智能检测 |
+| **MediArch Graph**    | ✅ 正常  | ✅ 完全兼容          | ➖ 不适用         | ✅ 智能检测 |
 | **Neo4j Agent**         | ✅ 正常  | ✅ 完全兼容          | ✅ 已升级         | ✅ 完成     |
 | **Milvus Agent**        | ✅ 正常  | ✅ 兼容              | ⚠️ 待升级         | ✅ 完成     |
 | **MongoDB Agent**       | ✅ 正常  | ✅ 兼容              | ⚠️ 待升级         | ✅ 完成     |
@@ -304,7 +304,7 @@ def build_agent_graph():
 
     return builder.compile()
 
-# 导出图（供 Supervisor 导入）
+# 导出图（供 MediArch Graph 导入）
 graph = build_agent_graph()
 ```
 
@@ -323,7 +323,7 @@ agents = [
     ("Orchestrator Agent", "backend.app.agents.orchestrator_agent.agent"),
     ("Online Search Agent", "backend.app.agents.online_search_agent.agent"),
     ("Result Synthesizer Agent", "backend.app.agents.result_synthesizer_agent.agent"),
-    ("Supervisor Graph", "backend.app.agents.supervisor_graph"),
+    ("MediArch Graph", "backend.app.agents.mediarch_graph"),
 ]
 
 for name, module_path in agents:
@@ -913,11 +913,11 @@ python main.py
 
 **问题根源**：
 
-- Supervisor Graph 使用 `interrupt_before=["wait_for_feedback"]` 机制
+- MediArch Graph 使用 `interrupt_before=["wait_for_feedback"]` 机制
 - LangGraph dev 在 interrupt 处暂停执行，等待外部输入
 - 但调试阶段不需要人工反馈，导致卡死
 
-**解决方案**（`supervisor_graph.py`）：
+**解决方案**（`mediarch_graph.py`）：
 
 ```python
 # ⚠️ 2025-01-15: 调试阶段暂时禁用 Human-in-the-Loop
@@ -1012,7 +1012,7 @@ BG_JOB_ISOLATED_LOOPS=true  # 允许阻塞调用在独立线程中运行
 
 **测试覆盖**：
 
-1. ✅ Supervisor Graph 编译成功
+1. ✅ MediArch Graph 编译成功
 2. ✅ 查询可以正常执行并返回答案
 3. ✅ 不卡在 wait_for_feedback 节点
 4. ✅ 所有 Worker Agents 编译成功
@@ -1101,13 +1101,13 @@ langgraph dev
 
   1. 恢复 interrupt 机制：
 
-  # supervisor_graph.py line 957
+  # mediarch_graph.py line 957
 
   compiled_graph = builder.compile(
   interrupt_before=["wait_for_feedback"]
   ) 2. 恢复反馈路由：
 
-  # supervisor_graph.py line 929
+  # mediarch_graph.py line 929
 
   builder.add_edge("wait_for_feedback", "classify_feedback") 3. 取消注释条件边（line 932-943）
 
@@ -1169,7 +1169,7 @@ Orchestrator (分析intent, 改写query)
 【阶段1：知识图谱扩展】
 Neo4j Agent (深度检索 + 实体扩展) → query_path
    ↓
-Supervisor提取expansion → 注入到request.metadata
+MediArch Graph 提取expansion → 注入到request.metadata
    ↓
 【阶段2：深度检索】(并行)
    ├─ Milvus Agent (使用neo4j_expansion中的扩展实体)
@@ -1181,11 +1181,11 @@ Result Synthesizer (基于图谱路径合成答案)
 
 #### 📁 主要修改文件
 
-##### 1. **Supervisor Graph** (`supervisor_graph.py`)
+##### 1. **MediArch Graph** (`mediarch_graph.py`)
 
 **新增状态字段**:
 ```python
-class SupervisorState(TypedDict, total=False):
+class MediArchGraphState(TypedDict, total=False):
     # ... 原有字段 ...
 
     # ✅ [NEW] 两阶段检索架构支持
@@ -1308,9 +1308,9 @@ MongoDB Agent: 检索词["门诊空间", "医技空间", "门诊部", "医技科
 ##### 2. **信息传递机制**
 
 ```
-SupervisorState.neo4j_expansion
+MediArchGraphState.neo4j_expansion
     ↓ (注入)
-SupervisorState.request.metadata["neo4j_expansion"]
+MediArchGraphState.request.metadata["neo4j_expansion"]
     ↓ (传递)
 WorkerState.request.metadata.get("neo4j_expansion")
     ↓ (使用)
@@ -1331,8 +1331,8 @@ else:
 
 **编译验证**:
 ```bash
-$ python -c "from backend.app.agents.supervisor_graph import graph"
-[OK] Supervisor Graph compiled successfully
+$ python -c "from backend.app.agents.mediarch_graph import graph"
+[OK] MediArch Graph compiled successfully
 
 $ python -c "from backend.app.agents.neo4j_agent.agent import graph"
 [OK] Neo4j Agent compiled successfully
@@ -1368,11 +1368,11 @@ Query: "门诊空间与医技空间的联系及功能要求"
 
 **日志关键标识**:
 ```
-[Supervisor→Phase1] 调度Neo4j Agent进行知识图谱扩展
+[MediArchGraph→Phase1] 调度Neo4j Agent进行知识图谱扩展
 [Neo4jAgent→EntityMatch] 找到 15 个实体
 [Neo4jAgent→RelationReasoning] 找到 20 条关系
-[Supervisor→ExtractExpansion] Neo4j扩展: 15 实体, 20 关系
-[Supervisor→Phase2] 调度阶段2 Workers: ['milvus_agent', 'mongodb_agent']
+[MediArchGraph→ExtractExpansion] Neo4j扩展: 15 实体, 20 关系
+[MediArchGraph→Phase2] 调度阶段2 Workers: ['milvus_agent', 'mongodb_agent']
 [Milvus→Rewrite] 使用Neo4j扩展: 新增 10 个实体, 总搜索词 25 个
 [MongoDB→Rewrite] 使用Neo4j扩展: 新增 10 个实体, 总搜索词 22 个
 ```
@@ -1382,7 +1382,7 @@ Query: "门诊空间与医技空间的联系及功能要求"
 **详细技术文档**: `TWO_PHASE_ARCHITECTURE_IMPLEMENTATION.md` （完整实施报告）
 
 **涉及文件**:
-- `supervisor_graph.py`: +200行（新节点函数和流程控制）
+- `mediarch_graph.py`: +200行（新节点函数和流程控制）
 - `neo4j_agent/agent.py`: +50行（增强检索深度）
 - `milvus_agent/agent.py`: +60行（接收扩展信息）
 - `mongodb_agent/agent.py`: +60行（接收扩展信息）
@@ -1492,7 +1492,7 @@ $ python scripts/verify_llm_blocking_fix.py
 [OK] Orchestrator Agent             - 编译成功
 [OK] Online Search Agent            - 编译成功
 [OK] Result Synthesizer Agent       - 编译成功
-[OK] Supervisor Graph               - 编译成功
+[OK] MediArch Graph               - 编译成功
 
 ================================================================================
 测试结果: 7/7 agents编译成功
@@ -1673,11 +1673,11 @@ if cached is None:
     cache.set(query, filters, result, cache_type="fusion", ttl=300)
 ```
 
-### Supervisor Graph 改动
+### MediArch Graph 改动
 
 **新增状态字段**：
 ```python
-class SupervisorState(TypedDict, total=False):
+class MediArchGraphState(TypedDict, total=False):
     # 2025-11-25 新增
     parallel_retrieval_phase: str  # "phase1_parallel" | "phase2_fusion" | "phase3_mongodb"
     neo4j_items: List[AgentItem]
@@ -1755,7 +1755,7 @@ return {
 
 ```bash
 # 验证所有模块编译成功
-python -c "from backend.app.agents.supervisor_graph import graph; print('OK')"
+python -c "from backend.app.agents.mediarch_graph import graph; print('OK')"
 ```
 
 **验证结果**: 9/9 agents 编译成功
@@ -1764,7 +1764,7 @@ python -c "from backend.app.agents.supervisor_graph import graph; print('OK')"
 
 **升级时间**: 2025-11-25
 **涉及文件**:
-- `supervisor_graph.py` (+200行)
+- `mediarch_graph.py` (+200行)
 - `knowledge_fusion/__init__.py` (新增)
 - `knowledge_fusion/fusion.py` (新增, ~450行)
 - `retrieval_cache.py` (新增, ~280行)

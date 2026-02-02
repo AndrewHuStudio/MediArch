@@ -1,8 +1,5 @@
 "use client"
 
-import { useState } from "react"
-import { FileText } from 'lucide-react'
-import { motion, AnimatePresence } from "framer-motion"
 import type { PDFSource } from "./pdf-source-card"
 
 // 重新导出 PDFSource 类型以便其他文件导入
@@ -16,103 +13,52 @@ interface PDFCitationBadgeProps {
 }
 
 export function PDFCitationBadge({ source, citationNumber, onClick, style }: PDFCitationBadgeProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
   return (
-    <div
-      className={`absolute pointer-events-auto ${isExpanded ? 'z-50' : 'z-10'}`}
+    <button
+      type="button"
+      className="absolute pointer-events-auto rounded-md border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-200 shadow-sm hover:bg-blue-500/20 transition-colors"
       style={style}
+      onClick={onClick}
+      title={`${source.title} · 第 ${source.pageNumber} 页`}
     >
-      <div 
-        className="relative flex items-start group"
-        onMouseEnter={() => setIsExpanded(true)}
-        onMouseLeave={() => setIsExpanded(false)}
-      >
-        <motion.div
-          className="w-7 h-7 flex items-center justify-center rounded-md cursor-pointer shadow-lg backdrop-blur-sm border border-gray-700/50 relative z-10 transition-opacity duration-300 group-hover:opacity-0"
-          style={{
-            background: 'linear-gradient(135deg, rgba(55, 65, 81, 0.95), rgba(31, 41, 55, 0.98))',
-          }}
-          whileHover={{ 
-            scale: 1.05,
-            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.5)',
-          }}
-          onClick={onClick}
-          transition={{ duration: 0.2 }}
-        >
-          <span className="text-[11px] font-semibold text-gray-200">
-            {citationNumber}
-          </span>
-        </motion.div>
-
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ 
-                width: 0, 
-                opacity: 0,
-                x: -8,
-              }}
-              animate={{ 
-                width: 220, 
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{ 
-                width: 0, 
-                opacity: 0,
-                x: -8,
-              }}
-              transition={{ 
-                duration: 0.3, 
-                ease: [0.4, 0, 0.2, 1]
-              }}
-              className="absolute left-0 top-0 overflow-hidden cursor-pointer"
-              style={{
-                transformOrigin: 'left center',
-              }}
-              onClick={onClick}
-            >
-              <div className="w-[220px] bg-gradient-to-br from-gray-900/98 to-gray-800/98 backdrop-blur-lg border border-gray-700/60 rounded-lg shadow-2xl overflow-hidden">
-                {/* 缩略图 */}
-                {source.thumbnail ? (
-                  <div className="w-full h-28 overflow-hidden bg-gray-800/50">
-                    <img 
-                      src={source.thumbnail || "/placeholder.svg"} 
-                      alt={source.title} 
-                      className="w-full h-full object-cover" 
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full h-28 flex items-center justify-center bg-gradient-to-br from-gray-800/80 to-gray-900/80">
-                    <FileText className="w-10 h-10 text-gray-600" />
-                  </div>
-                )}
-                
-                {/* 资料信息 */}
-                <div className="p-3 space-y-1.5">
-                  <div className="text-xs font-semibold text-gray-100 line-clamp-2 leading-tight" title={source.title}>
-                    {source.title}
-                  </div>
-                  <div className="text-[10px] text-blue-400 font-medium">
-                    第 {source.pageNumber} 页
-                  </div>
-                  <div className="text-[10px] text-gray-400 line-clamp-2 leading-relaxed">
-                    {source.snippet}
-                  </div>
-                </div>
-
-                {/* 点击提示 */}
-                <div className="px-3 pb-2">
-                  <div className="text-[9px] text-gray-500 text-center">
-                    点击查看详情
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+      {citationNumber}
+    </button>
   )
+}
+
+export function buildPageValueSummary(source: PDFSource): string | null {
+  const title = String(source.title || "")
+  const section = String(source.section || "")
+  const highlight = String(source.highlightText || "")
+  const snippet = String(source.snippet || "")
+  const contentType = source.contentType || "text"
+
+  const text = `${title} ${section} ${highlight} ${snippet}`
+
+  if (contentType === "image") {
+    if (/(平面|布局|布置)/.test(text) && /(详图|节点|构造|大样|设备)/.test(text)) {
+      return "包含平面布置与关键节点/设备示意，可用于从整体到细部校对配置"
+    }
+    if (/(平面|布局|布置)/.test(text)) {
+      return "展示空间平面布局与流线关系，适合快速建立功能分区与尺度感"
+    }
+    if (/(详图|节点|构造|大样|设备)/.test(text)) {
+      return "提供节点/设备安装示意，适合深化设计与施工落地核对"
+    }
+    return "包含关键配图，可用于核对空间布置与设备点位关系"
+  }
+
+  if (/(规范|标准|要求|应当|必须|不得)/.test(text)) {
+    return "汇总关键条文/指标，适合做合规性对照与参数校核"
+  }
+
+  if (/(流程|流线|洁污|人流|物流|无菌|污染|感控)/.test(text)) {
+    return "聚焦功能流程/感染控制要点，适合用于流线与分区策略推敲"
+  }
+
+  if (/(平面|布局|布置|尺度|面积)/.test(text)) {
+    return "提炼空间配置与尺度要点，适合用于方案阶段快速对照"
+  }
+
+  return null
 }

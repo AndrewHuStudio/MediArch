@@ -32,10 +32,10 @@ from backend.databases.graph.builders.kg_builder import MedicalKGBuilder
 
 @pytest.fixture
 def builder():
-    """创建测试用的 KGBuilder 实例（禁用 Milvus）"""
+    """创建测试用的 KGBuilder 实例"""
     with patch('backend.databases.graph.builders.kg_builder.MongoClient'):
         with patch('backend.databases.graph.builders.kg_builder.GraphDatabase'):
-            builder = MedicalKGBuilder(use_milvus=False)
+            builder = MedicalKGBuilder()
             # 禁用 LLM 调用
             builder.entity_type_llm_fallback = False
             yield builder

@@ -170,6 +170,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--max-images-per-doc", type=int, default=0, help="每份资料最多处理多少张图（0=不限制）")
     parser.add_argument("--limit", type=int, default=0, help="最多处理多少张图（0=不限制）")
     parser.add_argument("--batch-size", type=int, default=32, help="Milvus/Embedding 同步批次大小（同一 doc 内）")
+    parser.add_argument(
+        "--mongo-batch-size",
+        type=int,
+        default=int(os.getenv("MONGO_CURSOR_BATCH_SIZE", "10") or 10),
+        help="MongoDB cursor batch_size（建议 1-20；降低长任务游标/会话空闲超时风险）",
+    )
     parser.add_argument("--no-milvus", action="store_true", help="仅更新 Mongo，不更新 Milvus（不建议）")
     args = parser.parse_args(argv)
 
@@ -277,10 +283,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "image_url_abs": 1,
     }
 
-    cursor = (
-        chunks.find({**q, **apply_filter}, projection)
-        .sort([("doc_id", 1), ("page_range.0", 1), ("chunk_id", 1)])
-    )
+    mongo_batch_size = max(1, int(args.mongo_batch_size or 1))
 
     max_per_doc = int(args.max_images_per_doc or 0)
     hard_limit = int(args.limit or 0)
@@ -329,115 +332,127 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not DOCS_OCR_ROOT.exists():
         console.print(f"[yellow]WARN[/yellow] documents_ocr 不存在: {DOCS_OCR_ROOT}")
 
-    if not args.apply:
-        # DRY_RUN: 不调用 VLM，不写库。只做筛选与路径检查。
-        for ch in cursor:
-            scanned += 1
-            doc_id_str = str(ch.get("doc_id"))
-            if max_per_doc and per_doc_done[doc_id_str] >= max_per_doc:
-                continue
-            img_abs = _resolve_image_abs(ch)
-            if not img_abs:
-                missing_image += 1
-                continue
-            per_doc_done[doc_id_str] += 1
-            selected += 1
-            if hard_limit and selected >= hard_limit:
-                break
-
-        _print_stats(
-            "Dry Run Result",
-            {
-                "scanned": scanned,
-                "selected": selected,
-                "missing_image_path": missing_image,
-                "unique_docs_touched": len(per_doc_done),
-            },
+    with client.start_session() as session:
+        cursor = (
+            chunks.find({**q, **apply_filter}, projection, no_cursor_timeout=True, session=session)
+            .sort([("doc_id", 1), ("page_range.0", 1), ("chunk_id", 1)])
+            .allow_disk_use(True)
+            .batch_size(mongo_batch_size)
         )
-        client.close()
-        return 0
 
-    # APPLY
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("{task.description}"),
-        BarColumn(),
-        TextColumn("{task.completed}/{task.total}"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task_total = total_candidates if total_candidates > 0 else None
-        task_id = progress.add_task("VLM backfill images", total=task_total)
+        if not args.apply:
+            # DRY_RUN: 不调用 VLM，不写库。只做筛选与路径检查。
+            for ch in cursor:
+                scanned += 1
+                doc_id_str = str(ch.get("doc_id"))
+                if max_per_doc and per_doc_done[doc_id_str] >= max_per_doc:
+                    continue
+                img_abs = _resolve_image_abs(ch)
+                if not img_abs:
+                    missing_image += 1
+                    continue
+                per_doc_done[doc_id_str] += 1
+                selected += 1
+                if hard_limit and selected >= hard_limit:
+                    break
 
-        for ch in cursor:
-            scanned += 1
-            progress.advance(task_id, 1)
+            cursor.close()
+            _print_stats(
+                "Dry Run Result",
+                {
+                    "scanned": scanned,
+                    "selected": selected,
+                    "missing_image_path": missing_image,
+                    "unique_docs_touched": len(per_doc_done),
+                },
+            )
+            client.close()
+            return 0
 
-            doc_id_str = str(ch.get("doc_id"))
-            if max_per_doc and per_doc_done[doc_id_str] >= max_per_doc:
-                continue
+        # APPLY
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            task_total = total_candidates if total_candidates > 0 else None
+            task_id = progress.add_task("VLM backfill images", total=task_total)
 
-            img_abs = _resolve_image_abs(ch)
-            if not img_abs:
-                missing_image += 1
-                continue
+            for ch in cursor:
+                scanned += 1
+                progress.advance(task_id, 1)
 
-            if current_doc_id is None:
-                current_doc_id = doc_id_str
-            if doc_id_str != current_doc_id or len(pending_for_doc) >= batch_size:
+                doc_id_str = str(ch.get("doc_id"))
+                if max_per_doc and per_doc_done[doc_id_str] >= max_per_doc:
+                    continue
+
+                img_abs = _resolve_image_abs(ch)
+                if not img_abs:
+                    missing_image += 1
+                    continue
+
+                if current_doc_id is None:
+                    current_doc_id = doc_id_str
+                if doc_id_str != current_doc_id or len(pending_for_doc) >= batch_size:
+                    flush_pending(str(current_doc_id))
+                    current_doc_id = doc_id_str
+
+                meta = ch.get("metadata") if isinstance(ch.get("metadata"), dict) else {}
+                caption = (meta.get("caption") or "").strip()
+                section = (ch.get("section") or meta.get("section") or "").strip()
+                page = meta.get("page_number") or meta.get("page") or ((ch.get("page_range") or [0])[0] if isinstance(ch.get("page_range"), list) else 0)
+                try:
+                    page = int(page or 0)
+                except Exception:
+                    page = 0
+
+                try:
+                    vlm_caption = generate_image_description(
+                        image_path=img_abs,
+                        ocr_text=caption,
+                        section=section,
+                        page=page,
+                    )
+                except Exception:
+                    vlm_caption = f"[图片: {caption}]" if caption else "[图片]"
+
+                ok = _vlm_ok(vlm_caption)
+                if ok:
+                    vlm_success += 1
+                else:
+                    vlm_failed += 1
+
+                new_meta = dict(meta)
+                new_meta["vlm_processed"] = bool(ok)
+
+                try:
+                    res = chunks.update_one(
+                        {"_id": ch["_id"]},
+                        {"$set": {"content": vlm_caption, "metadata": new_meta}},
+                        session=session,
+                    )
+                    if getattr(res, "modified_count", 0):
+                        mongo_updated += 1
+                except Exception:
+                    pass
+
+                # prepare for Milvus sync
+                ch["content"] = vlm_caption
+                ch["metadata"] = new_meta
+                pending_for_doc.append(ch)
+                per_doc_done[doc_id_str] += 1
+                selected += 1
+
+                if hard_limit and selected >= hard_limit:
+                    break
+
+            if current_doc_id is not None:
                 flush_pending(str(current_doc_id))
-                current_doc_id = doc_id_str
 
-            meta = ch.get("metadata") if isinstance(ch.get("metadata"), dict) else {}
-            caption = (meta.get("caption") or "").strip()
-            section = (ch.get("section") or meta.get("section") or "").strip()
-            page = meta.get("page_number") or meta.get("page") or ((ch.get("page_range") or [0])[0] if isinstance(ch.get("page_range"), list) else 0)
-            try:
-                page = int(page or 0)
-            except Exception:
-                page = 0
-
-            try:
-                vlm_caption = generate_image_description(
-                    image_path=img_abs,
-                    ocr_text=caption,
-                    section=section,
-                    page=page,
-                )
-            except Exception:
-                vlm_caption = f"[图片: {caption}]" if caption else "[图片]"
-
-            ok = _vlm_ok(vlm_caption)
-            if ok:
-                vlm_success += 1
-            else:
-                vlm_failed += 1
-
-            new_meta = dict(meta)
-            new_meta["vlm_processed"] = bool(ok)
-
-            try:
-                res = chunks.update_one(
-                    {"_id": ch["_id"]},
-                    {"$set": {"content": vlm_caption, "metadata": new_meta}},
-                )
-                if getattr(res, "modified_count", 0):
-                    mongo_updated += 1
-            except Exception:
-                pass
-
-            # prepare for Milvus sync
-            ch["content"] = vlm_caption
-            ch["metadata"] = new_meta
-            pending_for_doc.append(ch)
-            per_doc_done[doc_id_str] += 1
-            selected += 1
-
-            if hard_limit and selected >= hard_limit:
-                break
-
-        if current_doc_id is not None:
-            flush_pending(str(current_doc_id))
+        cursor.close()
 
     _print_stats(
         "Apply Result",

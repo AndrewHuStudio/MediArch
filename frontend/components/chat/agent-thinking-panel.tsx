@@ -11,6 +11,9 @@ interface AgentThinkingPanelProps {
   agentStatus: "thinking" | "synthesizing" | "idle"
   currentThought: string
   isThinking: boolean
+  // 新增：支持并行Agent状态
+  activeAgents?: Set<number>
+  completedAgents?: Set<number>
 }
 
 export default function AgentThinkingPanel({
@@ -19,29 +22,39 @@ export default function AgentThinkingPanel({
   agentStatus,
   currentThought,
   isThinking,
+  activeAgents = new Set(),
+  completedAgents = new Set(),
 }: AgentThinkingPanelProps) {
   const agentRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  // 使用 useMemo 计算完成的智能体集合，避免在 useEffect 中使用 setState
-  const completedAgents = useMemo(() => {
-    const completed = new Set<string>()
-    if (activeAgentIndex >= 0) {
-      for (let i = 0; i < activeAgentIndex; i++) {
-        if (agents[i]) {
-          completed.add(agents[i])
+  // 当前运行的智能体列表（支持并行）
+  const runningAgents = useMemo(() => {
+    const running = new Set<string>()
+    if (isThinking) {
+      // 使用新的并行状态
+      activeAgents.forEach(index => {
+        if (index >= 0 && index < agents.length) {
+          running.add(agents[index])
         }
+      })
+      // 向后兼容：如果没有并行状态，回退到单个activeAgentIndex
+      if (running.size === 0 && activeAgentIndex >= 0 && activeAgentIndex < agents.length) {
+        running.add(agents[activeAgentIndex])
       }
     }
-    return completed
-  }, [activeAgentIndex, agents])
+    return running
+  }, [isThinking, activeAgents, activeAgentIndex, agents])
 
-  // 当前运行的智能体
-  const runningAgent = useMemo(() => {
-    if (isThinking && activeAgentIndex >= 0 && activeAgentIndex < agents.length) {
-      return agents[activeAgentIndex]
-    }
-    return null
-  }, [isThinking, activeAgentIndex, agents])
+  // 已完成的智能体集合
+  const completedAgentNames = useMemo(() => {
+    const completed = new Set<string>()
+    completedAgents.forEach(index => {
+      if (index >= 0 && index < agents.length) {
+        completed.add(agents[index])
+      }
+    })
+    return completed
+  }, [completedAgents, agents])
 
   // 滚动到当前活跃的智能体
   useEffect(() => {
@@ -93,8 +106,8 @@ export default function AgentThinkingPanel({
 
   // 获取智能体的状态图标和样式
   const getAgentStyle = (agent: string, index: number) => {
-    const isActive = runningAgent === agent
-    const isComplete = completedAgents.has(agent)
+    const isActive = runningAgents.has(agent)
+    const isComplete = completedAgentNames.has(agent)
 
     if (isActive && isThinking) {
       return {
@@ -135,7 +148,7 @@ export default function AgentThinkingPanel({
             <span className={`h-2 w-2 rounded-full ${cardStyle.dot}`} />
           </div>
           <div className="relative z-10 text-sm text-white/90">
-            {isThinking ? currentThought || "正在分析..." : "等待下一次提问"}
+            {isThinking ? currentThought : "等待下一次提问"}
           </div>
         </div>
 

@@ -140,11 +140,7 @@ python -m backend.cli.vlm_manager --only missing
 **功能**: 从 MongoDB chunks 抽取实体/关系 → 写入 Neo4j
 
 ```bash
-# 基本用法：构建知识图谱（交互式选择是否启用 Milvus）
-python -m backend.cli.build_kg
-
-# 禁用 Milvus 实体属性向量库
-set KG_USE_MILVUS=false
+# 基本用法：构建知识图谱
 python -m backend.cli.build_kg
 
 # 跳过磁盘空间检查
@@ -164,11 +160,8 @@ KG_OPENAI_BASE_URL=https://api.deepseek.com/v1
 KG_OPENAI_MODEL=deepseek-v3
 MONGODB_URI=mongodb://admin:mediarch2024@localhost:27017/mediarch?authSource=admin
 NEO4J_URI=bolt://localhost:7687
-MILVUS_HOST=localhost
-MILVUS_PORT=19530
 
 # 可选配置
-KG_USE_MILVUS=true                    # 是否启用 Milvus 实体向量库
 KG_SCHEMA_PATH=backend/databases/graph/schemas/medical_architecture.json
 SKIP_DISK_CHECK=0                     # 是否跳过磁盘检查
 
@@ -192,7 +185,6 @@ KG_COMPLETION_PRICE_PER_MTOK=1.0
 │ LLM模型    deepseek-v3       │
 │ MongoDB    mongodb://...     │
 │ Neo4j      bolt://...        │
-│ Milvus     localhost:19530   │
 ╰──────────────────────────────╯
 
 正在初始化构建器...
@@ -211,7 +203,6 @@ KG_COMPLETION_PRICE_PER_MTOK=1.0
 │ 平均速度         87.6 chunks/分钟 │
 │ Neo4j节点数      11800       │
 │ Neo4j边数        32000       │
-│ Milvus向量(本次) 11800       │
 ╰──────────────────────────────╯
 
 💰 估算成本：$1.2450 USD
@@ -353,7 +344,6 @@ NEO4J_PASSWORD=mediarch2024
 KG_OPENAI_API_KEY=your_deepseek_api_key
 KG_OPENAI_BASE_URL=https://api.deepseek.com/v1
 KG_OPENAI_MODEL=deepseek-v3
-KG_USE_MILVUS=true
 
 # 强制重新索引（可选）
 FORCE_REINGEST=0

@@ -69,6 +69,7 @@ export interface ChatRequest {
   stream?: boolean
   include_citations?: boolean
   include_diagnostics?: boolean
+  deep_search?: boolean  // 深度检索模式
 }
 
 export interface ChatResponse {

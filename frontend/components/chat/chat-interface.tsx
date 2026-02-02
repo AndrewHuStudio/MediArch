@@ -139,21 +139,51 @@ const createConversationSummary = (raw: string) => {
   return normalized.length > 60 ? `${normalized.slice(0, 60)}...` : normalized
 }
 
+const buildPdfUrl = (rawPdfPath?: string, documentPath?: string, filePath?: string) => {
+  const toApiUrl = (path: string) => getApiUrl(path.startsWith("/") ? path : `/${path}`)
+
+  const normalizeRelativePath = (path: string) => {
+    // 去掉重复的 /api/v1 前缀，统一用 getApiUrl 拼接
+    if (path.startsWith("/api/v1/")) return path.replace(/^\/api\/v1/, "")
+    return path
+  }
+
+  const resolvePath = (path?: string) => {
+    if (!path) return undefined
+    const normalized = normalizeRelativePath(path)
+    const isAbsolute = /^https?:\/\//i.test(normalized)
+    if (isAbsolute) {
+      return normalized
+    }
+    return toApiUrl(normalized)
+  }
+
+  // 1) 优先使用后端返回的 pdf_url
+  const fromPdfUrl = resolvePath(rawPdfPath)
+  if (fromPdfUrl) return fromPdfUrl
+
+  // 2) 其次用 document_path / file_path 组装
+  const fallbackPath = documentPath || filePath
+  if (fallbackPath) {
+    // 兼容绝对/相对路径，尽量取 documents 目录后的相对部分
+    const sanitized = fallbackPath.replace(/\\/g, "/")
+    const match = sanitized.match(/documents\/(.+)$/i)
+    const relative = match ? match[1] : sanitized
+    return toApiUrl(`/documents/pdf?path=${encodeURIComponent(relative)}`)
+  }
+
+  // 3) 无路径时返回 undefined，让上层走文本预览兜底
+  return undefined
+}
+
 // 将后端引用格式转换为前端 PDFSource 格式
 const citationsToPDFSources = (citations: Citation[]): PDFSource[] => {
   return citations.map((cite, index) => {
-    const rawPdfPath =
-      cite.pdf_url ||
-      (cite as any).pdfUrl ||
-      (cite.file_path ? `/documents/pdf?path=${encodeURIComponent(cite.file_path)}` : undefined)
-
-    // Avoid loading remote/external PDFs directly in demo/offline mode to prevent fetch/CORS errors.
-    // Only build backend URLs for relative paths (or backend-origin absolute URLs).
-    const backendBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    const isAbsoluteUrl = typeof rawPdfPath === "string" && /^https?:\/\//i.test(rawPdfPath)
-    const isBackendAbsoluteUrl = isAbsoluteUrl && typeof rawPdfPath === "string" && rawPdfPath.startsWith(backendBaseUrl)
-    const normalizedPdfPath = rawPdfPath?.startsWith("/api/v1/") ? rawPdfPath.replace(/^\/api\/v1/, "") : rawPdfPath
-    const pdfUrl = isBackendAbsoluteUrl ? (rawPdfPath as string) : normalizedPdfPath && !isAbsoluteUrl ? getApiUrl(normalizedPdfPath) : undefined
+    const documentPath = cite.document_path || (cite as any).documentPath
+    const filePath = cite.file_path || (cite as any).filePath
+    const imageUrl = (cite as any).imageUrl || cite.image_url
+    const rawPdfPath = cite.pdf_url || (cite as any).pdfUrl
+    const pdfUrl = buildPdfUrl(rawPdfPath as string | undefined, documentPath, filePath)
     const normalizedPositions =
       Array.isArray(cite.positions) && cite.positions.length > 0
         ? cite.positions.map((pos: any) => {
@@ -182,9 +212,12 @@ const citationsToPDFSources = (citations: Citation[]): PDFSource[] => {
       pdfUrl,
       documentPath: cite.document_path,
       filePath: cite.file_path,
+      imageUrl,
+      thumbnail: imageUrl,
       section: cite.section || cite.sub_section,
       metadata: cite.metadata,
       docId: cite.doc_id,
+      contentType: ((cite.content_type as any) || (cite.image_url ? "image" : undefined)) as any,
     }
   })
 }
@@ -228,11 +261,32 @@ const convertKnowledgeGraphData = (data: any | null): GraphData => {
 // 映射节点类型到前端支持的类型
 function mapNodeType(type: string | undefined): string {
   if (!type) return "entity"
+
+  // 直接使用 schema 定义的节点类型
+  const schemaTypes = [
+    "Hospital", "DepartmentGroup", "FunctionalZone", "Space",
+    "DesignMethod", "DesignMethodCategory", "Case", "Source",
+    "MedicalService", "MedicalEquipment", "TreatmentMethod",
+    "KnowledgePoint"  // 新增：知识点类型
+  ]
+
+  if (schemaTypes.includes(type)) {
+    return type
+  }
+
+  // 兼容旧的类型名称
   const typeLower = type.toLowerCase()
-  if (typeLower.includes("core") || typeLower.includes("entity")) return "entity"
-  if (typeLower.includes("concept")) return "concept"
-  if (typeLower.includes("community") || typeLower.includes("relation")) return "relation"
-  if (typeLower.includes("document") || typeLower.includes("source")) return "attribute"
+
+  if (typeLower.includes("hospital")) return "Hospital"
+  if (typeLower.includes("department")) return "DepartmentGroup"
+  if (typeLower.includes("zone") || typeLower.includes("功能分区")) return "FunctionalZone"
+  if (typeLower.includes("space") || typeLower.includes("room")) return "Space"
+  if (typeLower.includes("design") && typeLower.includes("method")) return "DesignMethod"
+  if (typeLower.includes("case") || typeLower.includes("案例")) return "Case"
+  if (typeLower.includes("knowledge") || typeLower.includes("知识")) return "KnowledgePoint"
+  // 检查 document 或 doc 后缀（如 design_standard_doc, diagram_atlas_doc）
+  if (typeLower.includes("document") || typeLower.includes("source") || typeLower.includes("_doc")) return "Source"
+
   return "entity"
 }
 
@@ -266,6 +320,8 @@ function InitialChatState({
   uploadedFiles,
   setUploadedFiles,
   handleSendMessage,
+  deepSearch,
+  setDeepSearch,
 }: {
   onQuickAction: (text: string) => void
   message: string
@@ -273,6 +329,8 @@ function InitialChatState({
   uploadedFiles: File[]
   setUploadedFiles: (files: File[]) => void
   handleSendMessage: () => void
+  deepSearch: boolean
+  setDeepSearch: (deepSearch: boolean) => void
 }) {
   return (
     <motion.div
@@ -309,6 +367,8 @@ function InitialChatState({
             onSend={handleSendMessage}
             variant="initial"
             placeholder="输入您的问题..."
+            deepSearch={deepSearch}
+            setDeepSearch={setDeepSearch}
           />
         </motion.div>
 
@@ -366,6 +426,10 @@ function ChatInterfaceContent() {
     setCurrentThought,
     agentStatus,
     setAgentStatus,
+    activeAgents,
+    setActiveAgents,
+    completedAgents,
+    setCompletedAgents,
     conversationTitle,
     setConversationTitle,
     conversationSummary,
@@ -394,6 +458,7 @@ function ChatInterfaceContent() {
   const [backendSessionId, setBackendSessionId] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [recommendedQuestions, setRecommendedQuestions] = useState<string[]>([])
+  const [deepSearch, setDeepSearch] = useState(false) // 深度检索模式
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasProcessedInitialQuestion = useRef(false)
@@ -495,26 +560,34 @@ function ChatInterfaceContent() {
     })
   }, [])
 
+  const getStatusText = (status: AgentStatusUpdate) => status.thought || ""
+
   // 智能体名称映射
   const agentNameMap: Record<string, number> = {
     Orchestrator: 0,
     orchestrator: 0,
+    orchestrator_agent: 0,
     "Orchestrator Agent": 0,
     Neo4j: 1,
     neo4j: 1,
+    neo4j_agent: 1,
     "Neo4j Agent": 1,
     Milvus: 2,
     milvus: 2,
+    milvus_agent: 2,
     "Milvus Agent": 2,
     MongoDB: 3,
     mongodb: 3,
+    mongodb_agent: 3,
     "MongoDB Agent": 3,
     OnlineSearch: 4,
     online_search: 4,
+    online_search_agent: 4,
     "Online Search Agent": 4,
     Synthesizer: 5,
     synthesizer: 5,
     result_synthesizer: 5,
+    result_synthesizer_agent: 5,
     "Result Synthesizer Agent": 5,
   }
 
@@ -523,16 +596,38 @@ function ChatInterfaceContent() {
     (status: AgentStatusUpdate) => {
       const agentIndex = agentNameMap[status.agent_name] ?? -1
       if (agentIndex >= 0) {
-        setActiveAgentIndex(agentIndex)
-        if (status.thought) {
-          setCurrentThought(status.thought)
-        }
-        if (status.status === "running") {
+        const statusText = getStatusText(status)
+        if (status.status === "running" || status.status === "pending") {
+          // 添加到活跃Agent集合
+          setActiveAgents(prev => new Set(prev).add(agentIndex))
+          setActiveAgentIndex(agentIndex)
           setIsThinking(true)
           setAgentStatus(agentIndex === 5 ? "synthesizing" : "thinking")
-        } else if (status.status === "completed" && agentIndex === 5) {
-          setIsThinking(false)
-          setAgentStatus("idle")
+          // 运行状态：始终更新思考内容
+          if (statusText) {
+            setCurrentThought(statusText)
+          }
+        } else if (status.status === "completed" || status.status === "error") {
+          // 从活跃Agent移除，添加到已完成集合
+          setActiveAgents(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(agentIndex)
+            const [nextActive] = newSet
+            setActiveAgentIndex(nextActive ?? agentIndex)
+            // 只有在没有其他Agent运行时，才更新为完成消息
+            // 避免已完成的Agent覆盖正在运行的Agent的思考内容
+            if (newSet.size === 0 && statusText) {
+              setCurrentThought(statusText)
+            }
+            return newSet
+          })
+          setCompletedAgents(prev => new Set(prev).add(agentIndex))
+
+          // 只有综合器完成时才改为 idle
+          if (agentIndex === 5 || status.status === "error") {
+            setIsThinking(false)
+            setAgentStatus("idle")
+          }
         }
       }
     },
@@ -549,6 +644,9 @@ function ChatInterfaceContent() {
     setAgentStatus("thinking")
     setActiveAgentIndex(0)
     setGraphData({ nodes: [], links: [] })
+    // 重置并行Agent状态
+    setActiveAgents(new Set())
+    setCompletedAgents(new Set())
 
     let accumulatedContent = ""
     let receivedCitations: Citation[] = []
@@ -612,6 +710,7 @@ function ChatInterfaceContent() {
           session_id: backendSessionId || undefined,
           include_online_search: false, // 测试阶段关闭
           include_citations: true,
+          deep_search: deepSearch, // 深度检索模式
         },
         callbacks
       )
@@ -659,7 +758,7 @@ function ChatInterfaceContent() {
       onKnowledgeGraph: (data) => {
         if (data) {
           receivedKnowledgeGraph = data
-          setGraphData(data)
+          setGraphData(convertKnowledgeGraphData(data as KnowledgeGraphData))
         }
       },
       onRecommendations: (questions) => {
@@ -690,6 +789,7 @@ function ChatInterfaceContent() {
         {
           message: text,
           include_citations: true,
+          deep_search: deepSearch, // 深度检索模式
         },
         callbacks
       )
@@ -969,6 +1069,8 @@ function ChatInterfaceContent() {
                   uploadedFiles={uploadedFiles}
                   setUploadedFiles={setUploadedFiles}
                   handleSendMessage={() => handleSendMessageWithText()}
+                  deepSearch={deepSearch}
+                  setDeepSearch={setDeepSearch}
                 />
               </div>
             ) : (
@@ -1018,7 +1120,7 @@ function ChatInterfaceContent() {
                       initial={{ opacity: 0, x: -40 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.5, ease: "easeOut" }}
-                      className="flex flex-col min-h-0 overflow-hidden max-w-5xl w-full mx-auto"
+                      className="flex h-full flex-col min-h-0 overflow-hidden max-w-[70%] min-w-[800px] w-full mx-auto"
                     >
                       <ChatMessages agents={agents} />
 
@@ -1040,16 +1142,20 @@ function ChatInterfaceContent() {
 
                       <div ref={messagesEndRef} />
 
-                      <ChatInput
-                        message={message}
-                        setMessage={setMessage}
-                        uploadedFiles={uploadedFiles}
-                        setUploadedFiles={setUploadedFiles}
-                        onSend={() => handleSendMessageWithText()}
-                        disabled={isLoading}
-                        placeholder="继续对话..."
-                        variant="conversation"
-                      />
+                      <div className="mt-auto">
+                        <ChatInput
+                          message={message}
+                          setMessage={setMessage}
+                          uploadedFiles={uploadedFiles}
+                          setUploadedFiles={setUploadedFiles}
+                          onSend={() => handleSendMessageWithText()}
+                          disabled={isLoading}
+                          placeholder="继续对话..."
+                          variant="conversation"
+                          deepSearch={deepSearch}
+                          setDeepSearch={setDeepSearch}
+                        />
+                      </div>
                     </motion.div>
 
                     <div className="hidden lg:flex flex-col min-h-0 gap-4">
@@ -1060,6 +1166,8 @@ function ChatInterfaceContent() {
                           agentStatus={agentStatus}
                           currentThought={currentThought}
                           isThinking={isThinking}
+                          activeAgents={activeAgents}
+                          completedAgents={completedAgents}
                         />
                       </div>
                       <div className="flex-1 min-h-[280px]">

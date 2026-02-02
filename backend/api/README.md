@@ -403,8 +403,8 @@ API_PREFIX=/api/v1
 # ==================== CORS 配置 ====================
 CORS_ORIGINS=["http://localhost:3000","http://localhost:7860"]
 
-# ==================== LangGraph Supervisor 配置 ====================
-PRELOAD_SUPERVISOR=true  # 启动时预热 Supervisor
+# ==================== LangGraph MediArch Graph 配置 ====================
+PRELOAD_SUPERVISOR=true  # 启动时预热 MediArch Graph
 SUPERVISOR_TIMEOUT_MS=30000
 
 # ==================== 会话管理配置 ====================
@@ -597,7 +597,7 @@ docker-compose down
 
 ## 性能优化
 
-### 1. 预热 Supervisor
+### 1. 预热 MediArch Graph
 
 在 `.env` 中启用：
 

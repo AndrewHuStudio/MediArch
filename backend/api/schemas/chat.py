@@ -28,14 +28,17 @@ class ChatRequest(BaseModel):
     filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="检索过滤器（可选）")
 
     # 检索参数
-    top_k: Optional[int] = Field(default=8, ge=1, le=50, description="返回结果数量")
+    top_k: Optional[int] = Field(default=12, ge=1, le=50, description="返回结果数量")
     include_online_search: Optional[bool] = Field(default=False, description="是否包含在线搜索（测试阶段默认关闭）")
 
     # 响应配置
     stream: Optional[bool] = Field(default=True, description="是否使用流式响应")
     include_citations: Optional[bool] = Field(default=True, description="是否包含引用信息")
     include_diagnostics: Optional[bool] = Field(default=False, description="是否包含诊断信息")
-    max_citations: Optional[int] = Field(default=10, ge=1, le=100, description="最大返回 citations 数量（默认10）")
+    max_citations: Optional[int] = Field(default=9, ge=5, le=100, description="最大返回 citations 数量（默认9）")
+
+    # 深度检索模式（可选）
+    deep_search: Optional[bool] = Field(default=False, description="是否启用深度检索模式")
 
 
 class AgentStatusUpdate(BaseModel):

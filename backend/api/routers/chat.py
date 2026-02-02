@@ -35,8 +35,8 @@ from backend.api.schemas.chat import (
 from backend.api.schemas.common import Citation
 from backend.api.core.config import settings
 
-# 导入 LangGraph Supervisor
-from backend.app.agents.supervisor_graph import graph as supervisor_graph
+# 导入 LangGraph MediArch Graph
+from backend.app.agents.mediarch_graph import graph as mediarch_graph
 from backend.app.agents.base_agent import AgentRequest, AgentResponse
 
 logger = logging.getLogger("mediarch_api")
@@ -95,7 +95,12 @@ def _add_message_to_session(session_id: str, role: str, content: str, citations=
         SESSION_STORE[session_id]["messages"] = SESSION_STORE[session_id]["messages"][-max_history:]
 
 
-def _extract_citations_from_items(items: List[Any], max_citations: int = 10) -> List[Dict]:
+def _extract_citations_from_items(
+    items: List[Any],
+    max_citations: int = 10,
+    *,
+    allow_images: bool = True,
+) -> List[Dict]:
     """
     从检索结果中提取引用信息
 
@@ -144,25 +149,28 @@ def _extract_citations_from_items(items: List[Any], max_citations: int = 10) -> 
     def _try_add(data: Dict[str, Any]) -> None:
         source_name = data.get("source", "")
         image_url = data.get("image_url")
+        if image_url and not allow_images:
+            return
         key = (source_name, image_url) if image_url else source_name
         if source_name and key not in seen_sources:
             seen_sources.add(key)
             citations.append(data)
 
-    # Pass 1: 优先收集图片 citations（避免被 max_citations 截断后“有图却不返回图”）
-    for item in items:
-        if len(citations) >= max_citations:
-            break
-        for cite in _iter_item_citations(item):
-            try:
-                data = _citation_to_dict(cite)
-                if data.get("image_url"):
-                    _try_add(data)
-                    if len(citations) >= max_citations:
-                        break
-            except Exception as e:
-                invalid_count += 1
-                logger.warning(f"[ExtractCitations] 无效的 citation: {e}, cite={cite}")
+    # Pass 1: 视需求决定是否优先收集图片 citations
+    if allow_images:
+        for item in items:
+            if len(citations) >= max_citations:
+                break
+            for cite in _iter_item_citations(item):
+                try:
+                    data = _citation_to_dict(cite)
+                    if data.get("image_url"):
+                        _try_add(data)
+                        if len(citations) >= max_citations:
+                            break
+                except Exception as e:
+                    invalid_count += 1
+                    logger.warning(f"[ExtractCitations] 无效的 citation: {e}, cite={cite}")
 
     # Pass 2: 再补充文本 citations
     for item in items:
@@ -188,6 +196,72 @@ def _extract_citations_from_items(items: List[Any], max_citations: int = 10) -> 
     logger.info(f"[ExtractCitations] 提取了 {len(normalized)} 个有效的 citations")
 
     return normalized
+
+
+def _postprocess_answer_and_align_citations(
+    answer: str,
+    citations_full: List[Any],
+    *,
+    include_citations: bool,
+) -> tuple[str, List[Any]]:
+    """
+    API 层最终兜底：强制对齐“正文引用标记”与“返回的 citations 列表”。
+
+    解决的问题：
+    - 正文出现越界引用（例如 sources 只有 4 条，但正文仍出现 [8][9]）
+    - 正文第一处引用与侧边 PDF/参考资料列表不对应（编号不符合阅读直觉）
+    - 引用过于频繁（每句/每分点后面都有）：压缩到段落/列表块末尾一次
+    """
+    import re
+
+    if not answer:
+        return answer, citations_full
+
+    # 若不返回 citations，则移除正文中的 `[n]`，避免出现“悬空引用”
+    if (not include_citations) or (not citations_full):
+        cleaned = re.sub(r"\[(\d+)\]", "", answer)
+        cleaned = re.sub(r" +", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip(), citations_full
+
+    # 复用 Synthesizer 的后处理逻辑，确保“正文/侧边徽标/参考资料列表”三端一致
+    from backend.app.agents.result_synthesizer_agent.agent import (
+        _normalize_inline_citation_groups,
+        _tighten_citation_spacing,
+        _remap_citations_by_first_appearance,
+        _sort_adjacent_citation_groups,
+        _expand_citation_ranges,
+        _strip_decorative_symbols,
+        _split_heading_lines,
+        _relocate_heading_citations,
+        _strip_citations_in_tables,
+        _relocate_leading_citations,
+    )
+
+    citations_count = len(citations_full)
+
+    # 文本清洗：避免 `\n[1]` 被前端误判为新段落/列表
+    cleaned = re.sub(r"\n+\s*(\[\d+\])", r"\1", answer)
+    cleaned = re.sub(r"\+\d+", "", cleaned)
+    cleaned = cleaned.replace("🔗", "")
+    cleaned = re.sub(r" +", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+
+    cleaned = _strip_decorative_symbols(cleaned)
+    cleaned = _split_heading_lines(cleaned)
+    cleaned = _normalize_inline_citation_groups(cleaned)
+    cleaned = _expand_citation_ranges(cleaned)
+    cleaned = _relocate_heading_citations(cleaned)
+    cleaned = _strip_citations_in_tables(cleaned)
+    cleaned = _relocate_leading_citations(cleaned)
+    cleaned = _tighten_citation_spacing(cleaned)
+
+    # 重新编号：按“正文首次出现顺序”从 [1] 开始，并同步重排 citations（也会移除越界引用）
+    cleaned, citations_full = _remap_citations_by_first_appearance(cleaned, citations_full)
+    cleaned = _sort_adjacent_citation_groups(cleaned)
+    cleaned = _tighten_citation_spacing(cleaned)
+
+    return cleaned.strip(), citations_full
 
 
 def _query_path_to_graph(query_path: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -289,11 +363,104 @@ def _to_ocr_image_rel_path(raw: str, ctx: Dict[str, Any]) -> Optional[str]:
     return "/".join(parts)
 
 
-def _extract_images(citations: List[Dict[str, Any]], api_base: str, max_images: int = 5) -> List[str]:
-    """Build browser-accessible image URLs from citations."""
+def _infer_image_role(text: str) -> str:
+    t = str(text or "")
+    if any(k in t for k in ("总平面", "平面", "总体", "总图", "布置", "布局")):
+        return "overall"
+    if any(k in t for k in ("详图", "节点", "构造", "剖面", "大样")):
+        return "detail"
+    if any(k in t for k in ("接口", "管线", "给排水", "电气", "弱电", "强电", "风管", "管道")):
+        return "interface"
+    return "other"
+
+
+_IMAGE_QUERY_TRIGGERS = (
+    "平面图",
+    "剖面图",
+    "立面图",
+    "总平面",
+    "图纸",
+    "图示",
+    "示意图",
+    "流程图",
+    "结构图",
+    "配图",
+    "附图",
+    "带图",
+    "带图片",
+    "给图",
+    "看图",
+    "图片",
+    "image",
+    "figure",
+    "diagram",
+    "plan",
+    "section",
+)
+
+_IMAGE_QUERY_NEGATIONS = (
+    "不要图",
+    "不需要图",
+    "不看图",
+    "不要图片",
+    "不需要图片",
+)
+
+
+def _wants_images_in_answer(query: str) -> bool:
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
+        return False
+    return True
+
+
+def _build_image_caption(cite: Dict[str, Any]) -> str:
+    import re
+
+    source = str(cite.get("doc_name") or cite.get("source") or "").strip()
+    page = cite.get("page_number")
+    location = str(cite.get("location") or "").strip()
+    snippet = str(cite.get("snippet") or "").strip()
+
+    # 优先用 snippet 的“图片说明/标题”部分
+    desc = snippet
+    desc = desc.replace("[图片:", "").replace("[图片：", "").replace("[图片", "").replace("]", "").strip()
+    desc = re.sub(r"\s+", " ", desc)
+    if len(desc) > 70:
+        desc = desc[:69] + "…"
+
+    if not desc:
+        desc = location or "相关配图"
+
+    head = source or "资料配图"
+    if isinstance(page, int) and page > 0:
+        head = f"{head}（第{page}页）"
+    return f"{head}：{desc}"
+
+
+def _order_image_refs_for_injection(image_refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    role_order = {"overall": 0, "detail": 1, "interface": 2, "other": 3}
+
+    def _key(ref: Dict[str, Any]) -> tuple[int, int]:
+        role = str(ref.get("role") or "other")
+        order = role_order.get(role, 3)
+        page = ref.get("page_number")
+        try:
+            page_num = int(page) if page is not None else 10**6
+        except Exception:
+            page_num = 10**6
+        return (order, page_num)
+
+    return sorted(image_refs, key=_key)
+
+
+def _extract_image_refs(citations: List[Dict[str, Any]], api_base: str, max_images: int = 5) -> List[Dict[str, Any]]:
+    """Build browser-accessible image URLs + captions from citations."""
     api_base = (api_base or "").rstrip("/")
     api_root = f"{api_base}{settings.API_PREFIX}".rstrip("/")
-    images: List[str] = []
+    out: List[Dict[str, Any]] = []
     seen: set[str] = set()
 
     for cite in citations or []:
@@ -317,26 +484,134 @@ def _extract_images(citations: List[Dict[str, Any]], api_base: str, max_images: 
         if url in seen:
             continue
         seen.add(url)
-        images.append(url)
-        if len(images) >= max_images:
+
+        caption = _build_image_caption(cite)
+        out.append(
+            {
+                "url": url,
+                "caption": caption,
+                "role": _infer_image_role(caption),
+                "source": cite.get("source") or cite.get("doc_name"),
+                "page_number": cite.get("page_number"),
+            }
+        )
+        if len(out) >= max_images:
             break
 
-    return images
+    return out
 
 
-def _image_placeholder_block(images: List[str]) -> str:
-    if not images:
+def _build_image_relation_summary(image_refs: List[Dict[str, Any]]) -> str:
+    roles = [str(r.get("role") or "other") for r in image_refs]
+    has_overall = "overall" in roles
+    has_detail = "detail" in roles
+    has_interface = "interface" in roles
+
+    if has_overall and has_detail and has_interface:
+        return "建议按“整体布置 → 局部节点 → 机电接口”顺序阅读：先看平面/布局，再看关键节点详图，最后核对接口与系统需求。"
+    if has_overall and has_detail:
+        return "图示呈“整体—局部”关系：先看平面/布局把握尺度与分区，再看节点详图确认关键设备与构造做法。"
+    if has_overall and has_interface:
+        return "图示可按“空间布置 → 系统接口”阅读：先确定平面/流线，再核对给排水、电气、净化等接口条件。"
+    if has_detail and has_interface:
+        return "图示偏“节点—接口”关系：先看节点详图，再对照接口/管线条件，确保落地施工可实现。"
+    return ""
+
+
+def _image_placeholder_block(image_refs: List[Dict[str, Any]]) -> str:
+    if not image_refs:
         return ""
-    placeholders = "\n".join(f"[image:{i}]" for i in range(len(images)))
-    return "\n\n### 相关图示\n" + placeholders
+
+    lines: List[str] = []
+    relation = _build_image_relation_summary(image_refs)
+    if relation:
+        lines.append("\n\n【图示关系】" + relation)
+
+    for i, ref in enumerate(image_refs):
+        caption = str(ref.get("caption") or "").strip() or "相关配图"
+        lines.append(f"\n\n（图{i+1}：{caption}）\n[image:{i}]")
+
+    return "".join(lines)
 
 
-def _append_image_placeholders(answer: str, images: List[str]) -> str:
-    if not images:
+def _append_image_placeholders(answer: str, image_refs: List[Dict[str, Any]]) -> str:
+    if not image_refs:
         return answer
     if "[image:" in (answer or ""):
         return answer
-    return (answer or "").rstrip() + _image_placeholder_block(images)
+    return (answer or "").rstrip() + _image_placeholder_block(image_refs)
+
+
+def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, Any]]) -> str:
+    """Try to interleave images into the main body instead of appending a block at the end.
+
+    - If answer already contains `[image:` tokens, keep it as-is (do NOT reorder images).
+    - Otherwise, inject captioned `[image:i]` after paragraphs in the most relevant section (prefer `### 资料印证`).
+    """
+    if not image_refs:
+        return answer
+    text = (answer or "").rstrip()
+    if "[image:" in text:
+        return text
+
+    import re
+
+    # Keep the citation catalog section intact (avoid injecting images into the reference list).
+    head = text
+    tail = ""
+    m_ref = re.search(r"(?m)^###\s*引用\s*$", text)
+    if m_ref:
+        head = text[: m_ref.start()].rstrip()
+        tail = "\n\n" + text[m_ref.start() :].lstrip()
+
+    # Prefer inserting images into "资料印证" section, then "关键洞察", then "开场概览".
+    preferred_headers = ("资料印证", "关键洞察", "开场概览")
+    insert_at = 0
+    section_end = len(head)
+
+    def _find_section(name: str) -> Optional[tuple[int, int]]:
+        m = re.search(rf"(?m)^###\s*{re.escape(name)}\s*$", head)
+        if not m:
+            return None
+        start = m.end()
+        m_next = re.search(r"(?m)^###\s+", head[start:])
+        end = start + (m_next.start() if m_next else len(head[start:]))
+        nl = head.find("\n", start)
+        body_start = (nl + 1) if nl != -1 and nl < end else start
+        return body_start, end
+
+    for name in preferred_headers:
+        sec = _find_section(name)
+        if sec:
+            insert_at, section_end = sec
+            break
+
+    # Fallback: insert after the first paragraph.
+    if insert_at == 0 and section_end == len(head):
+        first_break = head.find("\n\n")
+        insert_at = (first_break + 2) if first_break != -1 else len(head)
+        section_end = len(head)
+
+    prefix = head[:insert_at]
+    target = head[insert_at:section_end]
+    suffix = head[section_end:]
+
+    paragraphs = [p for p in re.split(r"\n{2,}", target) if p.strip() != ""]
+    if not paragraphs:
+        return (prefix.rstrip() + _image_placeholder_block(image_refs) + "\n\n" + (target + suffix).lstrip()).rstrip() + tail
+
+    relation = _build_image_relation_summary(image_refs)
+
+    for i in range(len(image_refs)):
+        idx = min(i, len(paragraphs) - 1)
+        caption = str(image_refs[i].get("caption") or "").strip() or "相关配图"
+        token = f"\n\n（图{i+1}：{caption}）\n[image:{i}]"
+        if i == 0 and relation:
+            token = f"\n\n【图示关系】{relation}" + token
+        paragraphs[idx] = paragraphs[idx].rstrip() + token
+
+    rebuilt = "\n\n".join(paragraphs)
+    return (prefix + rebuilt + suffix).rstrip() + tail
 
 # ============================================================================
 # 智能体状态推送
@@ -363,6 +638,96 @@ def _create_agent_status_chunk(agent_name: str, status: str, thought: str = None
         is_final=False
     )
     return f"data: {chunk.model_dump_json()}\n\n"
+
+# 智能体节点中文映射（用于前端思考过程展示）
+AGENT_NODE_LABELS = {
+    "orchestrator": {
+        "extract_query": "提取用户问题",
+        "analyze_intent": "意图分析与相关性判断",
+        "decide_action": "决定调用哪些智能体",
+        "prepare_request": "组装检索请求与参数",
+    },
+    "neo4j": {
+        "init_params": "初始化图谱检索参数",
+        "query_analysis": "查询解析与关键词提取",
+        "entity_match": "实体匹配",
+        "relation_reasoning": "关系推理与路径扩展",
+        "community_filter": "子图/社区筛选",
+        "merge_results": "合并图谱结果",
+        "reflection": "质量评估与是否重试",
+        "add_citations": "添加规范引用",
+    },
+    "milvus": {
+        "extract_query": "提取检索问题",
+        "rewrite_query": "查询改写",
+        "search": "向量检索",
+        "extract_knowledge": "提取知识点",
+        "format": "结果格式化",
+    },
+    "mongodb": {
+        "extract_query": "提取检索问题",
+        "rewrite_query": "查询改写",
+        "search": "文档检索与过滤",
+        "format": "结果格式化",
+    },
+    "online_search": {
+        "extract_query": "提取查询",
+        "search": "在线搜索",
+        "format": "结果整理",
+    },
+    "synthesizer": {
+        "aggregate": "汇总多源结果",
+        "synthesize": "生成最终答案",
+    },
+}
+
+AGENT_NAMESPACE_KEYS = {
+    "orchestrator_agent": "orchestrator",
+    "neo4j_agent": "neo4j",
+    "milvus_agent": "milvus",
+    "mongodb_agent": "mongodb",
+    "online_search_agent": "online_search",
+    "result_synthesizer_agent": "synthesizer",
+}
+
+AGENT_DISPLAY_NAMES = {
+    "orchestrator": "Orchestrator",
+    "neo4j": "Neo4j",
+    "milvus": "Milvus",
+    "mongodb": "MongoDB",
+    "online_search": "OnlineSearch",
+    "synthesizer": "Synthesizer",
+}
+
+
+def _normalize_stream_event(event: Any) -> List[tuple[tuple[str, ...], Dict[str, Any]]]:
+    """标准化 LangGraph stream 事件为 (namespace, payload) 列表。"""
+    normalized: List[tuple[tuple[str, ...], Dict[str, Any]]] = []
+    if isinstance(event, dict):
+        normalized.append(((), event))
+        return normalized
+
+    if isinstance(event, tuple):
+        if len(event) == 2:
+            ns, payload = event
+            if isinstance(payload, dict):
+                normalized.append((tuple(ns) if isinstance(ns, (list, tuple)) else (), payload))
+        elif len(event) == 3:
+            ns, mode, payload = event
+            if mode == "updates" and isinstance(payload, dict):
+                normalized.append((tuple(ns) if isinstance(ns, (list, tuple)) else (), payload))
+
+    return normalized
+
+
+def _extract_agent_key(namespace: tuple[str, ...], node_name: str) -> Optional[str]:
+    for part in reversed(namespace or ()):
+        name = str(part).split(":", 1)[0]
+        if name in AGENT_NAMESPACE_KEYS:
+            return AGENT_NAMESPACE_KEYS[name]
+    if node_name in AGENT_NAMESPACE_KEYS:
+        return AGENT_NAMESPACE_KEYS[node_name]
+    return None
 
 
 # ============================================================================
@@ -402,21 +767,30 @@ async def chat(http_request: Request, request: ChatRequest):
         _add_message_to_session(session_id, "user", request.message)
 
         # 构建 AgentRequest
+        default_max_citations = 15 if request.deep_search else 9
+        max_citations_setting = int(request.max_citations or default_max_citations)
+        if request.deep_search and max_citations_setting <= 9:
+            max_citations_setting = 15
+        # 深度检索模式：增加 top_k 以获取更多候选结果
+        effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
         agent_request = AgentRequest(
             query=request.message,
             filters=request.filters or {},
-            top_k=request.top_k or 8,
+            top_k=effective_top_k,
             timeout_ms=settings.SUPERVISOR_TIMEOUT_MS,
             metadata={
                 "session_id": session_id,
                 "include_online_search": request.include_online_search,
                 "original_query": request.message,
+                "max_citations": max_citations_setting,
+                "include_citations": request.include_citations,
+                "deep_search": request.deep_search,
             }
         )
 
-        # 调用 LangGraph Supervisor
+        # 调用 LangGraph MediArch Graph
         config = {"configurable": {"thread_id": session_id}}
-        result = await supervisor_graph.ainvoke(
+        result = await mediarch_graph.ainvoke(
             {"request": agent_request, "original_query": request.message},
             config=config
         )
@@ -475,22 +849,49 @@ async def chat(http_request: Request, request: ChatRequest):
             pass
 
         # 提取各类信息
-        max_citations = int(getattr(request, "max_citations", None) or 10)
+        # 深度检索模式：返回更多 citations（15-20个）
+        max_citations = max_citations_setting
+        wants_images = _wants_images_in_answer(request.message)
         # 优先使用 Synthesizer 透传的最终 citations（用于严格交叉验证对齐 [n]）
         final_citations_override = result.get("final_citations")
         if isinstance(final_citations_override, list) and final_citations_override:
             citations_full = final_citations_override
         else:
-            citations_full = _extract_citations_from_items(items, max_citations=max_citations)
-        citations = citations_full if request.include_citations else []
+            citations_full = _extract_citations_from_items(
+                items,
+                max_citations=max_citations,
+                allow_images=wants_images,
+            )
         kg_data = _extract_knowledge_graph(worker_responses, result)
         recommended_questions = _extract_recommended_questions(result)
-        images = _extract_images(citations_full, api_base)
+        # Prefer Synthesizer-provided image order (aligns with answer's [image:i] indices).
+        image_references = result.get("image_references")
+        if isinstance(image_references, list) and image_references:
+            max_images = 8 if getattr(request, "deep_search", False) else 5
+            image_refs = _extract_image_refs(image_references, api_base, max_images=max_images)
+        else:
+            max_images = 8 if getattr(request, "deep_search", False) else 5
+            image_refs = _extract_image_refs(citations_full, api_base, max_images=max_images)
 
-        # 让前端能渲染图片：在文本末尾追加 [image:n] 占位符
-        # 严格交叉验证模式下，为避免破坏“只输出三段标题”的格式，不追加占位符。
-        if not strict_cross_doc_mode:
-            final_answer = _append_image_placeholders(final_answer, images)
+        answer_has_image_tokens = "[image:" in (final_answer or "")
+        if image_refs and (not answer_has_image_tokens):
+            image_refs = _order_image_refs_for_injection(image_refs)
+
+        images = [ref.get("url") for ref in image_refs if ref.get("url")]
+
+        # 让前端能渲染图片：优先尝试将图片插入正文附近；必要时再回退到末尾占位符。
+        # 严格交叉验证模式下，为避免破坏格式，不做任何占位符注入。
+        if not strict_cross_doc_mode and wants_images:
+            final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
+            final_answer = _append_image_placeholders(final_answer, image_refs)
+
+        # [FIX 2026-01-14] API 层最终对齐：避免“参考资料只有 N 条但正文出现 [N+1]”
+        final_answer, citations_full = _postprocess_answer_and_align_citations(
+            final_answer,
+            citations_full,
+            include_citations=bool(request.include_citations),
+        )
+        citations = citations_full if request.include_citations else []
 
         # 添加助手回复到历史
         _add_message_to_session(session_id, "assistant", final_answer, citations, images)
@@ -567,24 +968,29 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             # 添加用户消息到历史
             _add_message_to_session(session_id, "user", request.message)
 
-            # 发送智能体开始状态
-            agents = ["Orchestrator", "Neo4j", "Milvus", "MongoDB", "OnlineSearch", "Synthesizer"]
-            yield _create_agent_status_chunk("Orchestrator", "running", "Analyzing query...")
-
             # 构建 AgentRequest
+            default_max_citations = 15 if request.deep_search else 9
+            max_citations_setting = int(request.max_citations or default_max_citations)
+            if request.deep_search and max_citations_setting <= 9:
+                max_citations_setting = 15
+            # 深度检索模式：增加 top_k 以获取更多候选结果
+            effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
             agent_request = AgentRequest(
                 query=request.message,
                 filters=request.filters or {},
-                top_k=request.top_k or 8,
+                top_k=effective_top_k,
                 timeout_ms=settings.SUPERVISOR_TIMEOUT_MS,
                 metadata={
                     "session_id": session_id,
                     "include_online_search": request.include_online_search,
                     "original_query": request.message,
+                    "max_citations": max_citations_setting,
+                    "include_citations": request.include_citations,
+                    "deep_search": request.deep_search,
                 }
             )
 
-            # 调用 LangGraph Supervisor（使用 astream 获取中间状态）
+            # 调用 LangGraph MediArch Graph（使用 astream 获取中间状态）
             config = {"configurable": {"thread_id": session_id}}
 
             # 流式返回中间状态
@@ -594,35 +1000,52 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             kg_data = None
             recommended_questions = []
             images = []
+            image_references = []
             worker_responses = []
             final_citations_override = []
             neo4j_graph_sent = False
+            strict_cross_doc_mode = False
 
-            # 追踪已发送状态的Agent，避免重复发送
-            agent_status_sent = {
-                "Orchestrator": False,
-                "Neo4j": False,
-                "Milvus": False,
-                "MongoDB": False,
-                "Synthesizer": False,
-            }
             agent_completed = {
                 "Orchestrator": False,
                 "Neo4j": False,
                 "Milvus": False,
                 "MongoDB": False,
+                "OnlineSearch": False,
                 "Synthesizer": False,
             }
+            last_node_labels: Dict[str, str] = {}
 
-            async for event in supervisor_graph.astream(
+            async for event in mediarch_graph.astream(
                 {"request": agent_request, "original_query": request.message},
-                config=config
+                config=config,
+                stream_mode="updates",
+                subgraphs=True,
             ):
-                # 发送中间进度
-                if isinstance(event, dict):
+                for namespace, payload in _normalize_stream_event(event):
+                    if not payload:
+                        continue
+                    event_items = list(payload.items())
+
+                    # 节点级状态（用于前端思考过程）
+                    for node_name, _ in event_items:
+                        agent_key = _extract_agent_key(namespace, node_name)
+                        if not agent_key:
+                            continue
+                        label = AGENT_NODE_LABELS.get(agent_key, {}).get(node_name)
+                        if not label:
+                            continue
+                        last_node_labels[agent_key] = label
+                        display_name = AGENT_DISPLAY_NAMES.get(agent_key, agent_key)
+                        yield _create_agent_status_chunk(display_name, "running", label)
+
+                    # 只处理顶层节点的聚合逻辑
+                    if namespace:
+                        continue
+
                     # LangGraph astream 返回的 event 格式: {node_name: node_output}
                     # 例如: {"orchestrator_agent": {...}}, {"neo4j_agent": {...}}
-                    for node_name, node_output in event.items():
+                    for node_name, node_output in event_items:
                         thought = None
 
                         # 从节点输出中提取思考信息
@@ -642,19 +1065,17 @@ async def chat_stream(http_request: Request, request: ChatRequest):
 
                         # 根据节点名称发送状态更新
                         if node_name == "orchestrator_agent":
-                            if not agent_status_sent["Orchestrator"]:
-                                yield _create_agent_status_chunk("Orchestrator", "completed", thought or "Query analysis completed")
+                            if not agent_completed["Orchestrator"]:
+                                thought_text = last_node_labels.get("orchestrator") or thought
+                                yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
                                 agent_completed["Orchestrator"] = True
-                                agent_status_sent["Orchestrator"] = True
 
                         elif node_name == "neo4j_agent":
                             diagnostics = node_output.get("diagnostics", {}) if isinstance(node_output, dict) else {}
-                            if not agent_status_sent["Neo4j"]:
-                                yield _create_agent_status_chunk("Neo4j", "running", "Querying knowledge graph...")
-                                agent_status_sent["Neo4j"] = True
                             # Neo4j 完成
                             if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                yield _create_agent_status_chunk("Neo4j", "completed", thought or "Knowledge graph query completed")
+                                thought_text = last_node_labels.get("neo4j") or thought
+                                yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
                                 agent_completed["Neo4j"] = True
                                 query_path = diagnostics.get("query_path")
                                 if query_path and not neo4j_graph_sent:
@@ -670,54 +1091,45 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                                         neo4j_graph_sent = True
 
                         elif node_name == "milvus_agent":
-                            if not agent_status_sent["Milvus"]:
-                                yield _create_agent_status_chunk("Milvus", "running", "Vector similarity search...")
-                                agent_status_sent["Milvus"] = True
                             # Milvus 完成
                             if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                yield _create_agent_status_chunk("Milvus", "completed", thought or "Vector search completed")
+                                thought_text = last_node_labels.get("milvus") or thought
+                                yield _create_agent_status_chunk("Milvus", "completed", thought_text)
                                 agent_completed["Milvus"] = True
 
                         elif node_name == "mongodb_agent":
-                            if not agent_status_sent["MongoDB"]:
-                                yield _create_agent_status_chunk("MongoDB", "running", "Document retrieval...")
-                                agent_status_sent["MongoDB"] = True
                             # MongoDB 完成
                             if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                yield _create_agent_status_chunk("MongoDB", "completed", thought or "Document retrieval completed")
+                                thought_text = last_node_labels.get("mongodb") or thought
+                                yield _create_agent_status_chunk("MongoDB", "completed", thought_text)
                                 agent_completed["MongoDB"] = True
 
-                        elif node_name == "result_synthesizer_agent":
-                            if not agent_status_sent["Synthesizer"]:
-                                yield _create_agent_status_chunk("Synthesizer", "running", "Generating comprehensive answer...")
-                                agent_status_sent["Synthesizer"] = True
+                        elif node_name == "online_search_agent":
+                            if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
+                                thought_text = last_node_labels.get("online_search") or thought
+                                yield _create_agent_status_chunk("OnlineSearch", "completed", thought_text)
+                                agent_completed["OnlineSearch"] = True
 
                         elif node_name == "knowledge_fusion":
                             # Knowledge Fusion 完成时，说明 Neo4j 和 Milvus 阶段1都已完成
                             if not agent_completed["Neo4j"]:
-                                yield _create_agent_status_chunk("Neo4j", "completed", "Knowledge graph query completed")
+                                thought_text = last_node_labels.get("neo4j") or "实体匹配"
+                                yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
                                 agent_completed["Neo4j"] = True
                             if not agent_completed["Milvus"]:
-                                yield _create_agent_status_chunk("Milvus", "completed", "Vector search completed")
+                                thought_text = last_node_labels.get("milvus") or "向量检索"
+                                yield _create_agent_status_chunk("Milvus", "completed", thought_text)
                                 agent_completed["Milvus"] = True
 
                         elif node_name == "prepare_parallel_workers":
                             # 准备阶段完成，Orchestrator 已完成
                             if not agent_completed["Orchestrator"]:
-                                yield _create_agent_status_chunk("Orchestrator", "completed", thought or "Query analysis completed")
+                                thought_text = last_node_labels.get("orchestrator") or thought
+                                yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
                                 agent_completed["Orchestrator"] = True
 
-                        elif node_name == "fan_out_workers":
-                            # 开始并行检索
-                            if not agent_status_sent["Neo4j"]:
-                                yield _create_agent_status_chunk("Neo4j", "running", "Querying knowledge graph...")
-                                agent_status_sent["Neo4j"] = True
-                            if not agent_status_sent["Milvus"]:
-                                yield _create_agent_status_chunk("Milvus", "running", "Vector similarity search...")
-                                agent_status_sent["Milvus"] = True
-
                     # 收集中间结果
-                    for node_name, node_output in event.items():
+                    for node_name, node_output in event_items:
                         if isinstance(node_output, dict):
                             if "items" in node_output:
                                 items_data = node_output["items"]
@@ -725,7 +1137,7 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                                     all_items.extend(items_data)
 
                     # 从各节点输出中收集worker_responses和final_answer
-                    for node_name, node_output in event.items():
+                    for node_name, node_output in event_items:
                         if isinstance(node_output, dict):
                             # 收集 worker_responses
                             if "worker_responses" in node_output:
@@ -735,19 +1147,15 @@ async def chat_stream(http_request: Request, request: ChatRequest):
 
                             # 检查 final_answer（通常来自 result_synthesizer_agent 或 push_answer_message）
                             if "final_answer" in node_output and node_output["final_answer"]:
-                                yield _create_agent_status_chunk("Synthesizer", "completed", "Answer generation completed")
+                                if not agent_completed["Synthesizer"]:
+                                    thought_text = last_node_labels.get("synthesizer")
+                                    yield _create_agent_status_chunk("Synthesizer", "completed", thought_text)
+                                    agent_completed["Synthesizer"] = True
                                 final_answer = node_output["final_answer"]
-
-                                # 逐字符流式发送答案
-                                for i in range(0, len(final_answer), 10):  # 每次发送10个字符
-                                    chunk_text = final_answer[i:i+10]
-                                    chunk = StreamingChatChunk(
-                                        chunk_type="content",
-                                        content=chunk_text,
-                                        is_final=False
-                                    )
-                                    yield f"data: {chunk.model_dump_json()}\n\n"
-                                    await asyncio.sleep(0.02)  # 模拟打字延迟
+                                # image_references（用于 images[] 顺序对齐）
+                                if "image_references" in node_output and node_output["image_references"]:
+                                    if isinstance(node_output["image_references"], list):
+                                        image_references = node_output["image_references"]
 
                             # 提取知识图谱
                             if "answer_graph_data" in node_output and node_output["answer_graph_data"]:
@@ -762,6 +1170,9 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                                 fc = node_output["final_citations"]
                                 if isinstance(fc, list):
                                     final_citations_override = fc
+                            # 严格交叉验证模式标记
+                            if "strict_cross_doc" in node_output:
+                                strict_cross_doc_mode = bool(node_output.get("strict_cross_doc"))
 
                             # 提取 unified_hints 中的知识图谱数据
                             if "unified_hints" in node_output and node_output["unified_hints"]:
@@ -776,16 +1187,62 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                                     }
 
             # 提取引用信息（图片也依赖 citations 来构建 URL）
-            max_citations = int(getattr(request, "max_citations", None) or 10)
-            all_citations_full = final_citations_override if final_citations_override else _extract_citations_from_items(all_items, max_citations=max_citations)
-            all_citations = all_citations_full if request.include_citations else []
+            # 深度检索模式：返回更多 citations（15-20个）
+            max_citations = max_citations_setting
+            wants_images = _wants_images_in_answer(request.message)
+            all_citations_full = (
+                final_citations_override
+                if final_citations_override
+                else _extract_citations_from_items(
+                    all_items,
+                    max_citations=max_citations,
+                    allow_images=wants_images,
+                )
+            )
 
             # 提取知识图谱（如果还没有）
             if not kg_data:
                 kg_data = _extract_knowledge_graph(worker_responses, {"answer_graph_data": None})
 
             # 提取图片（构建浏览器可访问的 /api/v1/documents/image?... URL）
-            images = _extract_images(all_citations_full, api_base)
+            if isinstance(image_references, list) and image_references:
+                max_images = 8 if getattr(request, "deep_search", False) else 5
+                image_refs = _extract_image_refs(image_references, api_base, max_images=max_images)
+            else:
+                max_images = 8 if getattr(request, "deep_search", False) else 5
+                image_refs = _extract_image_refs(all_citations_full, api_base, max_images=max_images)
+
+            answer_has_image_tokens = "[image:" in (final_answer or "")
+            if image_refs and (not answer_has_image_tokens):
+                image_refs = _order_image_refs_for_injection(image_refs)
+
+            images = [ref.get("url") for ref in image_refs if ref.get("url")]
+
+            # 让前端能渲染图片：优先尝试插入正文附近；必要时回退到末尾占位符块。
+            # 严格交叉验证模式下，为避免破坏固定输出格式，不注入占位符。
+            if image_refs and not strict_cross_doc_mode and wants_images:
+                final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
+                final_answer = _append_image_placeholders(final_answer, image_refs)
+
+            # [FIX 2026-01-14] API 层最终对齐：避免流式返回时出现越界/乱引用
+            final_answer, all_citations_full = _postprocess_answer_and_align_citations(
+                final_answer,
+                all_citations_full,
+                include_citations=bool(request.include_citations),
+            )
+            all_citations = all_citations_full if request.include_citations else []
+
+            # 逐字符流式发送答案（注意：这里已经注入了 [image:n]）
+            if final_answer:
+                for i in range(0, len(final_answer), 10):  # 每次发送10个字符
+                    chunk_text = final_answer[i:i+10]
+                    chunk = StreamingChatChunk(
+                        chunk_type="content",
+                        content=chunk_text,
+                        is_final=False
+                    )
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+                    await asyncio.sleep(0.02)  # 模拟打字延迟
 
             # 提取推荐问题（如果还没有）
             if not recommended_questions:
@@ -835,19 +1292,7 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                 )
                 yield f"data: {chunk.model_dump_json()}\n\n"
 
-            # 让前端能渲染图片：追加 [image:n] 占位符块
-            if images and '[image:' not in (final_answer or ''):
-                placeholder_block = _image_placeholder_block(images)
-                if placeholder_block:
-                    chunk = StreamingChatChunk(
-                        chunk_type='content',
-                        content=placeholder_block,
-                        is_final=False,
-                    )
-                    yield f"data: {chunk.model_dump_json()}\n\n"
-
-            # 历史记录也存储带占位符的最终答案
-            final_answer = _append_image_placeholders(final_answer, images)
+            # 历史记录也存储带占位符/插图的最终答案
 
             # 添加助手回复到历史
             _add_message_to_session(session_id, "assistant", final_answer, all_citations, images)

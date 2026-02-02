@@ -12,7 +12,7 @@ Integrate hospital-related regulations, standards, books, reports, research pape
 
 This project aims to build a conversational, inspirational system for comprehensive hospital architectural design. It seeks to bridge the gap between design knowledge and creative inspiration. Traditional manual lookups and searches are not only inefficient but also struggle to link and deeply integrate knowledge from multiple sources.To address this pain point, we propose a **Graph-Based Agentic Retrieval-Augmented Generation (RAG)** framework driven by a multi-source database of intelligent agents.
 
-![图片加载失败](images\从信息到智慧的综合医院设计流程构想.png "从信息到智慧的综合医院设计流程构想")
+![图片加载失败](./images/从信息到智慧的综合医院设计流程构想.png "从信息到智慧的综合医院设计流程构想")
 
 ### 数据源整合方面(Data Source Integration)：
 
@@ -70,9 +70,10 @@ The Orchestrator Agent is responsible for decomposing, interpreting, and enrichi
 
 - Finally, users receive not only the synthesized answer but also contextual recommendations from the Result Synthesizer Agent, guiding further exploration and deeper retrieval.
 
-![图片加载失败](images\系统架构图.png "系统架构图")
+![图片加载失败](./images/系统架构图.png "系统架构图")
 
 ## 核心技术与挑战（Key Technologies & Challenges）
+
 
 ### 挑战一：知识抽取与本体建模
 
@@ -94,32 +95,49 @@ The Orchestrator Agent is responsible for decomposing, interpreting, and enrichi
 
 > Challenge 5: Result Synthesizer Agent — Conflict Resolution and Result Processing
 
-该脚本依次执行三个阶段：
 
-1. **身份合并**：同名/别名节点使用 `apoc.refactor.mergeNodes` 进行无损合并，并修复因合并产生的“单元素数组”属性；
-2. **孤儿挂载**：按关键词优先级为孤立的 `FunctionalZone` 寻找最优父级，所有自动创建的 `CONTAINS` 关系都会记录 `matched_by/run_id/script_ver/created_at` 以便审计；
-3. **粒度纠偏**：按照强/弱规则配置，将“护士站、候诊室”等节点从 `FunctionalZone` 降级为 `Space`，同时标记 `auto_downgrade` 字段。
+## 快速启动命令
 
-执行完毕后，脚本会输出 run_id、剩余孤儿数、当次新增关系和降级节点统计，可作为日常运维报表或回滚依据。
+#### 1. 启动后端（FastAPI）
 
+在项目根目录下打开终端，执行：
+
+```bash
+# 方式 1：直接运行 main.py
+python backend/api/main.py
+
+# 方式 2：使用 uvicorn（更灵活）
 uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
-pnpm dev
+```
 
-## 知识图谱与向量检索优化方案（2025-12-12 PRD 摘要）
+后端服务将在 `http://localhost:8000` 启动
 
-- 核心痛点：`mediarch_chunks` 与 `entity_attributes` 重复存储、索引流程串行、向量检索与图谱检索割裂。
-- 优化目标：以 `mediarch_chunks` 作为统一向量源，图谱节点直接持有 `chunk_ids`；索引与图谱构建并行；检索结果按“向量相似度 + 图谱关联度”融合。
-- 关键方案：双向链接 `chunk_ids ↔ entity_ids`；ThreadPoolExecutor 并行索引；HybridRetriever 同时调用 Milvus 与 Neo4j 并做重排序；MongoDB/Neo4j 建立针对 `entity_ids/chunk_ids` 的索引。
-- 计划里程碑：Week 1-2 完成数据层去冗余与双向关联，Week 3 上线并行索引并提交性能报告，Week 4-6 上线混合检索与前端可视化，Week 7 集成测试，Week 8 正式上线与监控。
-- 指标预期：索引时间 -40%，检索准确度 +20%（至 90%），存储成本 -40%，P95 响应 < 1.5s。
-- 详情参见：`2025-12-12_知识图谱优化方案PRD.md`
+- API 文档：http://localhost:8000/api/docs
+- ReDoc 文档：http://localhost:8000/api/redoc
 
-## 每日工作日志（Daily Log）
+#### 2. 启动前端（Next.js）
 
-> 更新方式：每个工作日添加/刷新一条，记录“完成/交付、问题/风险、今日/明日重点、参考”。下一工作日直接在此段落顶部插入新日期条目。
+**新开一个终端窗口**，在项目根目录下执行：
 
-### 2025-12-12
-- 完成/交付：输出《知识图谱与向量检索优化方案》PRD v1.0，确定“统一向量库 + 图谱并行构建 + 混合检索融合”的技术路线，梳理阶段性里程碑与指标。
-- 问题/风险：现有 `entity_attributes` 与 `mediarch_chunks` 冗余；索引链路串行导致耗时；向量与图谱检索缺少 `chunk_ids/entity_ids` 的互链，融合效果受限。
-- 今日/明日重点：启动阶段 1——在图谱节点写入 `chunk_ids`，为 MongoDB chunks 添加 `entity_ids` 字段并补链；起草 `parallel_index_and_kg.py` 并行索引骨架与重试逻辑。
-- 参考：`2025-12-12_知识图谱优化方案PRD.md`
+```bash
+# 进入前端目录并启动
+cd frontend && pnpm dev
+
+# 或者使用 npm
+cd frontend && npm run dev
+```
+
+前端服务将在 `http://localhost:3000` 启动
+
+
+## 环境要求
+
+### 后端依赖
+- Python 3.11+
+- 已安装项目依赖：`pip install -r requirements.txt`
+- 配置好 `.env` 文件（参考 `.env.minimal`）
+
+### 前端依赖
+- Node.js 18+
+- pnpm 或 npm
+- 已安装依赖：`cd frontend && pnpm install`

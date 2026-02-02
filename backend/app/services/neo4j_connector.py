@@ -13,3 +13,9 @@ def get_neo4j_driver() -> Optional[Any]:
     return GraphDatabase.driver(uri, auth=(user, password))
 
 
+@lru_cache(maxsize=1)
+def get_neo4j_database() -> str:
+    """获取 Neo4j 数据库名称"""
+    return os.getenv("NEO4J_DATABASE", "neo4j")
+
+

@@ -61,9 +61,9 @@ async def get_expansion_llm():
             return _expansion_llm
 
         try:
-            api_key = os.getenv("INTELLIGENT_EXPANSION_API_KEY") or os.getenv("OPENAI_API_KEY")
+            api_key = os.getenv("MEDIARCH_API_KEY")
             if not api_key:
-                raise ValueError("缺少 INTELLIGENT_EXPANSION_API_KEY 或 OPENAI_API_KEY")
+                raise ValueError("缺少 MEDIARCH_API_KEY（intelligent_expansion）")
 
             base_url = (os.getenv("INTELLIGENT_EXPANSION_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "").rstrip("/")
             model_name = os.getenv("INTELLIGENT_EXPANSION_MODEL", "gpt-4o-mini")

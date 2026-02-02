@@ -11,6 +11,7 @@ export interface PDFSource {
   pageNumber: number
   snippet: string
   highlightText?: string
+  imageUrl?: string
   thumbnail?: string
   pdfUrl?: string
   documentPath?: string
@@ -18,6 +19,7 @@ export interface PDFSource {
   section?: string
   metadata?: Record<string, unknown>
   docId?: string
+  contentType?: 'text' | 'image' | 'table'  // [FIX 2025-12-27] 添加 content_type 字段
   // PDF 高亮位置信息
   positions?: Array<{
     page: number

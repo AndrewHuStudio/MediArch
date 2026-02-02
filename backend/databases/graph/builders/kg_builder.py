@@ -1,9 +1,8 @@
 """
 医疗建筑知识图谱构建器
 
-方案：图谱+向量混合存储
+方案：图谱（Neo4j）+ 溯源（MongoDB）
 - Neo4j：存储实体和关系（轻量级结构）+ 内嵌轻量属性
-- Milvus：存储属性详细内容（文案、图片、表格）+ 向量检索
 - MongoDB：原始文档和富媒体数据溯源
 
 特性：
@@ -44,19 +43,17 @@ load_dotenv()
 
 
 class MedicalKGBuilder:
-    """医疗建筑知识图谱构建器（图谱+向量混合存储）"""
+    """医疗建筑知识图谱构建器（Neo4j 图谱构建）"""
     
     def __init__(
-        self, 
-        schema_path: str = "backend/databases/graph/schemas/medical_architecture_3.json",
-        use_milvus: bool = True
+        self,
+        schema_path: str = "backend/databases/graph/schemas/medical_architecture_3.json"
     ):
         """
         初始化构建器
-        
+
         Args:
             schema_path: Schema文件路径
-            use_milvus: 是否启用Milvus向量存储（默认True）
         """
         # 加载Schema（支持环境变量 KG_SCHEMA_PATH 覆盖）
         resolved_schema_path = os.getenv("KG_SCHEMA_PATH", schema_path)
@@ -159,18 +156,28 @@ class MedicalKGBuilder:
         self.extractions_collection = self.db.get_collection("kg_extractions")
         
         # 连接Neo4j
+        neo4j_uri = os.getenv("NEO4J_URI")
+        neo4j_user = os.getenv("NEO4J_USER")
+        neo4j_password = os.getenv("NEO4J_PASSWORD")
+        self.neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
+
         self.neo4j_driver = GraphDatabase.driver(
-            os.getenv("NEO4J_URI"),
-            auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
+            neo4j_uri,
+            auth=(neo4j_user, neo4j_password)
         )
         
         # 初始化LLM Client（统一封装）
+        # 支持两种环境变量前缀：KG_OPENAI_* 或 OPENAI_*（向下兼容）
+        api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+        model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+
         self.llm_client = LLMClient(
-            api_key=os.getenv("KG_OPENAI_API_KEY"),
-            base_url=os.getenv("KG_OPENAI_BASE_URL"),
-            model=os.getenv("KG_OPENAI_MODEL", "gpt-4o-mini"),
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
         )
-        self.llm_model = os.getenv("KG_OPENAI_MODEL", "gpt-4o-mini")
+        self.llm_model = model
         # 是否将图片作为图节点进行回链（默认关闭，改为检索层召回）
         self.link_images = os.getenv("KG_LINK_IMAGES", "0").lower() in {"1", "true", "yes"}
         # 语义相似度消歧（候选建议）
@@ -204,7 +211,7 @@ class MedicalKGBuilder:
         # 关系验证 LLM 兜底开关
         self.relation_llm_fallback = os.getenv("KG_RELATION_LLM_FALLBACK", "0").lower() in {"1", "true", "yes"}
         
-        # Milvus连接（可选）
+        # 构建选项
         self.enable_cooccurrence_aug = os.getenv("KG_RELATION_COOC_AUG", "1").lower() in {"1", "true", "yes"}
         self.drop_uncertain_relations = os.getenv("KG_RELATION_DROP_UNCERTAIN", "0").lower() in {"1", "true", "yes"}
 
@@ -241,26 +248,11 @@ class MedicalKGBuilder:
                     self.cooccur_allowed_pairs.add((a, b))
                     self.cooccur_allowed_pairs.add((b, a))
         self.cooccur_write_cooccur = os.getenv("KG_COOCCUR_WRITE_CO_OCCUR", "0").lower() in {"1", "true", "yes"}
-        self.use_milvus = use_milvus
-        self.embedding_dim = None  # 存储embedding维度
-        self.milvus_collection = None
-        self.milvus_collection_name = os.getenv("MILVUS_COLLECTION", "entity_attributes")
-        self.milvus_status: Dict[str, Any] = {}
 
-        if self.use_milvus:
-            ensured = self._ensure_milvus_collection(force_create=False)
-            if not ensured:
-                print(f"[WARN] Milvus not available. Falling back to graph-only mode.")
-        # Milvus flush 阈值（条数/时间）
-        self._milvus_max_buffer = int(os.getenv("MILVUS_FLUSH_MAX", "1000"))
-        self._milvus_flush_sec = int(os.getenv("MILVUS_FLUSH_SEC", "30"))
-        self._milvus_last_flush_ts = time.time()
-        
         self.last_write_summary: Dict[str, Any] = {}
 
         print(f"[OK] KGBuilder initialized")
         print(f"  - Neo4j: Entities + Relations")
-        print(f"  - Milvus: {'Enabled (Attributes)' if self.use_milvus else 'Disabled'}")
         print(f"  - Mongo chunks collection: {self.chunks_collection.name}")
         if self.enable_semantic_fusion:
             print("  - Entity fusion suggestions: Enabled")
@@ -281,18 +273,6 @@ class MedicalKGBuilder:
         self._chunk_entity_index: Dict[str, List[str]] = defaultdict(list)
         self._chunk_sequence_counter = 0
 
-        if self.use_milvus and self.milvus_collection:
-            summary = self._milvus_status_summary()
-            if summary:
-                self.milvus_status = summary
-                print("[Milvus] entity_attributes status:")
-                print(f"  - vectors      : {summary['num_entities']}")
-                print(f"  - vector_dim   : {summary['vector_dim']}")
-                print(f"  - created_at   : {summary['created_time']}")
-                print(f"  - collection   : {self.milvus_collection_name}")
-            else:
-                print("[Milvus] Unable to read collection status.")
-
         self.rebuild_strategy = self._determine_build_strategy()
 
         # 加载概念节点索引（用于去重）
@@ -301,7 +281,10 @@ class MedicalKGBuilder:
             total_concepts = sum(len(v) for v in self.concept_nodes.values())
             print(f"[OK] Loaded {total_concepts} concept nodes from Neo4j")
         else:
-            print("[WARN] No concept nodes found. Please run seed_ontology script first.")
+            print(
+                "[WARN] No concept nodes found. "
+                "Please run seed_ontology_v2.py (recommended) or seed_ontology.py first."
+            )
 
         # 扩展允许的关系类型，加入弱证据关系
         if isinstance(self.allowed_relation_types, set):
@@ -313,26 +296,34 @@ class MedicalKGBuilder:
 
         Returns:
             {
-                "Hospital": {"综合医院": "node_id_123"},
-                "DepartmentGroup": {"急诊部": "node_id_456", ...},
+                "Hospital": {"综合医院": "entity_xxx"},
+                "DepartmentGroup": {"急诊部": "entity_yyy", ...},
                 ...
             }
         """
         index = {}
         try:
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 result = session.run("""
                     MATCH (n) WHERE n.is_concept = true
-                    RETURN labels(n)[0] AS label, n.name AS name, id(n) AS node_id
+                    RETURN labels(n)[0] AS label,
+                           coalesce(n.name, n.title) AS name,
+                           n.id AS node_id
                 """)
                 for record in result:
                     label = record["label"]
                     name = record["name"]
-                    node_id = str(record["node_id"])
+                    node_id = record.get("node_id")
+                    if not label or not name or not node_id:
+                        continue
+                    node_id = str(node_id)
 
                     if label not in index:
                         index[label] = {}
-                    index[label][name] = node_id
+                    # 用规范化名称作为 key，避免别名/同义词导致无法命中
+                    concept_type = self.label_to_concept.get(label, label)
+                    canonical_name = canonicalize(str(name), str(concept_type), self.alias_map)
+                    index[label][canonical_name] = node_id
         except Exception as e:
             print(f"[WARN] Failed to load concept node index: {e}")
 
@@ -443,10 +434,50 @@ class MedicalKGBuilder:
         - 稳定 ID = hash(标准化名字 + 类型 + 作用域)
         - 已存在则只追加 chunk_id / 补充描述
         """
+        # 0) 概念节点：优先引用预注入骨架（全局唯一，避免重复创建）
+        if entity_type:
+            label = self.concept_to_label.get(entity_type)
+            if label and label in self.concept_nodes:
+                canonical_name = canonicalize(entity_name, entity_type, self.alias_map)
+                concept_node_id = self.concept_nodes[label].get(canonical_name)
+                if concept_node_id:
+                    # 确保在 NetworkX 图中也有占位节点（后续属性/关系写入都依赖 graph.nodes）
+                    if self.graph.has_node(concept_node_id):
+                        props = self.graph.nodes[concept_node_id].get("properties", {})
+                        chunk_ids = props.get("chunk_ids") or []
+                        if chunk_id and chunk_id not in chunk_ids:
+                            chunk_ids.append(chunk_id)
+                        props["chunk_ids"] = chunk_ids
+                        # 以 schema_type 驱动后续写入标签匹配
+                        props.setdefault("schema_type", entity_type)
+                        if description:
+                            existing_desc = props.get("description")
+                            if not existing_desc or (description not in existing_desc and len(description) > len(existing_desc)):
+                                props["description"] = description
+                        props.setdefault("attributes", [])
+                        self.graph.nodes[concept_node_id]["properties"] = props
+                    else:
+                        properties = {
+                            "name": entity_name,
+                            "chunk_ids": [chunk_id] if chunk_id else [],
+                            "attributes": [],
+                            "schema_type": entity_type,
+                        }
+                        if description:
+                            properties["description"] = description
+                        self.graph.add_node(
+                            concept_node_id,
+                            label="entity",
+                            properties=properties,
+                            level=2,
+                        )
+                        self.node_counter += 1
+
+                    print(f"[Concept] Referencing concept node: {canonical_name} ({label}) -> {concept_node_id}")
+                    return concept_node_id
+
         # 1) 基于名称+类型(+作用域) 生成稳定ID
-        entity_node_id = self._generate_stable_entity_id(
-            entity_name, entity_type or "", scope_chain
-        )
+        entity_node_id = self._generate_stable_entity_id(entity_name, entity_type or "", scope_chain)
 
         # 2) 已存在：追加 chunk_id / 补充描述 / 补齐类型
         if self.graph.has_node(entity_node_id):
@@ -467,26 +498,11 @@ class MedicalKGBuilder:
             self.graph.nodes[entity_node_id]["properties"] = props
             return entity_node_id
 
-        # 2.5) 检查是否为概念节点（全局唯一，引用而不创建）
-        if entity_type:
-            label = self.concept_to_label.get(entity_type)
-            if label and label in self.concept_nodes:
-                # 标准化名称进行匹配
-                canonical_name = canonicalize(entity_name, entity_type, self.alias_map)
-                if canonical_name in self.concept_nodes[label]:
-                    # 找到概念节点，返回其ID而不是创建新节点
-                    concept_node_id = self.concept_nodes[label][canonical_name]
-                    print(f"[Concept] Referencing concept node: {canonical_name} ({label}) -> {concept_node_id}")
-                    # 不在NetworkX中创建，直接返回Neo4j节点ID
-                    # 注意：这里需要特殊处理，标记为概念节点引用
-                    return f"concept:{concept_node_id}"
-
         # 3) 新建节点：最小必需属性
         properties = {
             "name": entity_name,
             "chunk_ids": [chunk_id] if chunk_id else [],
             "attributes": [],            # 轻量属性列表（值）
-            "milvus_vector_ids": [],     # 写 Milvus 后回填 vector id
         }
         if entity_type:
             properties["schema_type"] = entity_type
@@ -791,9 +807,9 @@ class MedicalKGBuilder:
         except Exception:
             pass
 
-        # Neo4j 约束：为每个真实标签创建唯一约束 (id)
+        # Neo4j 约束:为每个真实标签创建唯一约束 (id)
         try:
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 for lbl in set(self.type_to_label.values()):
                     session.run(
                         f"""
@@ -805,18 +821,36 @@ class MedicalKGBuilder:
             pass
 
     def _get_cached_extraction(self, chunk_id: str) -> Optional[Dict]:
-        """按 chunk_id + 版本查询缓存。"""
+        """按 chunk_id + 版本查询缓存。
+
+        只返回状态为 "success" 的缓存结果，失败的缓存会被忽略（自动重试）。
+        """
         try:
             doc = self.extractions_collection.find_one({
                 "chunk_id": chunk_id,
                 "version": self.extraction_version,
-            }, projection={"_id": 0, "result": 1})
-            return doc["result"] if doc and "result" in doc else None
+            }, projection={"_id": 0, "result": 1, "status": 1})
+
+            if not doc or "result" not in doc:
+                return None
+
+            # 只返回成功的缓存，失败的缓存会被重试
+            status = doc.get("status", "success")  # 兼容旧数据，默认为成功
+            if status == "success":
+                return doc["result"]
+
+            return None
         except Exception:
             return None
 
-    def _cache_extraction_result(self, chunk_id: str, result: Dict) -> None:
-        """写入/更新缓存（幂等）。"""
+    def _cache_extraction_result(self, chunk_id: str, result: Dict, status: str = "success") -> None:
+        """写入/更新缓存（幂等）。
+
+        Args:
+            chunk_id: chunk ID
+            result: 抽取结果
+            status: 处理状态 ("success" 或 "failed")
+        """
         try:
             self.extractions_collection.update_one(
                 {"chunk_id": chunk_id, "version": self.extraction_version},
@@ -824,6 +858,7 @@ class MedicalKGBuilder:
                     "chunk_id": chunk_id,
                     "version": self.extraction_version,
                     "result": result,
+                    "status": status,
                     "updated_at": datetime.utcnow(),
                 }},
                 upsert=True,
@@ -861,16 +896,50 @@ class MedicalKGBuilder:
             print(f"[WARN] Schema file not found: {schema_path}")
             return {}
     
-    def get_construction_prompt(self, chunk_text: str) -> str:
+    def get_construction_prompt(self, chunk_text: str, content_type: str = "text") -> str:
         """
         生成实体和关系提取的Prompt
-        
-        优化点：强调实体描述、富媒体引用提取
+
+        优化点：根据content_type（text/image/table）使用不同的提取策略
         """
         schema_str = json.dumps(self.schema, ensure_ascii=False, indent=2)
-        
-        prompt = f"""你是一个专业的医疗建筑领域知识抽取专家。请从以下文本中提取实体、关系和属性。
 
+        # 根据content_type选择前缀提示
+        if content_type == "image":
+            type_specific_intro = """你是一个专业的医疗建筑领域知识抽取专家。以下文本是通过VLM从医疗建筑图片（平面图、流程图、示意图、照片等）中提取的描述性内容。
+
+**图片内容特点**：
+- 可能包含空间布局、功能分区、流线组织、设备配置等视觉信息
+- 图表中的标注、尺寸、说明文字都是重要信息
+- 流程图、平面图中的连接关系、相邻关系需要特别关注
+- 施工图、案例照片中的设计方法、技术要点需要提取
+
+**提取重点**：
+1. **空间实体**: 从图中识别的房间、功能区、设备
+2. **空间关系**: CONNECTED_TO（流线连接）、ADJACENT_TO（相邻）、CONTAINS（包含）
+3. **设计方法**: 从图例、标注中识别的设计策略（如三区划分、流线分离）
+4. **尺寸参数**: 面积、距离、高度等数值信息
+"""
+        elif content_type == "table":
+            type_specific_intro = """你是一个专业的医疗建筑领域知识抽取专家。以下文本是从医疗建筑相关表格中提取的结构化数据。
+
+**表格内容特点**：
+- 通常包含规范要求、技术参数、面积指标、设备清单等
+- 数据高度结构化，行列对应关系明确
+- 可能是设计标准、比较分析、参数列表
+
+**提取重点**：
+1. **实体+属性配对**: 表格每行通常对应一个实体及其多个属性
+2. **数值信息**: 精确提取数字、单位、范围（如"≥30㎡"、"10-15m"）
+3. **规范要求**: 强制性/推荐性指标、适用条件
+4. **对比关系**: 表格中的实体比较、参数差异
+"""
+        else:  # text
+            type_specific_intro = """你是一个专业的医疗建筑领域知识抽取专家。请从以下文本中提取实体、关系和属性。
+
+"""
+
+        prompt = f"""{type_specific_intro}
 **领域Schema**（参考，但不限于）：
 {schema_str}
 
@@ -884,8 +953,9 @@ class MedicalKGBuilder:
    - **医疗服务**：诊疗、护理、检查等服务项目（如：急诊抢救、血液透析、CT检查）
    - **医疗设备**：用于诊疗/监护的设备（如：手术机器人、呼吸机、透析机）
    - **治疗方法**：治疗手段或流程（如：微创手术、介入治疗、康复训练）
-   - **资料来源**：规范标准、政策文件、学术论文、书籍报告（如：GB 51039-2014、建筑设计规范）
+   - **资料来源**：规范标准、政策文件、学术论文、书籍报告（如：GB 51039-2014、建筑设计规范、《建筑设计资料集》）
    - ⚠️ 注意区分：急救中心、手术部→功能分区；急诊部→部门；综合医院→医院
+   - 🔥 **重要**：PDF文件名（如"XX.pdf"）、带书名号的书籍名（如《XX》）必须识别为"资料来源"，不要误识别为其他类型
 
 2. **关系类型**：优先使用 Schema 中的 Relations（MENTIONED_IN / CONTAINS / CONNECTED_TO / ADJACENT_TO / REQUIRES / GUIDES / PROVIDES / PERFORMED_IN / USES / SUPPORTS / REFERENCES / REFERS_TO）
 
@@ -1073,39 +1143,6 @@ class MedicalKGBuilder:
             print(f"[ERROR] LLM extraction failed: {e}")
             return None
     
-    def _embed_text(self, text: str) -> Optional[List[float]]:
-        """
-        生成文本的embedding向量（带维度验证）
-        
-        Args:
-            text: 需要向量化的文本
-            
-        Returns:
-            向量列表，失败返回None
-        """
-        if not self.use_milvus:
-            return None
-        
-        try:
-            # 使用统一封装生成 embedding（默认 3072 维）
-            embedding_model = os.getenv("EMBEDDING_MODEL")
-            vectors = self.llm_client.embeddings([text], model=embedding_model, dimensions=3072)
-            vector = vectors[0] if vectors else []
-            
-            # 验证向量维度
-            if self.embedding_dim and len(vector) != self.embedding_dim:
-                print(f"[WARN] Vector dimension mismatch!")
-                print(f"  Expected: {self.embedding_dim}, Got: {len(vector)}")
-                print(f"  Model: {embedding_model}")
-                # 可以选择截断或填充，这里直接报错
-                raise ValueError(f"Vector dimension mismatch: {len(vector)} != {self.embedding_dim}")
-            
-            return vector
-            
-        except Exception as e:
-            print(f"[WARN] Embedding generation failed: {e}")
-            return None
-    
     def _extract_media_refs(self, chunk_content: str, chunk_data: Dict = None) -> Dict[str, Any]:
         """
         从chunk中提取富媒体引用信息
@@ -1182,6 +1219,14 @@ class MedicalKGBuilder:
         s = (name or "").strip().lower()
         if not s:
             return "空间"
+
+        # [FIX] 优先判断：如果是PDF文件名或包含文件扩展名，直接识别为资料来源
+        if s.endswith('.pdf') or s.endswith('.doc') or s.endswith('.docx') or '.pdf' in s:
+            return "资料来源"
+        # 如果包含《》书名号，很可能是资料来源
+        if '《' in name and '》' in name:
+            return "资料来源"
+
         space_markers = ["间", "室", "走廊", "卫生间", "候诊", "护士站", "办公室", "诊室", "复苏室", "库房", "机房", "缓冲", "刷手", "配餐"]
         if any(m in s for m in space_markers):
             return "空间"
@@ -1189,7 +1234,7 @@ class MedicalKGBuilder:
             return "设计方法"
         if any(x in s for x in ["案例", "项目", "工程"]):
             return "案例"
-        if any(x in s for x in ["规范", "标准", "文件", "文献", "指南"]):
+        if any(x in s for x in ["规范", "标准", "文件", "文献", "指南", "图集", "手册", "资料集"]):
             return "资料来源"
         if any(x in s for x in ["部", "中心", "科", "区"]):
             # 粗略地按功能分区
@@ -1315,122 +1360,12 @@ class MedicalKGBuilder:
             # 初始化属性列表（如果不存在）
             if "attributes" not in entity_node["properties"]:
                 entity_node["properties"]["attributes"] = []
-            if "milvus_vector_ids" not in entity_node["properties"]:
-                entity_node["properties"]["milvus_vector_ids"] = []
-            
-            # 处理每个属性
+
+            # 处理每个属性 - 只存储在Neo4j的properties中
             for attr in attrs:
                 attr_type = classify_attribute_type(attr)
-                
-                # 方案1：存储在Neo4j的properties中（轻量级 - 只存值）
-                # 详细信息（type, chunk_id）通过Milvus存储和关联
                 entity_node["properties"]["attributes"].append(attr)
-                
-                # 方案2：同时存储到Milvus（富内容）
-                if self.use_milvus:
-                    vector_id = self._store_attribute_to_milvus(
-                        entity_name=entity,
-                        attribute_text=attr,
-                        attribute_type=attr_type,
-                        chunk_id=chunk_id,
-                        chunk_content=chunk_content,
-                        chunk_data=chunk_data,
-                        source_document=source_document,
-                        entity_id=entity_node_id  # 传入Neo4j实体ID
-                    )
-                    if vector_id:
-                        entity_node["properties"]["milvus_vector_ids"].append(vector_id)
-    
-    def _store_attribute_to_milvus(
-        self,
-        entity_name: str,
-        attribute_text: str,
-        attribute_type: str,
-        chunk_id: str,
-        chunk_content: str,
-        chunk_data: Dict = None,
-        source_document: str = "",
-        entity_id: str = ""
-    ) -> Optional[str]:
-        """
-        将属性详细信息存储到Milvus
-        
-        Args:
-            entity_name: 实体名称
-            attribute_text: 属性文本
-            attribute_type: 属性类型
-            chunk_id: 来源chunk
-            chunk_content: chunk完整内容
-            chunk_data: 完整chunk数据（包含富媒体信息）
-            source_document: 来源文档名称
-            entity_id: 实体在Neo4j中的ID
-            
-        Returns:
-            向量ID（如果成功）
-        """
-        if not self.use_milvus:
-            return None
-        
-        try:
-            # 1. 生成向量
-            combined_text = f"{entity_name}: {attribute_text}"
-            vector = self._embed_text(combined_text)
-            
-            if vector is None:
-                return None
-            
-            # 2. 生成唯一ID
-            vector_id = f"attr_{nanoid.generate(size=12)}"
-            
-            # 3. 提取富媒体引用
-            media_refs = self._extract_media_refs(chunk_content, chunk_data)
-            
-            # 4. 提取页码（如果有）
-            page_number = 0
-            if chunk_data:
-                page_number = chunk_data.get("page_number", 0) or chunk_data.get("page", 0) or 0
-            
-            # 5. 准备存储数据（按Milvus schema顺序）
-            # 确保 source_document 不为 None
-            final_source_doc = source_document if source_document else ""
-            
-            milvus_data = {
-                "id": vector_id,
-                "entity_name": entity_name,
-                "entity_id": entity_id,  # Neo4j实体ID
-                "attribute_text": attribute_text,
-                "attribute_type": attribute_type,
-                "has_image": media_refs["has_image"],
-                "has_table": media_refs["has_table"],
-                "image_refs": json.dumps(media_refs["image_refs"], ensure_ascii=False),
-                "table_refs": json.dumps(media_refs["table_refs"], ensure_ascii=False),
-                "vector": vector,
-                "chunk_id": chunk_id,
-                "source_document": final_source_doc,  # 使用处理后的值
-                "page_number": page_number,
-            }
-            
-            # 6. 插入Milvus缓存
-            # 注意：实际插入需要在build_from_mongodb完成后批量执行
-            # 这里先返回ID，数据存储在临时缓存中
-            if not hasattr(self, '_milvus_buffer'):
-                self._milvus_buffer = []
-            self._milvus_buffer.append(milvus_data)
-            # 条数/时间阈值触发 flush（非阻塞最佳努力）
-            try:
-                now = time.time()
-                if len(self._milvus_buffer) >= self._milvus_max_buffer or (now - self._milvus_last_flush_ts) >= self._milvus_flush_sec:
-                    self._flush_milvus_buffer()
-                    self._milvus_last_flush_ts = now
-            except Exception:
-                pass
-            
-            return vector_id
-            
-        except Exception as e:
-            print(f"[WARN] Failed to store attribute to Milvus: {e}")
-            return None
-    
+
     def _generate_stable_entity_id(self, entity_name: str, entity_type: str = "", scope_chain: Optional[List[str]] = None) -> str:
         """
         生成基于名称+类型的稳定ID
@@ -1456,176 +1391,22 @@ class MedicalKGBuilder:
         hash_value = hashlib.sha256(unique_key.encode('utf-8')).hexdigest()[:16]
         
         return f"entity_{hash_value}"
-    
-    def _ensure_milvus_connection(self) -> bool:
-        """优化版本: 快速验证 + 容错降级"""
-        from pymilvus import connections, utility, Collection
-        import socket
-        import time
 
-        alias = "default"
-        host = os.getenv("MILVUS_HOST", "127.0.0.1")
-        port = int(os.getenv("MILVUS_PORT", "19530"))
-
-        # 阶段 1: 基础网络探测(3秒超时)
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(3)
-            if sock.connect_ex((host, port)) != 0:
-                print(f"[ERROR] Port {port} unreachable")
-                return False
-            sock.close()
-        except Exception as e:
-            print(f"[ERROR] Network test failed: {e}")
-            return False
-
-        # 阶段 2: gRPC 连接
-        try:
-            try:
-                existing = connections.get_connection_addr(alias)
-                if existing:
-                    print(f"[Milvus] Using existing connection")
-            except:
-                pass
-            
-            connections.connect(
-                alias=alias,
-                host=host,
-                port=str(port),
-                timeout=10.0
-            )
-        except Exception as e:
-            print(f"[ERROR] gRPC connection failed: {e}")
-            return False
-
-        # 阶段 3: 服务就绪探测(最多重试3次)
-        server_ready = False
-        for attempt in range(3):
-            try:
-                version = utility.get_server_version(using=alias)
-                if version:
-                    print(f"[Milvus] Server version: {version}")
-                    server_ready = True
-                    break
-            except Exception as e:
-                if attempt == 2:
-                    print(f"[WARN] Version probe failed after 3 attempts")
-                time.sleep(0.5)
-        
-        # 降级: 使用 list_collections 作为备选探针
-        if not server_ready:
-            try:
-                utility.list_collections(using=alias)
-                print(f"[Milvus] Server responding (fallback probe)")
-                server_ready = True
-            except Exception as e:
-                print(f"[ERROR] Server not responding: {e}")
-                return False
-
-        if not server_ready:
-            return False
-
-        # 阶段 4: 集合验证
-        try:
-            if not utility.has_collection(self.milvus_collection_name, using=alias):
-                print(f"[INFO] Creating collection '{self.milvus_collection_name}'...")
-                from backend.databases.graph.utils.setup_milvus_collection import (
-                    setup_entity_attributes_collection
-                )
-                setup_entity_attributes_collection(
-                    collection_name=self.milvus_collection_name,
-                    drop_existing=False,
-                    vector_dim=int(os.getenv("EMBEDDING_DIM")),
-                )
-            
-            self.milvus_collection = Collection(self.milvus_collection_name, using=alias)
-            
-            try:
-                self.milvus_collection.load()
-            except:
-                pass  # 某些版本自动 load
-            
-            print(f"[OK] Milvus connection validated")
-            return True
-            
-        except Exception as e:
-            print(f"[ERROR] Collection validation failed: {e}")
-            return False
-    
-    def _flush_milvus_buffer(self) -> List[str]:
-        """优化版本: 连接预检 + 失败保留缓冲"""
-        if not self.use_milvus or not hasattr(self, '_milvus_buffer') or not self._milvus_buffer:
-            return []
-    
-        print(f"\n[Milvus] Flushing {len(self._milvus_buffer)} vectors...")
-
-        # 1) 连接预检(快速失败)
-        if not self._ensure_milvus_connection():
-            print("[ERROR] Connection unavailable - keeping buffer for retry")
-            return []  # 保留缓冲,下次重试
-
-        # 2) 组装数据
-        rows = self._milvus_buffer
-        data = [
-            [x["id"] for x in rows],
-            [x["entity_name"] for x in rows],
-            [x["entity_id"] for x in rows],
-            [x["attribute_text"] for x in rows],
-            [x["attribute_type"] for x in rows],
-            [x["has_image"] for x in rows],
-            [x["has_table"] for x in rows],
-            [x["image_refs"] for x in rows],
-            [x["table_refs"] for x in rows],
-            [x["vector"] for x in rows],
-            [x["chunk_id"] for x in rows],
-            [x["source_document"] for x in rows],
-            [x["page_number"] for x in rows],
-        ]
-
-        # 3) Insert(最多3次重试)
-        inserted = None
-        for attempt in range(3):
-            try:
-                inserted = self.milvus_collection.insert(data)
-                break
-            except Exception as e:
-                print(f"[WARN] Insert attempt {attempt+1}/3 failed: {e}")
-                if attempt < 2:
-                    time.sleep(0.5)
-        
-        if inserted is None:
-            print("[ERROR] Insert failed - keeping buffer")
-            return []
-
-        # 4) Flush(最多3次重试)
-        for attempt in range(3):
-            try:
-                self.milvus_collection.flush()
-                break
-            except Exception as e:
-                print(f"[WARN] Flush attempt {attempt+1}/3 failed: {e}")
-                if attempt < 2:
-                    time.sleep(0.3)
-        
-        # 5) 成功后清空缓冲
-        ids = getattr(inserted, "primary_keys", []) or []
-        print(f"[OK] Flushed {len(ids)} vectors")
-        self._milvus_buffer = []
-        return ids
-    
     def process_chunk(self, chunk: Dict[str, Any], source_document: str = "") -> bool:
         """
         处理单个chunk
-        
+
         特性：
         1. 使用属性内嵌存储
         2. 提取富媒体引用
         3. 传递完整chunk数据给Milvus
+        4. 根据content_type使用针对性prompt
         """
         try:
             chunk_id = chunk.get("chunk_id") or chunk.get("_id")
             content = chunk.get("content", "")
-            
+            content_type = chunk.get("content_type", "text")  # 新增：获取chunk类型
+
             if not content or len(content) < 20:
                 return False
 
@@ -1635,15 +1416,15 @@ class MedicalKGBuilder:
 
             # 命中缓存则跳过 LLM
             extracted = self._get_cached_extraction(str(chunk_id))
+            cached = extracted is not None  # 标记是否从缓存读取
+
             if not extracted:
-                prompt = self.get_construction_prompt(content)
+                # 新增：根据content_type生成针对性prompt
+                prompt = self.get_construction_prompt(content, content_type)
                 extracted = self.extract_with_llm(prompt)
                 if not extracted:
-                    # 负缓存，防止反复调用
-                    self._cache_extraction_result(str(chunk_id), {"entities": {}, "attributes": {}, "triples": []})
+                    # 失败的不缓存，下次会自动重试
                     return False
-                # 写入缓存
-                self._cache_extraction_result(str(chunk_id), extracted)
 
             # 提取数据（适配新格式）
             entities = extracted.get("entities", {})
@@ -1666,7 +1447,17 @@ class MedicalKGBuilder:
                 name: entity_descriptions.get(name, "") for name in entity_types
             }
 
+            # ✅ 关键修复：验证失败时的处理
             if not entity_types:
+                # 如果是从缓存读取的，删除无效缓存
+                if cached:
+                    try:
+                        self.extractions_collection.delete_one({
+                            "chunk_id": str(chunk_id),
+                            "version": self.extraction_version
+                        })
+                    except Exception:
+                        pass
                 return False
 
             attributes = {
@@ -1686,7 +1477,20 @@ class MedicalKGBuilder:
             triples = filtered_triples
 
             if not triples and not attributes:
+                # 如果是从缓存读取的，删除无效缓存
+                if cached:
+                    try:
+                        self.extractions_collection.delete_one({
+                            "chunk_id": str(chunk_id),
+                            "version": self.extraction_version
+                        })
+                    except Exception:
+                        pass
                 return False
+
+            # ✅ 只有验证通过后才缓存（非缓存数据）
+            if not cached:
+                self._cache_extraction_result(str(chunk_id), extracted, status="success")
 
             source_label = (
                 source_document
@@ -1749,7 +1553,7 @@ class MedicalKGBuilder:
 
                 # 注册chunk实体，用于后续共现增强
                 self._register_chunk_entities(str(chunk_id), entity_types, chunk)
-                # 图片回链（可选）：默认关闭，避免大量图片进入图；由检索层通过 Mongo/Milvus 返回
+                # 图片回链（可选）：默认关闭，避免大量图片进入图；由检索层通过 Mongo 返回
                 if self.link_images:
                     try:
                         space_node_ids = []
@@ -2054,9 +1858,15 @@ class MedicalKGBuilder:
                 except Exception:
                     pass
 
+        # 新增：chunk类型统计
+        chunk_type_stats = defaultdict(int)
+
         with self.mongo_client.start_session(causal_consistency=False) as session:
             while True:
-                query = {}
+                # 新增：筛选chunk类型（text, image, table）
+                query = {
+                    "content_type": {"$in": ["text", "image", "table"]}
+                }
                 if last_id is not None:
                     query["_id"] = {"$gt": last_id}
 
@@ -2118,6 +1928,10 @@ class MedicalKGBuilder:
                         else:
                             src = ""
 
+                    # 新增：统计chunk类型
+                    content_type = chunk.get("content_type", "unknown")
+                    chunk_type_stats[content_type] += 1
+
                     if self.process_chunk(chunk, source_document=src):
                         success_chunks += 1
                     else:
@@ -2128,7 +1942,12 @@ class MedicalKGBuilder:
 
                 # 记录本批次最后一个 _id，用于下一页
                 last_id = batch[-1]["_id"]
-        
+
+        # 新增：输出chunk类型统计
+        print(f"\n[INFO] Chunk类型分布:")
+        for content_type, count in sorted(chunk_type_stats.items()):
+            print(f"  - {content_type}: {count:,}")
+
         # 输出处理的文档统计
         print(f"\n[INFO] 处理的文档数量: {len(processed_doc_ids)}")
         if len(processed_doc_ids) > 0:
@@ -2167,8 +1986,6 @@ class MedicalKGBuilder:
         print(f"  Chunks: {stats['total_chunks']} (Success: {stats['success_chunks']}, Skipped: {stats['skipped_chunks']})")
         print(f"  Nodes: {stats['total_nodes']}")
         print(f"  Edges: {stats['total_edges']}")
-        if self.use_milvus and hasattr(self, '_milvus_buffer'):
-            print(f"  Milvus Vectors (buffered): {len(self._milvus_buffer)}")
         print(f"{'='*60}\n")
 
         if self.enable_cooccurrence_aug:
@@ -2178,56 +1995,23 @@ class MedicalKGBuilder:
     
     def write_to_databases(self) -> bool:
         """
-        两阶段提交：先Milvus后Neo4j，确保跨库一致性
-        
+        写入数据库（Neo4j + MongoDB 溯源）
+
         流程：
-        1. Phase 1: 写入Milvus并验证
-        2. Phase 2: 写入Neo4j
-        3. 任一失败则中止并报错
+        1) （可选）共现/规则补边增强
+        2) 写入 Neo4j
+        3) 输出写入摘要
         
         Returns:
             成功返回True，失败返回False
         """
         print(f"\n{'='*60}")
-        print("Starting Two-Phase Commit: Milvus -> Neo4j")
+        print("Writing Knowledge Graph to Neo4j")
         print(f"{'='*60}\n")
 
         self.last_write_summary = {}
-        milvus_written = 0
-        
-        # Phase 1: 写入Milvus（如果启用）
-        if self.use_milvus:
-            print("[Phase 1] Writing to Milvus...")
-            try:
-                # 确保连接到最新的数据库
-                if not self._ensure_milvus_connection():
-                    raise Exception("无法建立 Milvus 连接")
-                
-                milvus_ids = self._flush_milvus_buffer()
-                milvus_written = len(milvus_ids)
-                
-                if not milvus_ids and hasattr(self, '_milvus_buffer') and self._milvus_buffer:
-                    # 有数据但写入失败
-                    raise Exception("Milvus写入失败，没有返回IDs")
-                
-                print(f"[OK] Phase 1 completed: {milvus_written} vectors written to Milvus")
-                
-            except Exception as e:
-                print(f"\n[ERROR] Phase 1 failed: Milvus写入失败")
-                print(f"  原因: {e}")
-                print(f"  [ERROR] 中止Neo4j写入以保持一致性")
-                self.last_write_summary = {}
-                return False
-        else:
-            print("[Phase 1] Milvus disabled, skipping...")
-        
-        # Phase 2: 写入Neo4j（如果策略不是 milvus_rebuild）
-        rebuild_strategy = getattr(self, 'rebuild_strategy', 'incremental')
-        if rebuild_strategy == "milvus_rebuild":
-            print("\n[Phase 2] Skipping Neo4j write (milvus_rebuild mode - Neo4j preserved)")
-            print("[INFO] Only Milvus entity_attributes will be rebuilt")
-        else:
-            print("\n[Phase 2] Writing to Neo4j...")
+
+        print("[Phase] Writing to Neo4j...")
         try:
             if self.enable_cooccurrence_aug:
                 print("[INFO] Augmenting relations via co-occurrence...")
@@ -2252,22 +2036,17 @@ class MedicalKGBuilder:
                 self.augment_relations_by_rules()
             self.write_to_neo4j()
             # 全局拓扑增强已移除（避免长时间阻塞构建）；如需启用，请改为离线脚本
-            print(f"[OK] Phase 2 completed: Graph written to Neo4j")
+            print(f"[OK] Graph written to Neo4j")
             
         except Exception as e:
-            print(f"\n[ERROR] Phase 2 failed: Neo4j写入失败")
+            print(f"\n[ERROR] Neo4j写入失败")
             print(f"  原因: {e}")
-            
-            # 注意：此时Milvus已写入，理想情况下应回滚
-            # 但Milvus不支持事务回滚，需要手动清理
-            if self.use_milvus:
-                print(f"  [WARN] 警告：Milvus数据已写入，需手动清理")
             
             self.last_write_summary = {}
             return False
         
         print(f"\n{'='*60}")
-        print("[SUCCESS] Two-Phase Commit Successful!")
+        print("[SUCCESS] Write Successful!")
         print(f"{'='*60}\n")
         
         graph_nodes = self.graph.number_of_nodes()
@@ -2275,7 +2054,7 @@ class MedicalKGBuilder:
         neo_nodes = None
         neo_edges = None
         try:
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 neo_nodes = session.run("MATCH (n) RETURN count(n) AS c").single().get("c", 0)
                 neo_edges = session.run("MATCH ()-[r]->() RETURN count(r) AS c").single().get("c", 0)
         except Exception as e:
@@ -2286,10 +2065,7 @@ class MedicalKGBuilder:
             "graph_edges": graph_edges,
             "neo4j_nodes": neo_nodes if neo_nodes is not None else graph_nodes,
             "neo4j_edges": neo_edges if neo_edges is not None else graph_edges,
-            "milvus_vectors_written": milvus_written,
         }
-        if self.use_milvus and hasattr(self, '_milvus_buffer'):
-            summary["milvus_vectors_buffered"] = len(self._milvus_buffer)
 
         self.last_write_summary = summary
 
@@ -2299,8 +2075,6 @@ class MedicalKGBuilder:
         if neo_nodes is not None and neo_edges is not None:
             print(f"  - Neo4j nodes    : {neo_nodes}")
             print(f"  - Neo4j edges    : {neo_edges}")
-        if self.use_milvus:
-            print(f"  - Milvus vectors : {milvus_written}")
 
         # 可选：在成功提交后，生成语义合并候选（不改图，仅输出建议）
         if self.enable_semantic_fusion:
@@ -2390,7 +2164,7 @@ class MedicalKGBuilder:
         if not strong_pairs:
             return 0
 
-        with self.neo4j_driver.session() as session:
+        with self.neo4j_driver.session(database=self.neo4j_database) as session:
             session.run(
                 """
                 UNWIND $pairs AS p
@@ -2401,12 +2175,115 @@ class MedicalKGBuilder:
                 pairs=[{"a": a, "b": b} for a, b in strong_pairs]
             )
         return len(strong_pairs)
-    
+
+    def _auto_attach_orphan_entities(self):
+        """
+        自动将孤立的功能分区/空间实体连接到核心空间体系
+
+        策略：
+        1. 识别孤立节点（没有CONTAINS关系的功能分区/空间）
+        2. 基于名称关键词匹配，自动挂载到预定义的核心实体
+        3. 创建CONTAINS关系，标记为auto_generated
+        """
+        print(f"\n[INFO] Auto-attaching orphan entities to core hierarchy...")
+
+        # 定义核心实体关键词映射（功能分区 -> 可能的父实体关键词）
+        core_mappings = {
+            # 急诊相关
+            "急诊部": ["急救", "急诊", "抢救", "EICU", "急诊监护"],
+            # 门诊相关
+            "门诊部": ["门诊", "诊室", "候诊", "挂号", "分诊"],
+            # 医技相关
+            "手术部": ["手术", "术前", "术后", "刷手", "麻醉准备", "器械准备"],
+            "ICU": ["重症", "监护", "ICU", "SICU", "NICU", "PICU"],
+            "检验科": ["检验", "化验", "采血", "标本"],
+            "影像中心": ["放射", "CT", "MRI", "X光", "超声", "影像"],
+            "药剂科": ["药房", "药库", "配药"],
+            # 住院相关
+            "住院部": ["病房", "护士站", "病区", "住院"],
+        }
+
+        # 查找所有功能分区和空间节点
+        orphan_nodes = []
+        parent_candidates = {}
+
+        for node_id, node_data in self.graph.nodes(data=True):
+            props = node_data.get("properties", {})
+            schema_type = props.get("schema_type")
+            name = props.get("name", "")
+
+            # 收集核心实体（部门/功能分区）作为潜在父节点
+            if schema_type in {"部门", "功能分区"}:
+                parent_candidates[node_id] = (name, schema_type)
+
+            # 识别孤立的功能分区/空间（没有被CONTAINS的入边）
+            if schema_type in {"功能分区", "空间"}:
+                has_parent = False
+                for _, target, edge_data in self.graph.in_edges(node_id, data=True):
+                    rel_type = edge_data.get("type", "")
+                    if rel_type == "CONTAINS":
+                        has_parent = True
+                        break
+
+                if not has_parent:
+                    orphan_nodes.append((node_id, name, schema_type))
+
+        # 自动挂载孤立节点
+        attached_count = 0
+        for orphan_id, orphan_name, orphan_type in orphan_nodes:
+            orphan_name_lower = orphan_name.lower()
+
+            # 尝试匹配核心实体
+            best_match = None
+            best_score = 0
+
+            for parent_id, (parent_name, parent_type) in parent_candidates.items():
+                # 跳过自己
+                if parent_id == orphan_id:
+                    continue
+
+                # 基于关键词匹配
+                for core_name, keywords in core_mappings.items():
+                    if core_name in parent_name:
+                        for keyword in keywords:
+                            if keyword in orphan_name_lower or keyword.lower() in orphan_name_lower:
+                                # 计算匹配分数（关键词长度越长，匹配越精确）
+                                score = len(keyword)
+                                if score > best_score:
+                                    best_score = score
+                                    best_match = (parent_id, parent_name, parent_type)
+
+            # 如果找到匹配，创建CONTAINS关系
+            if best_match and best_score >= 2:  # 至少2个字符匹配
+                parent_id, parent_name, parent_type = best_match
+
+                # 检查是否已存在关系
+                if not self.graph.has_edge(parent_id, orphan_id):
+                    self.graph.add_edge(
+                        parent_id,
+                        orphan_id,
+                        type="CONTAINS",
+                        properties={
+                            "auto_generated": True,
+                            "matched_by": f"关键词匹配",
+                            "script_ver": "v6.0_auto_attach",
+                            "created_at": datetime.now().isoformat()
+                        }
+                    )
+                    attached_count += 1
+                    print(f"[AUTO-ATTACH] {parent_name}({parent_type}) -[CONTAINS]-> {orphan_name}({orphan_type})")
+
+        print(f"[INFO] Auto-attached {attached_count} orphan entities to core hierarchy")
+        return attached_count
+
     def write_to_neo4j(self):
         """将图批量写入Neo4j（UNWIND，属性作为properties，安全无动态标签）。"""
         print(f"\n{'='*60}")
         print("Writing Knowledge Graph to Neo4j (batched)")
         print(f"{'='*60}\n")
+
+        # [NEW] 在写入Neo4j之前，自动挂载孤立实体到核心体系
+        self._auto_attach_orphan_entities()
 
         # 准备节点数据（按真实标签分组）
         from collections import defaultdict
@@ -2439,14 +2316,13 @@ class MedicalKGBuilder:
             filtered_props["chunk_ids"] = properties.get("chunk_ids", [])
             if self.keep_attributes_list:
                 filtered_props["attributes"] = properties.get("attributes", [])
-            filtered_props["milvus_vector_ids"] = properties.get("milvus_vector_ids", [])
             filtered_props["level"] = level
 
             row = {"id": node_id, "props": filtered_props}
             nodes_by_label[label].append(row)
             node_label_by_id[node_id] = label
 
-        with self.neo4j_driver.session() as session:
+        with self.neo4j_driver.session(database=self.neo4j_database) as session:
             # 批量写节点（使用真实标签，而非 :Entity）
             for lbl, rows in nodes_by_label.items():
                 session.run(
@@ -2461,10 +2337,6 @@ class MedicalKGBuilder:
                         n.chunk_ids = CASE 
                             WHEN n.chunk_ids IS NULL THEN row.props.chunk_ids
                             ELSE n.chunk_ids + [x IN row.props.chunk_ids WHERE NOT x IN n.chunk_ids]
-                        END,
-                        n.milvus_vector_ids = CASE
-                            WHEN n.milvus_vector_ids IS NULL THEN row.props.milvus_vector_ids
-                            ELSE n.milvus_vector_ids + [x IN row.props.milvus_vector_ids WHERE NOT x IN n.milvus_vector_ids]
                         END
                     """,
                     rows=rows,
@@ -2532,16 +2404,12 @@ class MedicalKGBuilder:
 
         print(f"[OK] Knowledge graph written to Neo4j (batched)\n")
         print(f"  [OK] Entities stored with embedded attributes")
-        print(f"  [OK] Milvus IDs linked for rich content retrieval")
         print(f"  [OK] Chunk IDs linked for MongoDB traceability")
     
     def close(self):
         """关闭所有连接"""
         self.mongo_client.close()
         self.neo4j_driver.close()
-        if self.use_milvus:
-            from pymilvus import connections
-            connections.disconnect("default")
         print("[OK] All connections closed")
 
     def _register_chunk_entities(self, chunk_id: str, entity_types: Dict[str, Any], chunk: Dict[str, Any]):
@@ -2827,131 +2695,46 @@ class MedicalKGBuilder:
         except Exception as exc:
             print(f"[WARN] Rules augmentation failed: {exc}")
 
-    def _ensure_milvus_collection(self, force_create: bool = False) -> bool:
-        try:
-            from pymilvus import connections, utility, Collection
-
-            # 1) 只在缺连接时连接；不要反复断开重连
-            try:
-                connections.get_connection_addr("default")
-            except Exception:
-                connections.connect(
-                    alias="default",
-                        host=os.getenv("MILVUS_HOST", "127.0.0.1"),
-                    port=os.getenv("MILVUS_PORT", "19530")
-                )
-
-            # 2) has/drop/create 一律带 using="default"
-            has_collection = utility.has_collection(self.milvus_collection_name, using="default")
-            if not has_collection or force_create:
-                print(f"[INFO] Collection '{self.milvus_collection_name}' not found. Creating...")
-                from backend.databases.graph.utils.setup_milvus_collection import setup_entity_attributes_collection
-                setup_entity_attributes_collection(
-                    collection_name=self.milvus_collection_name,
-                    drop_existing=False,
-                    vector_dim=int(os.getenv("EMBEDDING_DIM"))
-                )
-
-            # 3) 句柄也要绑定 using="default"
-            self.milvus_collection = Collection(self.milvus_collection_name, using="default")
-
-            # 4) load（某些版本 load_state 不稳定，直接 load 即可）
-            try:
-                self.milvus_collection.load()
-            except Exception:
-                pass
-
-            # 5) 记录向量维度
-            self.embedding_dim = None
-            for field in self.milvus_collection.schema.fields:
-                if field.name == "vector":
-                    # 2.6.x 有的是 field.params / 有的是 field.params.get('dim')
-                    self.embedding_dim = (field.params.get("dim")
-                                        if isinstance(getattr(field, "params", None), dict)
-                                        else getattr(field, "dim", None))
-                    break
-
-            print(f"[OK] Connected to Milvus")
-            print(f"  - Collection: {self.milvus_collection_name}")
-            print(f"  - Vector dimension: {self.embedding_dim}")
-            return True
-
-        except Exception as e:
-            print(f"[WARN] Milvus error: {e}")
-            # ⚠️ 不要立刻把 use_milvus 置 False；有时只是瞬断，可在后续 flush/insert 再重试
-            return False
-
-
-    def _milvus_status_summary(self) -> Optional[Dict[str, Any]]:
-        try:
-            from pymilvus import Collection
-            if not self.milvus_collection:
-                return None
-            coll = Collection(self.milvus_collection_name)
-            coll.load()
-            num_entities = coll.num_entities
-            vector_dim = None
-            for field in coll.schema.fields:
-                if field.name == "vector":
-                    vector_dim = field.params.get("dim")
-                    break
-            summary = {
-                "num_entities": num_entities,
-                "vector_dim": vector_dim,
-                "created_time": None,
-            }
-            return summary
-        except Exception:
-            return None
-
     def _determine_build_strategy(self) -> str:
-        """交互式决定构建策略：rebuild、incremental 或 milvus_rebuild。"""
+        """交互式决定构建策略：rebuild 或 incremental。"""
         default_mode = os.getenv("KG_BUILD_MODE", "prompt").lower()
-        if default_mode in {"rebuild", "incremental", "milvus_rebuild"}:
+        if default_mode in {"rebuild", "incremental"}:
             print(f"[INFO] Build mode via env KG_BUILD_MODE={default_mode}")
-            if default_mode == "milvus_rebuild":
-                self._prepare_for_milvus_rebuild()
-            elif default_mode == "rebuild":
+            if default_mode == "rebuild":
                 self._prepare_for_rebuild()
             return default_mode
 
         # 提示当前状态
         print("\n=== Knowledge Graph Build Mode ===")
         try:
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 node_count = session.run("MATCH (n) RETURN count(n) AS c").single().get("c", 0)
                 edge_count = session.run("MATCH ()-[r]->() RETURN count(r) AS c").single().get("c", 0)
             print(f"Current Neo4j state: {node_count} nodes / {edge_count} edges")
         except Exception as e:
             print(f"[WARN] Unable to fetch Neo4j stats: {e}")
 
-        if self.use_milvus and self.milvus_collection:
-            stats = self.milvus_status or self._milvus_status_summary()
-            if stats:
-                print(f"Milvus collection '{self.milvus_collection_name}': {stats['num_entities']} vectors, dim={stats['vector_dim']}")
-
         print("\nChoose build strategy:")
         print("  1. Incremental (append new data)")
-        print("  2. Rebuild (clear Neo4j + Milvus)")
-        print("  3. Rebuild Milvus only (clear Milvus entity_attributes, keep Neo4j)")
+        print("  2. Rebuild (clear Neo4j)")
         
         # 检查是否为交互式环境
         is_interactive = sys.stdin.isatty()
         
         if not is_interactive:
             print("[INFO] Non-interactive environment detected. Defaulting to incremental mode.")
-            print("[INFO] To specify build mode, set environment variable: KG_BUILD_MODE=rebuild|milvus_rebuild")
+            print("[INFO] To specify build mode, set environment variable: KG_BUILD_MODE=rebuild|incremental")
             return "incremental"
 
         try:
-            choice = input("Enter choice (1/2/3, default 1): ").strip()
+            choice = input("Enter choice (1/2, default 1): ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n[INFO] Input not available. Defaulting to incremental mode.")
             return "incremental"
         
         if choice == "2":
             try:
-                confirm = input("This will clear existing graph + vectors. Type 'REBUILD' to confirm: ").strip()
+                confirm = input("This will clear existing graph. Type 'REBUILD' to confirm: ").strip()
                 if confirm == "REBUILD":  # ✅ 修复：正确缩进在 try 块内
                     self._prepare_for_rebuild()
                     return "rebuild"
@@ -2959,87 +2742,17 @@ class MedicalKGBuilder:
             except (EOFError, KeyboardInterrupt):
                 print("\n[INFO] Input interrupted. Rebuild cancelled. Proceeding with incremental mode.")
         
-        elif choice == "3":
-            if not self.use_milvus:
-                print("[WARN] Milvus is not enabled. Cannot rebuild Milvus only.")
-                print("[INFO] Proceeding with incremental mode.")
-                return "incremental"
-            try:
-                confirm = input("This will clear Milvus entity_attributes only (Neo4j will be preserved). Continue? (yes/no): ").strip().lower()
-                if confirm in {"yes", "y"}:
-                    self._prepare_for_milvus_rebuild()
-                    return "milvus_rebuild"
-                print("[INFO] Milvus rebuild cancelled. Proceeding with incremental mode.")
-            except (EOFError, KeyboardInterrupt):
-                print("\n[INFO] Input interrupted. Milvus rebuild cancelled. Proceeding with incremental mode.")
-        
         return "incremental"
 
     def _prepare_for_rebuild(self) -> None:
-        """清空Neo4j和Milvus集合为重建做准备。"""
+        """清空 Neo4j 为重建做准备。"""
         print("[INFO] Clearing Neo4j nodes and relationships...")
         try:
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 session.run("MATCH (n) DETACH DELETE n")
             print("  ✓ Neo4j cleared")
         except Exception as e:
             print(f"  ✗ Failed to clear Neo4j: {e}")
-
-        if self.use_milvus and self.milvus_collection:
-            print(f"[INFO] Clearing Milvus collection '{self.milvus_collection_name}' ...")
-            try:
-                from pymilvus import Collection
-                coll = Collection(self.milvus_collection_name)
-                coll.load()
-                coll.delete("id != ''")
-                coll.flush()
-                print("  ✓ Milvus collection cleared")
-            except Exception as e:
-                print(f"  ✗ Failed to clear Milvus: {e}")
-
-    def _prepare_for_milvus_rebuild(self) -> None:
-        """只清空Milvus entity_attributes集合，保留Neo4j。"""
-        if not self.use_milvus:
-            print("[WARN] Milvus is not enabled. Cannot clear Milvus.")
-            return
-
-        print(f"[INFO] Clearing Milvus collection '{self.milvus_collection_name}' only (Neo4j preserved)...")
-        try:
-            from pymilvus import Collection, utility, connections
-
-            # 确保连接（不 disconnect）
-            try:
-                connections.get_connection_addr("default")
-            except Exception:
-                connections.connect(
-                    alias="default",
-                    host=os.getenv("MILVUS_HOST", "127.0.0.1"),
-                    port=os.getenv("MILVUS_PORT", "19530"),
-                )
-
-            # drop + recreate（都带 using）
-            if utility.has_collection(self.milvus_collection_name, using="default"):
-                utility.drop_collection(self.milvus_collection_name, using="default")
-                print(f"  ✓ Old collection '{self.milvus_collection_name}' dropped")
-
-            from backend.databases.graph.utils.setup_milvus_collection import setup_entity_attributes_collection
-            setup_entity_attributes_collection(
-                collection_name=self.milvus_collection_name,
-                drop_existing=False,
-                vector_dim=3072
-            )
-            print(f"  ✓ New collection '{self.milvus_collection_name}' created")
-
-            # 关键：刷新句柄 & load
-            self.milvus_collection = Collection(self.milvus_collection_name, using="default")
-            try:
-                self.milvus_collection.load()
-            except Exception:
-                pass
-            print("  ✓ Milvus collection object refreshed and loaded")
-
-        except Exception as e:
-                print(f"  ✗ Failed to clear Milvus: {e}")
 
     def _update_chunk_entity_links(self):
         """
@@ -3055,7 +2768,7 @@ class MedicalKGBuilder:
 
         try:
             # 从Neo4j查询所有 chunk_id -> entity_ids 的映射
-            with self.neo4j_driver.session() as session:
+            with self.neo4j_driver.session(database=self.neo4j_database) as session:
                 result = session.run("""
                     MATCH (e)-[r:MENTIONED_IN]->(s)
                     WHERE r.chunk_id IS NOT NULL AND r.chunk_id <> ''
@@ -3106,6 +2819,6 @@ class MedicalKGBuilder:
 
 if __name__ == "__main__":
     # 测试构建器
-    builder = MedicalKGBuilder(use_milvus=False)  # 先不启用Milvus测试
+    builder = MedicalKGBuilder()
     print("Builder initialized successfully!")
     builder.close()

@@ -25,6 +25,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from backend.app.agents.base_agent import (
     AgentItem,
     AgentRequest,
+    call_structured_llm,
     get_llm_manager,
 )
 from backend.app.services.query_expansion import expand_query
@@ -32,7 +33,22 @@ from backend.app.services.milvus_chunk_search import get_retriever
 
 logger = logging.getLogger("milvus_agent")
 
-DEFAULT_REWRITE_MODEL = os.getenv("MILVUS_AGENT_MODEL", "gpt-4o-mini")
+DEFAULT_REWRITE_MODEL = os.getenv("MILVUS_AGENT_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_TOP_K = 20
+
+_retriever_instance: Any | None = None
+_retriever_lock = asyncio.Lock()
+
+try:
+    from openai import RateLimitError as OpenAIRateLimitError
+except Exception:
+    OpenAIRateLimitError = None
+
+try:
+    import httpx
+    _HTTPX_ERRORS = (httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout)
+except Exception:
+    _HTTPX_ERRORS = ()
 
 
 # ============================================================================
@@ -41,7 +57,7 @@ DEFAULT_REWRITE_MODEL = os.getenv("MILVUS_AGENT_MODEL", "gpt-4o-mini")
 
 class MilvusRewriteResult(BaseModel):
     """LLM 结构化输出：Milvus 查询改写"""
-    
+
     search_terms: List[str] = Field(
         default_factory=list,
         description="用于向量检索的关键词、短语、同义词或别名，按相关度排序",
@@ -49,6 +65,41 @@ class MilvusRewriteResult(BaseModel):
     reasoning: str = Field(
         default="",
         description="改写理由",
+    )
+
+
+class KnowledgePoint(BaseModel):
+    """LLM 结构化输出：从文本中提取的知识点"""
+
+    title: str = Field(
+        description="知识点标题（简洁的一句话概括，如'手术室净高要求'）",
+    )
+    content: str = Field(
+        description="知识点具体内容（可操作的设计规范、技术要求或强制条文）",
+    )
+    category: str = Field(
+        description="知识点类别（如：尺寸要求、功能要求、安全规范、流线设计等）",
+    )
+    applicable_spaces: List[str] = Field(
+        default_factory=list,
+        description="适用的空间类型列表（如：手术室、ICU、门诊诊室等）",
+    )
+    priority: str = Field(
+        default="推荐",
+        description="优先级（强制、推荐、可选）",
+    )
+    source_ref: str = Field(
+        default="",
+        description="来源引用（如：GB 51039-2014 第5.1.2条）",
+    )
+
+
+class KnowledgePointsResult(BaseModel):
+    """LLM 结构化输出：知识点列表"""
+
+    knowledge_points: List[KnowledgePoint] = Field(
+        default_factory=list,
+        description="从文本中提取的知识点列表",
     )
 
 
@@ -61,14 +112,17 @@ class MilvusState(TypedDict, total=False):
     # 输入
     request: AgentRequest
     query: str
-    
+
     # 查询改写
     search_terms: List[str]
     rewrite_reason: str
-    
+
     # 检索结果
     retrieval_results: List[Dict[str, Any]]
-    
+
+    # 知识点提取
+    extracted_knowledge_points: List[Dict[str, Any]]  # 提取的结构化知识点
+
     # 输出
     items: List[AgentItem]
     diagnostics: Dict[str, Any]
@@ -80,13 +134,12 @@ class MilvusState(TypedDict, total=False):
 
 def _init_rewrite_llm():
     """初始化查询改写 LLM"""
-    api_key = os.getenv("MILVUS_AGENT_API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少 MILVUS_AGENT_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（milvus_agent）")
 
-    base_url = os.getenv("MILVUS_AGENT_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    base_url = base_url.rstrip("/") if base_url else None
-    model_provider = os.getenv("MILVUS_AGENT_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     base_model = init_chat_model(
@@ -145,6 +198,53 @@ def deduplicate_terms(terms: List[str]) -> List[str]:
     return ordered
 
 
+def _coerce_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _model_to_dict(value: Any) -> Dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    return dict(value)
+
+
+def _is_transient_error(error: Exception) -> bool:
+    """判断是否为瞬时错误（网络、超时、限流等）"""
+    if isinstance(error, asyncio.TimeoutError):
+        return True
+    if OpenAIRateLimitError is not None and isinstance(error, OpenAIRateLimitError):
+        return True
+    if _HTTPX_ERRORS and isinstance(error, _HTTPX_ERRORS):
+        return True
+    message = str(error).lower()
+    return any(
+        keyword in message
+        for keyword in (
+            "timeout",
+            "timed out",
+            "temporarily",
+            "connection",
+            "network",
+            "rate limit",
+            "quota",
+            "overloaded",
+            "429",
+        )
+    )
+
+
 def heuristic_rewrite(query: str) -> Dict[str, Any]:
     """
     启发式查询改写（LLM 失败时的兜底）
@@ -201,6 +301,17 @@ def heuristic_rewrite(query: str) -> Dict[str, Any]:
         "search_terms": search_terms,
         "reasoning": reasoning,
     }
+
+
+async def get_retriever_async():
+    """异步获取 Milvus retriever，避免首次初始化阻塞事件循环"""
+    global _retriever_instance
+    if _retriever_instance is not None:
+        return _retriever_instance
+    async with _retriever_lock:
+        if _retriever_instance is None:
+            _retriever_instance = await asyncio.to_thread(get_retriever)
+    return _retriever_instance
 
 
 def _rebalance_results_by_doc(
@@ -277,7 +388,7 @@ def _rebalance_results_by_doc(
 
 async def rewrite_query_with_llm(query: str) -> Optional[MilvusRewriteResult]:
     """
-    使用 LLM 改写查询（增强版 - 2025-12-09）
+    使用 LLM 改写查询（结构化输出优先 + 兼容兜底）
 
     [FIX 2025-12-09] 移除 with_structured_output()，改用手动解析
     - 原因：DeepSeek API 与 with_structured_output() 不兼容，导致 JSON 解析失败
@@ -310,6 +421,41 @@ async def rewrite_query_with_llm(query: str) -> Optional[MilvusRewriteResult]:
     )
 
     user_prompt = f"用户问题：{query}\n\n请直接返回 JSON，不要包含其他文本。"
+
+    # 1) Structured Output（带重试）
+    max_attempts = 3
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result: MilvusRewriteResult = await call_structured_llm(
+                llm=llm,
+                pydantic_model=MilvusRewriteResult,
+                messages=[
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt),
+                ],
+            )
+
+            logger.info(
+                f"[Milvus→Rewrite] LLM 结构化改写成功: "
+                f"terms={result.search_terms[:5] if len(result.search_terms) > 5 else result.search_terms}"
+            )
+            return result
+        except Exception as e:
+            last_error = e
+            if attempt < max_attempts and _is_transient_error(e):
+                delay = min(2.0 * attempt, 6.0)
+                logger.warning(
+                    "[Milvus→Rewrite] 结构化输出瞬时错误，%s/%s 次重试后等待 %.1fs: %s",
+                    attempt,
+                    max_attempts,
+                    delay,
+                    e,
+                )
+                await asyncio.sleep(delay)
+                continue
+            logger.warning("[Milvus→Rewrite] 结构化输出失败，降级为手动解析: %s", e)
+            break
 
     try:
         # [FIX 2025-12-09] LLM 不再绑定 with_structured_output()
@@ -344,6 +490,8 @@ async def rewrite_query_with_llm(query: str) -> Optional[MilvusRewriteResult]:
 
     except Exception as e:
         logger.error(f"[Milvus→Rewrite] LLM 改写异常: {e}，将使用启发式", exc_info=True)
+        if last_error is not None:
+            logger.debug("[Milvus→Rewrite] Structured Output 最后一次错误: %s", last_error)
         return None
 
 
@@ -440,9 +588,9 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
     
     logger.info(f"[Milvus→Search] 开始搜索，search_terms={search_terms}")
     
-    # 获取 retriever
+    # 获取 retriever（异步避免阻塞）
     try:
-        retriever = get_retriever()
+        retriever = await get_retriever_async()
     except Exception as e:
         logger.error(f"[Milvus→Search] Retriever 获取失败: {e}")
         return {
@@ -451,9 +599,12 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
         }
     
     # 提取参数
-    top_k = request.top_k if request else 5
+    top_k = request.top_k if request else DEFAULT_TOP_K
     content_type = request.filters.get("content_type") if request and request.filters else None
-    min_score = float(request.filters.get("min_similarity", 0.0)) if request and request.filters else 0.0
+    min_score = _coerce_float(
+        request.filters.get("min_similarity", 0.0) if request and request.filters else 0.0,
+        0.0,
+    )
 
     def _normalize_str_list(value: Any) -> List[str]:
         if value is None:
@@ -519,7 +670,7 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
             return []
         pages: List[int] = []
         # 150-154页 / 150~154页 / 150到154页
-        for m in re.finditer(r"(?:第\\s*)?(\\d{1,4})\\s*[-~～到至]\\s*(\\d{1,4})\\s*页", text):
+        for m in re.finditer(r"(?:第\s*)?(\d{1,4})\s*[-~～到至]\s*(\d{1,4})\s*页", text):
             try:
                 a = int(m.group(1))
                 b = int(m.group(2))
@@ -529,13 +680,13 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
                 continue
             pages.extend([a, b])
         # 单页：152页 / 第152页
-        for m in re.finditer(r"(?:第\\s*)?(\\d{1,4})\\s*页", text):
+        for m in re.finditer(r"(?:第\s*)?(\d{1,4})\s*页", text):
             try:
                 pages.append(int(m.group(1)))
             except Exception:
                 continue
         # P152 / p152
-        for m in re.finditer(r"\\b[Pp]\\s*(\\d{1,4})\\b", text):
+        for m in re.finditer(r"\b[Pp]\s*(\d{1,4})\b", text):
             try:
                 pages.append(int(m.group(1)))
             except Exception:
@@ -767,16 +918,208 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
     }
 
 
+async def node_extract_knowledge_points(state: MilvusState) -> Dict[str, Any]:
+    """
+    从 Milvus 检索结果中提取结构化知识点
+
+    使用 LLM 从文本片段中提取:
+    - 具体的设计规范
+    - 技术要求
+    - 强制条文
+    - 适用空间类型
+
+    这样可以将原始文本片段转换为结构化的、可操作的知识点
+    """
+    retrieval_results = state.get("retrieval_results", [])
+    query = state.get("query", "")
+    request = state.get("request")
+
+    enable_kp_extraction = False
+    if request and request.metadata:
+        enable_kp_extraction = bool(request.metadata.get("enable_knowledge_extraction", False))
+
+    if not enable_kp_extraction:
+        logger.info("[Milvus→ExtractKP] 知识点提取已禁用，跳过")
+        return {"extracted_knowledge_points": []}
+
+    if not retrieval_results:
+        logger.info("[Milvus→ExtractKP] 无检索结果,跳过知识点提取")
+        return {"extracted_knowledge_points": []}
+
+    logger.info(f"[Milvus→ExtractKP] 开始从 {len(retrieval_results)} 条结果中提取知识点")
+
+    top_n = _coerce_int(os.getenv("MILVUS_KP_TOP_N", "5"), 5)
+    top_results = retrieval_results[:max(1, top_n)]
+
+    max_concurrency = _coerce_int(os.getenv("MILVUS_KP_MAX_CONCURRENCY", "3"), 3)
+    max_concurrency = max(1, max_concurrency)
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    extracted_points: List[Dict[str, Any]] = []
+
+    try:
+        llm = await get_rewrite_llm()
+
+        async def extract_from_result(idx: int, result: Dict[str, Any]) -> List[Dict[str, Any]]:
+            content = result.get("content", "")
+            if not content or len(content.strip()) < 20:
+                return []
+
+            source_doc = result.get("source_document", "")
+            section = result.get("section", "")
+            page_number = result.get("page_number")
+
+            system_prompt = """你是医疗建筑设计领域的专家。你的任务是从给定的文本片段中提取结构化的知识点。
+
+知识点应该是:
+1. 具体的、可操作的设计规范或技术要求
+2. 包含明确的数值、尺寸或标准
+3. 能够直接指导设计工作
+
+请从文本中提取1-3个最重要的知识点,以JSON格式返回:
+```json
+{
+  "knowledge_points": [
+    {
+      "title": "简洁的标题",
+      "content": "具体的规范内容",
+      "category": "类别(如:尺寸要求、功能要求、安全规范等)",
+      "applicable_spaces": ["适用空间1", "适用空间2"],
+      "priority": "强制/推荐/可选",
+      "source_ref": "来源引用"
+    }
+  ]
+}
+```
+
+如果文本中没有明确的设计规范,返回空数组。"""
+
+            user_prompt = f"""用户查询: {query}
+
+文本来源: {source_doc}
+章节: {section or '未知'}
+页码: {page_number or '未知'}
+
+文本内容:
+{content[:1000]}
+
+请提取其中的结构化知识点。"""
+
+            async with semaphore:
+                # 1) Structured Output（带重试）
+                max_attempts = 3
+                last_error: Exception | None = None
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        structured: KnowledgePointsResult = await call_structured_llm(
+                            llm=llm,
+                            pydantic_model=KnowledgePointsResult,
+                            messages=[
+                                SystemMessage(content=system_prompt),
+                                HumanMessage(content=user_prompt),
+                            ],
+                        )
+                        points_structured = [_model_to_dict(p) for p in structured.knowledge_points]
+                        for point in points_structured:
+                            point["chunk_id"] = result.get("chunk_id", "")
+                            point["source_document"] = source_doc
+                            point["section"] = section
+                            point["page_number"] = page_number
+                            point["similarity"] = result.get("similarity", 0.0)
+                        logger.info(
+                            f"[Milvus→ExtractKP] 结构化提取成功: 结果 {idx+1}, "
+                            f"{len(points_structured)} 个知识点"
+                        )
+                        return points_structured
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_attempts and _is_transient_error(e):
+                            delay = min(2.0 * attempt, 6.0)
+                            logger.warning(
+                                "[Milvus→ExtractKP] 结构化输出瞬时错误，%s/%s 次重试后等待 %.1fs: %s",
+                                attempt,
+                                max_attempts,
+                                delay,
+                                e,
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        logger.warning("[Milvus→ExtractKP] 结构化输出失败，降级为手动解析: %s", e)
+                        break
+
+                # 2) 手动解析兜底
+                try:
+                    from backend.app.utils.llm_output_parser import parse_llm_output
+
+                    raw_result = await llm.ainvoke([
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=user_prompt),
+                    ])
+
+                    parsed_result = parse_llm_output(
+                        output=raw_result,
+                        pydantic_model=KnowledgePointsResult,
+                        fallback_parser=None,
+                    )
+
+                    if parsed_result and parsed_result.knowledge_points:
+                        points_manual = [_model_to_dict(p) for p in parsed_result.knowledge_points]
+                        for point in points_manual:
+                            point["chunk_id"] = result.get("chunk_id", "")
+                            point["source_document"] = source_doc
+                            point["section"] = section
+                            point["page_number"] = page_number
+                            point["similarity"] = result.get("similarity", 0.0)
+                        logger.info(
+                            f"[Milvus→ExtractKP] 手动解析成功: 结果 {idx+1}, "
+                            f"{len(points_manual)} 个知识点"
+                        )
+                        return points_manual
+                    logger.warning(f"[Milvus→ExtractKP] 手动解析失败: 结果 {idx+1}")
+                except Exception as e:
+                    logger.warning(f"[Milvus→ExtractKP] 手动解析异常: 结果 {idx+1}, 错误: {e}")
+                    if last_error is not None:
+                        logger.debug("[Milvus→ExtractKP] Structured Output 最后一次错误: %s", last_error)
+
+            return []
+
+        tasks = [extract_from_result(idx, result) for idx, result in enumerate(top_results)]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, list):
+                extracted_points.extend(result)
+
+    except Exception as e:
+        logger.error(f"[Milvus→ExtractKP] 知识点提取失败: {e}")
+        return {"extracted_knowledge_points": []}
+
+    logger.info(f"[Milvus→ExtractKP] 完成知识点提取,共 {len(extracted_points)} 个")
+
+    return {"extracted_knowledge_points": extracted_points}
+
+
 async def node_format_results(state: MilvusState) -> Dict[str, Any]:
     """
     格式化 Milvus chunks 结果为 AgentItem
 
     - 基于 page_number/section 构建 location
     - 输出 chunk_id 作为 citations（供 Knowledge Fusion / MongoDB 回表）
+    - 附加提取的知识点信息
     """
     retrieval_results = state.get("retrieval_results", [])
+    extracted_knowledge_points = state.get("extracted_knowledge_points", [])
 
     logger.info(f"[Milvus→Format] 格式化 {len(retrieval_results)} 条结果")
+
+    # 构建 chunk_id -> knowledge_points 的映射
+    kp_by_chunk: Dict[str, List[Dict[str, Any]]] = {}
+    for kp in extracted_knowledge_points:
+        chunk_id = kp.get("chunk_id", "")
+        if chunk_id:
+            if chunk_id not in kp_by_chunk:
+                kp_by_chunk[chunk_id] = []
+            kp_by_chunk[chunk_id].append(kp)
 
     items: List[AgentItem] = []
     for row in retrieval_results:
@@ -822,6 +1165,10 @@ async def node_format_results(state: MilvusState) -> Dict[str, Any]:
             "location": location_desc,
         }
 
+        # 添加提取的知识点
+        if chunk_id in kp_by_chunk:
+            attrs["knowledge_points"] = kp_by_chunk[chunk_id]
+
         snippet_text = content
         if content_type == "image":
             snippet_text = f"[图片] {content}"
@@ -841,7 +1188,7 @@ async def node_format_results(state: MilvusState) -> Dict[str, Any]:
             )
         )
 
-    logger.info(f"[Milvus→Format] 完成格式化，生成 {len(items)} 个AgentItem（含位置信息）")
+    logger.info(f"[Milvus→Format] 完成格式化，生成 {len(items)} 个AgentItem（含位置信息和知识点）")
 
     return {"items": items}
 
@@ -853,18 +1200,20 @@ async def node_format_results(state: MilvusState) -> Dict[str, Any]:
 def build_milvus_graph():
     """构建 Milvus Agent 图"""
     builder = StateGraph(MilvusState)
-    
+
     # 添加节点
     builder.add_node("extract_query", node_extract_query)
     builder.add_node("rewrite_query", node_rewrite_query)
     builder.add_node("search", node_search_milvus)
+    builder.add_node("extract_knowledge", node_extract_knowledge_points)  # 新增知识点提取节点
     builder.add_node("format", node_format_results)
-    
+
     # 设置流程
     builder.set_entry_point("extract_query")
     builder.add_edge("extract_query", "rewrite_query")
     builder.add_edge("rewrite_query", "search")
-    builder.add_edge("search", "format")
+    builder.add_edge("search", "extract_knowledge")  # 搜索后提取知识点
+    builder.add_edge("extract_knowledge", "format")  # 提取后格式化
     builder.add_edge("format", END)
     
     logger.info("[Milvus] 图构建完成")

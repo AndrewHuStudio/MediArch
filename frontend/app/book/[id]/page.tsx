@@ -178,29 +178,6 @@ export default function BookProductPage({ params }: BookProductPageProps) {
         </div>
       </div>
 
-      {/* Footer credits */}
-      <footer className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <div className="flex items-center gap-4 text-xs">
-          <span className={mutedTextClass}>Built in</span>
-          <a
-            href="https://v0.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`hover:opacity-80 underline ${mutedTextClass}`}
-          >
-            v0
-          </a>
-          <span className={mutedTextClass}>-</span>
-          <a
-            href="https://v0.app/community/book-rendering-design-xELoDknVbmM"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`hover:opacity-80 underline ${mutedTextClass}`}
-          >
-            Credits
-          </a>
-        </div>
-      </footer>
     </div>
   )
 }

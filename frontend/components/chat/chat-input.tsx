@@ -1,7 +1,7 @@
 "use client"
 
-import { useRef, useCallback, useEffect } from "react"
-import { Paperclip, ArrowUpIcon, FileText, ImageIcon } from "lucide-react"
+import { useRef, useCallback, useEffect, useState } from "react"
+import { Paperclip, ArrowUpIcon, FileText, ImageIcon, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -54,6 +54,8 @@ interface ChatInputProps {
   disabled?: boolean
   placeholder?: string
   variant?: "initial" | "conversation"
+  deepSearch?: boolean
+  setDeepSearch?: (deepSearch: boolean) => void
 }
 
 export function ChatInput({
@@ -65,6 +67,8 @@ export function ChatInput({
   disabled = false,
   placeholder = "输入您的问题...",
   variant = "conversation",
+  deepSearch = false,
+  setDeepSearch,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
@@ -131,15 +135,35 @@ export function ChatInput({
           )}
 
           <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-t border-white/5">
-            <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className="text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <Paperclip className="w-5 h-5" />
+              </Button>
+
+              {setDeepSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeepSearch(!deepSearch)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs",
+                    deepSearch
+                      ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
+                      : "text-neutral-400 hover:text-white hover:bg-white/10"
+                  )}
+                  title="深度检索模式：返回更多资料（15-20个），适合需要全面了解的场景"
+                >
+                  <Zap className={cn("w-3.5 h-3.5", deepSearch && "text-blue-300")} />
+                  <span>深度检索</span>
+                </Button>
+              )}
+            </div>
 
             <Button
               disabled={!canSend}
@@ -204,15 +228,35 @@ export function ChatInput({
         )}
 
         <div className="flex items-center justify-between p-3">
-          <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-white hover:bg-neutral-700"
-          >
-            <Paperclip className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-white hover:bg-neutral-700"
+            >
+              <Paperclip className="w-4 h-4" />
+            </Button>
+
+            {setDeepSearch && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDeepSearch(!deepSearch)}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-md transition-all text-xs",
+                  deepSearch
+                    ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
+                    : "text-neutral-400 hover:text-white hover:bg-neutral-700"
+                )}
+                title="深度检索模式：返回更多资料（15-20个），适合需要全面了解的场景"
+              >
+                <Zap className={cn("w-3 h-3", deepSearch && "text-blue-300")} />
+                <span className="hidden sm:inline">深度</span>
+              </Button>
+            )}
+          </div>
 
           <Button
             disabled={!canSend}

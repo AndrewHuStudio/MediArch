@@ -70,9 +70,8 @@ def main():
     p_inc.add_argument("--new-docs", type=str, help="新文档路径，逗号分隔")
     p_inc.add_argument("--auto", action="store_true", help="自动检测新文档")
 
-    # 新增：build 子命令，支持选择是否写 Milvus 与 schema 路径
+    # 新增：build 子命令
     p_build = subparsers.add_parser("build", help="从 Mongo 构建知识图谱")
-    p_build.add_argument("--use-milvus", action="store_true", help="启用 Milvus 写入")
     p_build.add_argument("--schema", type=str, default="backend/databases/graph/schemas/medical_architecture.json", help="Schema 路径")
     p_build.add_argument("--chunk-collection", type=str, help="MongoDB chunk 集合名，默认为环境变量或 mediarch_chunks")
 
@@ -86,10 +85,10 @@ def main():
         from backend.databases.graph.builders.kg_builder import MedicalKGBuilder
         if args.chunk_collection:
             os.environ["MONGODB_CHUNK_COLLECTION"] = args.chunk_collection
-        builder = MedicalKGBuilder(use_milvus=bool(args.use_milvus), schema_path=args.schema)
+        builder = MedicalKGBuilder(schema_path=args.schema)
         print("[STEP] 从MongoDB读取文档chunks...")
         stats = builder.build_from_mongodb()
-        print("[STEP] 写入Neo4j和Milvus...")
+        print("[STEP] 写入Neo4j...")
         builder.write_to_databases()
         builder.close()
         print("[OK] Build complete", stats)

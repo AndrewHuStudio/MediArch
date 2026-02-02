@@ -73,9 +73,13 @@ async def _check_database_status(db_name: str, db_type: str) -> DatabaseStatus:
 
         # 根据数据库类型执行检查
         if db_type == "neo4j":
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
             from backend.app.services.graph_retriever import get_neo4j_driver
             driver = get_neo4j_driver()
-            with driver.session() as session:
+            database = os.getenv("NEO4J_DATABASE", "neo4j")
+            with driver.session(database=database) as session:
                 result = session.run("RETURN 1 AS test")
                 result.single()
 
@@ -150,7 +154,7 @@ async def detailed_health():
             ("Orchestrator Agent", "backend.app.agents.orchestrator_agent.agent"),
             ("Online Search Agent", "backend.app.agents.online_search_agent.agent"),
             ("Result Synthesizer Agent", "backend.app.agents.result_synthesizer_agent.agent"),
-            ("Supervisor Graph", "backend.app.agents.supervisor_graph"),
+            ("MediArch Graph", "backend.app.agents.mediarch_graph"),
         ]
 
         agent_statuses: List[AgentStatus] = []
@@ -228,7 +232,7 @@ async def get_metrics():
                 "neo4j_avg_latency_ms": 0.0,
                 "milvus_avg_latency_ms": 0.0,
                 "mongodb_avg_latency_ms": 0.0,
-                "supervisor_avg_latency_ms": 0.0,
+                "mediarch_graph_avg_latency_ms": 0.0,
             },
             system_metrics={
                 "cpu_usage_percent": 0.0,

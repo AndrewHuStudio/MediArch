@@ -5,7 +5,7 @@
 将在前端开发完毕后，使用新的健康检查机制重新实现。
 
 新的健康检查机制：
-- 使用 supervisor_graph 中的 worker 状态
+- 使用 mediarch_graph 中的 worker 状态
 - 基于 graph 导入而非 registry
 - 参考 orchestrator_agent/agent.py 中的健康检查函数：
   * check_worker_status(agent_name: str) -> bool

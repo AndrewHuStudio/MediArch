@@ -1,31 +1,34 @@
-"""Orchestrator Agent - 优化版本
-
-核心改进：
-- ✅ 使用 LLMManager（线程安全）
-- ✅ 精简代码结构
-- ✅ 规范接口（与 supervisor 对接）
-- ✅ 删除冗余功能
-"""
-
 from __future__ import annotations
 
-import json
+import asyncio
 import logging
 import os
 from typing import Any, Dict, List, Optional
 from typing_extensions import TypedDict
 
+from pydantic import BaseModel, Field
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
 
-from backend.app.agents.base_agent import AgentRequest, get_llm_manager
+from backend.app.agents.base_agent import AgentRequest, call_structured_llm, get_llm_manager
+
+try:
+    from openai import RateLimitError as OpenAIRateLimitError
+except Exception:
+    OpenAIRateLimitError = None
+
+try:
+    import httpx
+    _HTTPX_ERRORS = (httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout)
+except Exception:
+    _HTTPX_ERRORS = ()
 
 logger = logging.getLogger("orchestrator_agent")
 
 # 默认配置
 DEFAULT_WORKERS = ["neo4j_agent", "milvus_agent", "mongodb_agent", "online_search_agent"]
-DEFAULT_TOP_K = 12
+DEFAULT_TOP_K = 20 
 DEFAULT_TIMEOUT_MS = 3000
 
 
@@ -51,6 +54,26 @@ class OrchestratorState(TypedDict, total=False):
     request: AgentRequest
     diagnostics: Dict[str, Any]
 
+class IntentAnalysisResult(BaseModel):
+    """LLM 结构化输出：意图分析结果"""
+
+    is_hospital_related: bool = Field(
+        ...,
+        description="问题是否与综合医院建筑设计相关",
+    )
+    rewritten_query: str = Field(
+        default="",
+        description="结合上下文改写后的完整问题",
+    )
+    general_answer: str = Field(
+        default="",
+        description="不相关时的引导回答",
+    )
+    reasoning: str = Field(
+        default="",
+        description="简要判断理由",
+    )
+
 
 # ============================================================================
 # LLM 管理
@@ -58,14 +81,13 @@ class OrchestratorState(TypedDict, total=False):
 
 def _init_orchestrator_llm():
     """初始化 Orchestrator LLM"""
-    api_key = os.getenv("ORCHESTRATOR_API_KEY") or os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("MEDIARCH_API_KEY")
     if not api_key:
-        raise ValueError("缺少 ORCHESTRATOR_API_KEY 或 OPENAI_API_KEY")
+        raise ValueError("缺少 MEDIARCH_API_KEY（orchestrator_agent）")
     
-    base_url = os.getenv("ORCHESTRATOR_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    base_url = base_url.rstrip("/") if base_url else None
-    model = os.getenv("ORCHESTRATOR_MODEL", "gpt-4o-mini")
-    model_provider = os.getenv("ORCHESTRATOR_MODEL_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
+    model = os.getenv("ORCHESTRATOR_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
     
     return init_chat_model(
         model=model,
@@ -80,9 +102,6 @@ def _init_orchestrator_llm():
 
 async def get_orchestrator_llm():
     """获取 Orchestrator LLM（异步版本，修复阻塞调用问题）
-
-    2025-11-18: 使用asyncio.to_thread()包装同步LLM初始化，
-    避免LangGraph dev的阻塞调用检测。
     """
     import asyncio
 
@@ -165,10 +184,23 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
     # 构建上下文（最近3轮对话）
     recent_context = []
     for msg in messages[-6:]:  # 最近3轮（每轮user+assistant）
-        if isinstance(msg, (HumanMessage, SystemMessage)):
-            content = msg.content if isinstance(msg.content, str) else ""
-            if content:
-                recent_context.append(f"{msg.__class__.__name__}: {content[:100]}")
+        if isinstance(msg, (HumanMessage, SystemMessage, AIMessage)):
+            content = msg.content
+            if isinstance(content, str):
+                snippet = content
+            elif isinstance(content, list):
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") in {"text", "input_text"}:
+                            text = block.get("text") or block.get("value") or ""
+                            if text:
+                                text_parts.append(text)
+                snippet = "\n".join(text_parts).strip()
+            else:
+                snippet = ""
+            if snippet:
+                recent_context.append(f"{msg.__class__.__name__}: {snippet[:100]}")
     
     context_str = "\n".join(recent_context[-4:]) if recent_context else "无上下文"
     
@@ -186,9 +218,10 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
 
 返回格式（必须是有效 JSON）：
 {
-  "is_hospital_related": true/false,
+  "is_hospital_related": true,
   "rewritten_query": "改写后的完整问题（如果有代词）",
-  "general_answer": "如果不相关，给出引导回答"
+  "general_answer": "如果不相关，给出引导回答",
+  "reasoning": "简要判断理由"
 }
 """
     
@@ -199,50 +232,88 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
 
 请分析并返回 JSON。"""
     
-    try:
-        llm = await get_orchestrator_llm()
-        response = await llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-        ])
-        
-        content = response.content.strip()
-        
-        # 清理 JSON（移除 markdown 代码块）
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
-        
-        result = json.loads(content)
-        
-        is_hospital_related = result.get("is_hospital_related", True)
-        rewritten_query = result.get("rewritten_query", query)
-        general_answer = result.get("general_answer", "")
-        
-        logger.info(
-            f"[Orchestrator→AnalyzeIntent] 相关性: {is_hospital_related}, "
-            f"改写: {rewritten_query if rewritten_query != query else '无'}"
+    def _is_transient_error(error: Exception) -> bool:
+        if isinstance(error, asyncio.TimeoutError):
+            return True
+        if OpenAIRateLimitError is not None and isinstance(error, OpenAIRateLimitError):
+            return True
+        if _HTTPX_ERRORS and isinstance(error, _HTTPX_ERRORS):
+            return True
+        message = str(error).lower()
+        return any(
+            keyword in message
+            for keyword in (
+                "timeout",
+                "timed out",
+                "temporarily",
+                "connection",
+                "network",
+                "rate limit",
+                "quota",
+                "overloaded",
+                "429",
+            )
         )
-        
-        return {
-            "is_hospital_related": is_hospital_related,
-            "rewritten_query": rewritten_query,
-            "general_answer": general_answer,
-        }
-    
-    except Exception as e:
-        logger.error(f"[Orchestrator→AnalyzeIntent] LLM 分析失败: {e}，使用启发式")
-        # 兜底：启发式判断
-        is_related = any(
-            keyword in query
-            for keyword in ["医院", "设计", "科室", "病房", "门诊", "手术", "ICU", "规范"]
-        )
-        return {
-            "is_hospital_related": is_related,
-            "rewritten_query": query,
-            "general_answer": "" if is_related else "这个问题不在我的专业领域内。",
-        }
+
+    llm = await get_orchestrator_llm()
+    max_attempts = 3
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result: IntentAnalysisResult = await call_structured_llm(
+                llm=llm,
+                pydantic_model=IntentAnalysisResult,
+                messages=[
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt),
+                ],
+            )
+            last_error = None
+            break
+        except Exception as e:
+            last_error = e
+            if attempt < max_attempts and _is_transient_error(e):
+                delay = min(2.0 * attempt, 6.0)
+                logger.warning(
+                    "[Orchestrator→AnalyzeIntent] 瞬时错误，%s/%s 次重试后继续等待 %.1fs: %s",
+                    attempt,
+                    max_attempts,
+                    delay,
+                    e,
+                )
+                await asyncio.sleep(delay)
+                continue
+            logger.error("[Orchestrator→AnalyzeIntent] LLM 分析失败", exc_info=True)
+            raise RuntimeError(
+                "Orchestrator 结构化输出失败；"
+                "请使用支持结构化输出的 OpenAI 兼容 API。"
+            ) from e
+    else:
+        result = None  # for type checkers only
+
+    if last_error is not None:
+        raise RuntimeError(
+            "Orchestrator 结构化输出失败；"
+            "请使用支持结构化输出的 OpenAI 兼容 API。"
+        ) from last_error
+
+    rewritten_query = result.rewritten_query.strip() if result.rewritten_query else ""
+    if not rewritten_query:
+        rewritten_query = query
+
+    logger.info(
+        f"[Orchestrator→AnalyzeIntent] 相关性: {result.is_hospital_related}, "
+        f"改写: {rewritten_query if rewritten_query != query else '无'}"
+    )
+
+    return {
+        "is_hospital_related": result.is_hospital_related,
+        "rewritten_query": rewritten_query,
+        "general_answer": result.general_answer or "",
+        "diagnostics": {
+            "intent_reasoning": result.reasoning,
+        },
+    }
 
 
 async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
@@ -250,27 +321,33 @@ async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
     is_hospital_related = state.get("is_hospital_related", True)
     rewritten_query = state.get("rewritten_query", "")
     general_answer = state.get("general_answer", "")
-    available_workers = state.get("available_workers") or DEFAULT_WORKERS
+    available_workers = state.get("available_workers")
+    if available_workers is None:
+        available_workers = DEFAULT_WORKERS
     
     logger.info(f"[Orchestrator→DecideAction] 相关性: {is_hospital_related}")
     
+    diagnostics = state.get("diagnostics") or {}
+
     # 不相关问题
     if not is_hospital_related:
         final_answer = general_answer or (
             "这个问题不在我的专业领域内。\n\n"
-            "💡 我专注于综合医院建筑设计，如果您有相关问题，欢迎咨询！"
+            "我专注于综合医院建筑设计，如果您有相关问题，欢迎咨询！"
         )
         
         return {
             "general_answer": final_answer,
             "agents_to_call": [],
-            "diagnostics": {"type": "general_question"},
+            "diagnostics": {**diagnostics, "type": "general_question"},
         }
     
     # 相关问题：选择 Workers
     workers = [w for w in DEFAULT_WORKERS if w in available_workers]
     if not workers:
-        workers = list(available_workers) or DEFAULT_WORKERS
+        workers = list(available_workers or [])
+        if not workers:
+            logger.warning("[Orchestrator→DecideAction] 未找到可用 Worker")
     
     logger.info(f"[Orchestrator→DecideAction] 调用 Workers: {workers}")
     
@@ -278,6 +355,7 @@ async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
         "agents_to_call": workers,
         "query": rewritten_query,  # 使用改写后的查询
         "diagnostics": {
+            **diagnostics,
             "type": "hospital_related",
             "rewritten": rewritten_query != state.get("extracted_query", ""),
         },
@@ -290,7 +368,7 @@ async def node_prepare_request(state: OrchestratorState) -> Dict[str, Any]:
     
     logger.info(f"[Orchestrator→PrepareRequest] 准备请求: {query}")
 
-    # ✅ 关键：保留上游（API / Supervisor）传入的 filters / top_k / timeout 等参数。
+    # ✅ 关键：保留上游（API / MediArch Graph）传入的 filters / top_k / timeout 等参数。
     # 否则会导致 doc scoping（filters.doc_ids/source_documents）在 Orchestrator 阶段被覆盖丢失。
     existing = state.get("request")
 

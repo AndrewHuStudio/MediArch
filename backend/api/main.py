@@ -31,6 +31,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.docs import get_swagger_ui_html
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # 导入路由
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     启动时:
     - 初始化数据库连接
-    - 预热 LangGraph Supervisor
+    - 预热 LangGraph MediArch Graph
     - 加载配置
 
     关闭时:
@@ -68,10 +69,10 @@ async def lifespan(app: FastAPI):
 
     # 启动时初始化
     try:
-        # 预热 LangGraph Supervisor（可选，提升首次请求速度）
+        # 预热 LangGraph MediArch Graph（可选，提升首次请求速度）
         if settings.PRELOAD_SUPERVISOR:
-            from backend.app.agents.supervisor_graph import graph as supervisor_graph
-            logger.info("[OK] LangGraph Supervisor 预热成功")
+            from backend.app.agents.mediarch_graph import graph as mediarch_graph
+            logger.info("[OK] LangGraph MediArch Graph 预热成功")
 
         # 初始化数据库连接池（如需要）
         # await init_database_pools()
@@ -97,7 +98,7 @@ app = FastAPI(
     title="MediArch API",
     description="综合医院设计问答助手 - 智能检索与咨询 API",
     version="1.0.0",
-    docs_url="/api/docs" if settings.ENVIRONMENT != "production" else None,
+    docs_url=None,  # 禁用默认文档，使用自定义路由
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
     openapi_url="/api/openapi.json" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan,
@@ -299,6 +300,18 @@ async def root():
         "docs": "/api/docs",
         "redoc": "/api/redoc",
     }
+
+
+@app.get("/api/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    """自定义 Swagger UI（使用国内可访问的 CDN）"""
+    return get_swagger_ui_html(
+        openapi_url="/api/openapi.json",
+        title=f"{app.title} - Swagger UI",
+        swagger_js_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js",
+        swagger_css_url="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css",
+        swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
+    )
 
 
 @app.get("/ping", tags=["Root"])

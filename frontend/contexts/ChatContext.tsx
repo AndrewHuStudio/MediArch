@@ -3,6 +3,7 @@
 import type React from "react"
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import type { PDFSource } from "@/components/chat/pdf-source-card"
+import type { GraphData } from "@/components/ui/knowledge-graph-d3"
 
 // 消息类型定义
 export interface Message {
@@ -33,12 +34,6 @@ export interface StoredConversation {
   isPinned: boolean
 }
 
-// GraphData 类型定义
-export interface GraphData {
-  nodes: Array<{ id: string; label: string; type: string }>
-  links: Array<{ source: string; target: string; label: string }>
-}
-
 // Context 状态类型
 interface ChatContextState {
   // 消息相关
@@ -62,6 +57,11 @@ interface ChatContextState {
   setCurrentThought: (thought: string) => void
   agentStatus: "thinking" | "synthesizing" | "idle"
   setAgentStatus: (status: "thinking" | "synthesizing" | "idle") => void
+  // 新增：支持并行Agent状态
+  activeAgents: Set<number>
+  setActiveAgents: React.Dispatch<React.SetStateAction<Set<number>>>
+  completedAgents: Set<number>
+  setCompletedAgents: React.Dispatch<React.SetStateAction<Set<number>>>
 
   // 对话元数据
   conversationTitle: string
@@ -69,7 +69,7 @@ interface ChatContextState {
   conversationSummary: string
   setConversationSummary: (summary: string) => void
   isConversationPinned: boolean
-  setIsConversationPinned: (pinned: boolean) => void
+  setIsConversationPinned: React.Dispatch<React.SetStateAction<boolean>>
   isAutoTitleActive: boolean
   setIsAutoTitleActive: (active: boolean) => void
   currentConversationId: string | undefined
@@ -111,6 +111,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [activeAgentIndex, setActiveAgentIndex] = useState(-1)
   const [currentThought, setCurrentThought] = useState("")
   const [agentStatus, setAgentStatus] = useState<"thinking" | "synthesizing" | "idle">("idle")
+  // 新增：支持并行Agent状态
+  const [activeAgents, setActiveAgents] = useState<Set<number>>(new Set())
+  const [completedAgents, setCompletedAgents] = useState<Set<number>>(new Set())
 
   // 对话元数据
   const [conversationTitle, setConversationTitle] = useState("新的对话")
@@ -158,6 +161,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrentThought,
     agentStatus,
     setAgentStatus,
+    // 新增：支持并行Agent状态
+    activeAgents,
+    setActiveAgents,
+    completedAgents,
+    setCompletedAgents,
 
     // 对话元数据
     conversationTitle,

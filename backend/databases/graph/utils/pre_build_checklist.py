@@ -46,23 +46,23 @@ class PreBuildChecker:
         """检查环境变量配置"""
         print("\n[1/8] 检查环境变量配置...")
 
-        # KG构建所需环境变量
-        required_kg_vars = [
-            "KG_OPENAI_API_KEY",
-            "KG_OPENAI_BASE_URL",
-            "KG_OPENAI_MODEL",
+        # KG 构建 LLM 配置（支持两种前缀：KG_OPENAI_* 或 OPENAI_*）
+        kg_api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        kg_base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
+        kg_model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or ""
+
+        # 数据库配置（必需）
+        required_db_vars = [
             "MONGODB_URI",
             "NEO4J_URI",
-            "NEO4J_USER",  # 修正：使用NEO4J_USER而非NEO4J_USERNAME
+            "NEO4J_USER",  # 修正：使用 NEO4J_USER 而非 NEO4J_USERNAME
             "NEO4J_PASSWORD",
         ]
 
-        # VLM图片描述（可选）
-        optional_vlm_vars = [
-            "KG_VISION_API_KEY",
-            "KG_VISION_BASE_URL",
-            "KG_VISION_MODEL"
-        ]
+        # VLM 图片描述（可选；支持 VLM_* 或旧版 KG_VISION_*）
+        vlm_api_key = os.getenv("VLM_API_KEY") or os.getenv("KG_VISION_API_KEY")
+        vlm_base_url = os.getenv("VLM_BASE_URL") or os.getenv("KG_VISION_BASE_URL")
+        vlm_model = os.getenv("VLM_MODEL") or os.getenv("VLM_MODE") or os.getenv("KG_VISION_MODEL")
 
         # Milvus（可选）
         optional_milvus_vars = [
@@ -70,8 +70,15 @@ class PreBuildChecker:
             "MILVUS_PORT"
         ]
 
-        missing = []
-        for var in required_kg_vars:
+        missing: List[str] = []
+        if not kg_api_key:
+            missing.append("KG_OPENAI_API_KEY/OPENAI_API_KEY")
+        if not kg_base_url:
+            missing.append("KG_OPENAI_BASE_URL/OPENAI_BASE_URL")
+        if not kg_model:
+            missing.append("KG_OPENAI_MODEL/OPENAI_MODEL")
+
+        for var in required_db_vars:
             if not os.getenv(var):
                 missing.append(var)
 
@@ -80,10 +87,16 @@ class PreBuildChecker:
             return False
 
         # 检查可选变量
-        vlm_configured = all(os.getenv(v) for v in optional_vlm_vars)
+        vlm_configured = bool(vlm_api_key and vlm_base_url and vlm_model)
         milvus_configured = all(os.getenv(v) for v in optional_milvus_vars)
 
         detail_parts = ["必需变量已配置"]
+        # 说明 KG LLM 使用的是哪一套前缀
+        if os.getenv("KG_OPENAI_API_KEY"):
+            detail_parts.append("KG LLM: KG_OPENAI_*")
+        else:
+            detail_parts.append("KG LLM: OPENAI_* (fallback)")
+
         if vlm_configured:
             detail_parts.append("VLM已配置")
         else:
@@ -195,7 +208,11 @@ class PreBuildChecker:
                 }
 
                 if seed_nodes == 0:
-                    self.add_warning("Neo4j未注入骨架数据，建议先运行: python backend/databases/graph/utils/seed_ontology.py")
+                    self.add_warning(
+                        "Neo4j未注入骨架数据，建议先运行: "
+                        "python backend/databases/graph/utils/seed_ontology_v2.py "
+                        "(或旧版: python backend/databases/graph/utils/seed_ontology.py)"
+                    )
                 else:
                     detail = f"总节点:{total_nodes}, 骨架节点:{seed_nodes}, 关系:{total_rels}"
                     self.add_check("Neo4j骨架", True, detail)
@@ -213,12 +230,6 @@ class PreBuildChecker:
         """检查Milvus连接（可选）"""
         print("\n[4/8] 检查Milvus连接...")
 
-        milvus_enabled = os.getenv("KG_USE_MILVUS", "").lower() in {"1", "true", "yes"}
-
-        if not milvus_enabled:
-            self.add_check("Milvus", True, "已禁用（通过KG_USE_MILVUS控制）")
-            return True, {"enabled": False}
-
         try:
             host = os.getenv("MILVUS_HOST", "localhost")
             port = os.getenv("MILVUS_PORT", "19530")
@@ -230,15 +241,15 @@ class PreBuildChecker:
                 timeout=5
             )
 
-            # 检查entity_attributes集合
+            # 检查核心 chunks 集合（Milvus 主要用于 mediarch_chunks 向量检索）
             try:
-                collection = Collection("entity_attributes", using="pre_check")
+                collection = Collection("mediarch_chunks", using="pre_check")
                 count = collection.num_entities
 
-                self.add_check("Milvus", True, f"已连接, entity_attributes向量数:{count}")
+                self.add_check("Milvus", True, f"已连接, mediarch_chunks向量数:{count}")
                 stats = {"enabled": True, "vectors": count}
             except Exception:
-                self.add_check("Milvus", True, "已连接, entity_attributes集合未创建（首次构建会自动创建）")
+                self.add_check("Milvus", True, "已连接, mediarch_chunks集合未创建/不可读")
                 stats = {"enabled": True, "vectors": 0}
 
             connections.disconnect("pre_check")
@@ -258,12 +269,11 @@ class PreBuildChecker:
             self.add_check("图片处理", True, "无图片chunk（可能文档不含图片）")
             return True
 
-        # 检查VLM配置
-        vlm_configured = all(os.getenv(v) for v in [
-            "KG_VISION_API_KEY",
-            "KG_VISION_BASE_URL",
-            "KG_VISION_MODEL"
-        ])
+        # 检查 VLM 配置（支持 VLM_* 或旧版 KG_VISION_*）
+        vlm_api_key = os.getenv("VLM_API_KEY") or os.getenv("KG_VISION_API_KEY")
+        vlm_base_url = os.getenv("VLM_BASE_URL") or os.getenv("KG_VISION_BASE_URL")
+        vlm_model = os.getenv("VLM_MODEL") or os.getenv("VLM_MODE") or os.getenv("KG_VISION_MODEL")
+        vlm_configured = bool(vlm_api_key and vlm_base_url and vlm_model)
 
         if vlm_configured:
             detail = f"图片chunks:{image_chunks}, VLM已配置（qwen3-vl-plus）"
@@ -338,8 +348,16 @@ class PreBuildChecker:
             sys.path.insert(0, str(project_root))
             from backend.databases.graph.builders.kg_builder import MedicalKGBuilder
 
-            # 测试实例化（不连接数据库）
-            builder = MedicalKGBuilder(use_milvus=False)
+            # 避免在 checklist 阶段触发交互式构建模式选择
+            old_mode = os.getenv("KG_BUILD_MODE")
+            os.environ["KG_BUILD_MODE"] = "incremental"
+            try:
+                builder = MedicalKGBuilder()
+            finally:
+                if old_mode is None:
+                    os.environ.pop("KG_BUILD_MODE", None)
+                else:
+                    os.environ["KG_BUILD_MODE"] = old_mode
 
             # 检查关键方法
             methods = [

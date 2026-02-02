@@ -11,6 +11,7 @@ export interface PDFSource {
   pageNumber: number
   snippet: string
   highlightText: string
+  imageUrl?: string
   thumbnail?: string
 }
 

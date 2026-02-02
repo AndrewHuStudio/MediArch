@@ -71,20 +71,20 @@ def incremental_kg_build(doc_titles=None):
     print("\n" + "="*80)
     print("步骤2：增量构建知识图谱")
     print("="*80)
-    
-    builder = MedicalKGBuilder(use_milvus=True)
-    
+
+    builder = MedicalKGBuilder()
+
     # 只处理指定的文档
     if doc_titles:
         stats = builder.build_from_mongodb(filter_docs=doc_titles)
     else:
         stats = builder.build_from_mongodb()
-    
+
     # 写入数据库（会自动merge）
     builder.write_to_databases()
-    
+
     builder.close()
-    
+
     print("\n✓ 知识图谱增量更新完成")
     print(f"  新增节点: {stats.get('total_nodes', 0)}")
     print(f"  新增关系: {stats.get('total_edges', 0)}")
