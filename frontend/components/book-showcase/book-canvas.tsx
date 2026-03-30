@@ -4,7 +4,6 @@ import type React from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { TrackballControls } from "@react-three/drei"
 import { Suspense, useRef, useEffect, useState } from "react"
-import type * as THREE from "three"
 import type { BookParams, MaterialProps } from "./types"
 import { Book } from "./book-3d-model"
 import { CameraController } from "./camera-controller"
@@ -34,14 +33,14 @@ export function BookModel({
 }: {
   params: BookParams
   materialProps: MaterialProps
-  meshRef: React.MutableRefObject<THREE.Mesh | null>
+  meshRef: React.MutableRefObject<any>
   onReady?: (ready: boolean) => void
   bookIndex?: number
   frontCoverUrl?: string
   backCoverUrl?: string
   highlightIntensity?: number
 }) {
-  const controlsRef = useRef<any>()
+  const controlsRef = useRef<any>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [hasFirstRender, setHasFirstRender] = useState(false)
 
@@ -115,7 +114,6 @@ export function BookModel({
             ref={controlsRef}
             noPan={true}
             noZoom={true}
-            enableRotate={true}
             staticMoving={false}
             dynamicDampingFactor={0.05}
             rotateSpeed={1.5}
@@ -134,8 +132,8 @@ function LightingRig({
   highlightIntensity: number
   targetPosition: [number, number, number]
 }) {
-  const spotlightRef = useRef<THREE.SpotLight>(null)
-  const fillLightRef = useRef<THREE.PointLight>(null)
+  const spotlightRef = useRef<any>(null)
+  const fillLightRef = useRef<any>(null)
 
   useFrame(() => {
     if (spotlightRef.current) {

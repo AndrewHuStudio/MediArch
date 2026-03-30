@@ -19,7 +19,7 @@ from typing import List, Dict, Optional, Any
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -46,7 +46,10 @@ class EmbeddingGenerator:
             timeout_sec: 请求超时时间
         """
         self.api_key = api_key or os.getenv("EMBEDDING_API_KEY")
-        self.base_url = (base_url or os.getenv("EMBEDDING_BASE_URL")).rstrip("/")
+        raw_base_url = (base_url or os.getenv("EMBEDDING_BASE_URL") or "").strip()
+        if not raw_base_url:
+            raise ValueError("EMBEDDING_BASE_URL未设置")
+        self.base_url = raw_base_url.rstrip("/")
         self.model = model or os.getenv("EMBEDDING_MODEL", "text-embedding-3-large")
         self.timeout_sec = float(timeout_sec)
         
@@ -125,68 +128,71 @@ class EmbeddingGenerator:
             batch = texts[start : start + batch_size]
 
             keys = [self._ckey(t) for t in batch]
-            batch_cached: Dict[str, List[float]] = {}
-            miss_inputs: List[str] = []
-            miss_keys: List[str] = []
+            merged: List[Optional[List[float]]] = [None] * len(batch)
+            miss_items: List[tuple[int, str, str]] = []
 
-            # 内存命中
-            for t, k in zip(batch, keys):
+            # 1) 命中内存缓存
+            for pos, (t, k) in enumerate(zip(batch, keys)):
                 v = self._cache.get(k)
                 if v is not None:
-                    batch_cached[k] = v
+                    merged[pos] = v
                 else:
-                    miss_inputs.append(t)
-                    miss_keys.append(k)
+                    miss_items.append((pos, t, k))
 
-            # SQLite 命中
-            if miss_inputs:
-                for t, k in list(zip(miss_inputs, miss_keys)):
+            # 2) 命中 SQLite 缓存
+            if miss_items:
+                still_miss: List[tuple[int, str, str]] = []
+                for pos, t, k in miss_items:
                     v = self._cache_get(k)
                     if v is not None:
                         self._cache[k] = v
-                        batch_cached[k] = v
-                        idx = miss_keys.index(k)
-                        miss_inputs.pop(idx)
-                        miss_keys.pop(idx)
+                        merged[pos] = v
+                    else:
+                        still_miss.append((pos, t, k))
+                miss_items = still_miss
 
-            if not miss_inputs:
-                embeddings.extend([batch_cached[self._ckey(t)] for t in batch])
+            if not miss_items:
+                # 已完全命中缓存
+                embeddings.extend([v if v is not None else self._zero_vector() for v in merged])
                 continue
 
-            payload = {"model": self.model, "input": miss_inputs}
+            payload = {"model": self.model, "input": [t for _, t, _ in miss_items]}
             if self.rate_delay > 0:
                 time.sleep(self.rate_delay)
 
             try:
                 result = self._post_with_retry(payload)
                 data = result.get("data") or []
-                # 使用返回的 index 字段对齐；若缺失，则顺序回填
-                remain_map: Dict[int, List[float]] = {}
+                # 使用返回的 index 字段对齐；若缺失则按顺序兜底。
+                indexed_map: Dict[int, List[float]] = {}
+                sequential: List[List[float]] = []
                 for item in data:
                     idx = item.get("index")
                     emb = item.get("embedding")
-                    if idx is None:
-                        remain_map[len(remain_map)] = emb
-                    else:
-                        remain_map[int(idx)] = emb
-
-                merged: List[List[float]] = []
-                next_idx = 0
-                for t, k in zip(batch, keys):
-                    if k in batch_cached:
-                        merged.append(batch_cached[k])
+                    if emb is None:
                         continue
-                    emb = remain_map.get(next_idx)
+                    if idx is None:
+                        sequential.append(emb)
+                        continue
+                    try:
+                        indexed_map[int(idx)] = emb
+                    except Exception:
+                        sequential.append(emb)
+
+                seq_cursor = 0
+                for miss_idx, (pos, _t, k) in enumerate(miss_items):
+                    emb = indexed_map.get(miss_idx)
+                    if emb is None and seq_cursor < len(sequential):
+                        emb = sequential[seq_cursor]
+                        seq_cursor += 1
                     if emb is None:
                         logger.warning("API未返回足够的embedding，使用零向量兜底。")
                         emb = self._zero_vector()
-                    else:
-                        next_idx += 1
+                    merged[pos] = emb
                     self._cache[k] = emb
                     self._cache_put(k, emb)
-                    merged.append(emb)
 
-                embeddings.extend(merged)
+                embeddings.extend([v if v is not None else self._zero_vector() for v in merged])
                 
             except Exception as e:
                 logger.error("批次 %d 生成失败: %s", (start // batch_size) + 1, e)

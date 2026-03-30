@@ -30,14 +30,17 @@ from backend.app.agents.base_agent import (
 )
 from backend.app.services.query_expansion import expand_query
 from backend.app.services.milvus_chunk_search import get_retriever
+from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 logger = logging.getLogger("milvus_agent")
 
-DEFAULT_REWRITE_MODEL = os.getenv("MILVUS_AGENT_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_REWRITE_MODEL = os.getenv("MILVUS_AGENT_MODEL") or get_llm_model("gpt-4o-mini")
 DEFAULT_TOP_K = 20
 
 _retriever_instance: Any | None = None
 _retriever_lock = asyncio.Lock()
+_reranker_instance: Any | None = None
+_reranker_lock = asyncio.Lock()
 
 try:
     from openai import RateLimitError as OpenAIRateLimitError
@@ -103,6 +106,27 @@ class KnowledgePointsResult(BaseModel):
     )
 
 
+class KnowledgePointsBatchItem(BaseModel):
+    """LLM 结构化输出：单个 chunk 的知识点"""
+
+    chunk_id: str = Field(
+        description="原始文本片段的 chunk_id",
+    )
+    knowledge_points: List[KnowledgePoint] = Field(
+        default_factory=list,
+        description="该 chunk 的知识点列表（无明确规范可为空）",
+    )
+
+
+class KnowledgePointsBatchResult(BaseModel):
+    """LLM 结构化输出：批量知识点"""
+
+    items: List[KnowledgePointsBatchItem] = Field(
+        default_factory=list,
+        description="按 chunk_id 分组的知识点列表",
+    )
+
+
 # ============================================================================
 # 状态定义
 # ============================================================================
@@ -134,12 +158,12 @@ class MilvusState(TypedDict, total=False):
 
 def _init_rewrite_llm():
     """初始化查询改写 LLM"""
-    api_key = os.getenv("MEDIARCH_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         raise ValueError("缺少 MEDIARCH_API_KEY（milvus_agent）")
 
-    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
-    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = get_llm_base_url()
+    model_provider = get_model_provider()
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     base_model = init_chat_model(
@@ -243,6 +267,114 @@ def _is_transient_error(error: Exception) -> bool:
             "429",
         )
     )
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return bool(default)
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_agent_rerank_enabled() -> bool:
+    # 默认开启；如需关闭可设置 MILVUS_AGENT_ENABLE_RERANK=0
+    return _env_bool("MILVUS_AGENT_ENABLE_RERANK", True)
+
+
+async def get_reranker_async():
+    """异步获取 reranker（单例）。"""
+    global _reranker_instance
+    if _reranker_instance is not None:
+        return _reranker_instance
+    async with _reranker_lock:
+        if _reranker_instance is None:
+            from data_process.vector.reranker import BgeReranker
+
+            model_name = os.getenv("RERANKER_MODEL", "qwen3-reranker-8b")
+            # Milvus Agent 统一走 API rerank，避免本地大模型加载
+            _reranker_instance = await asyncio.to_thread(
+                BgeReranker,
+                model_name,
+                None,
+                True,
+            )
+    return _reranker_instance
+
+
+async def _rerank_retrieval_results(
+    query: str,
+    rows: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    对 Milvus 初召回结果做 rerank，返回重排后结果与诊断信息。
+    """
+    diagnostics: Dict[str, Any] = {
+        "enabled": _is_agent_rerank_enabled(),
+        "applied": False,
+        "reason": "",
+        "model": os.getenv("RERANKER_MODEL", "qwen3-reranker-8b"),
+    }
+
+    if not diagnostics["enabled"]:
+        diagnostics["reason"] = "disabled_by_env"
+        return rows, diagnostics
+    if len(rows) <= 1:
+        diagnostics["reason"] = "insufficient_candidates"
+        return rows, diagnostics
+
+    reranker = await get_reranker_async()
+    max_candidates = _coerce_int(
+        os.getenv("MILVUS_AGENT_RERANK_MAX_CANDIDATES", "80"),
+        80,
+    )
+    max_candidates = max(2, min(max_candidates, 300))
+    candidates = rows[:max_candidates]
+    tail = rows[max_candidates:]
+
+    chunks: List[Dict[str, Any]] = []
+    for idx, row in enumerate(candidates):
+        chunks.append(
+            {
+                "content": row.get("content", "") or "",
+                "_candidate_idx": idx,
+            }
+        )
+
+    ranked_chunks = await asyncio.to_thread(
+        reranker.rerank,
+        query,
+        chunks,
+        len(chunks),
+    )
+
+    reranked_rows: List[Dict[str, Any]] = []
+    used_indices: set[int] = set()
+    for item in ranked_chunks:
+        idx = item.get("_candidate_idx")
+        if idx is None:
+            continue
+        try:
+            pos = int(idx)
+        except Exception:
+            continue
+        if pos < 0 or pos >= len(candidates) or pos in used_indices:
+            continue
+        used_indices.add(pos)
+        row = dict(candidates[pos])
+        if "rerank_score" in item:
+            row["rerank_score"] = float(item.get("rerank_score") or 0.0)
+        reranked_rows.append(row)
+
+    # 兼容上游异常/不完整返回，补齐未出现候选，保持稳定顺序。
+    if len(reranked_rows) < len(candidates):
+        for idx, row in enumerate(candidates):
+            if idx not in used_indices:
+                reranked_rows.append(row)
+
+    diagnostics["applied"] = True
+    diagnostics["reason"] = "ok"
+    diagnostics["input_candidates"] = len(candidates)
+    return reranked_rows + tail, diagnostics
 
 
 def heuristic_rewrite(query: str) -> Dict[str, Any]:
@@ -600,6 +732,15 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
     
     # 提取参数
     top_k = request.top_k if request else DEFAULT_TOP_K
+    top_k = max(1, int(top_k))
+    rerank_enabled = _is_agent_rerank_enabled()
+    rerank_fetch_multiplier = _coerce_int(
+        os.getenv("MILVUS_AGENT_RERANK_FETCH_MULTIPLIER", "3"),
+        3,
+    )
+    rerank_fetch_multiplier = max(1, min(rerank_fetch_multiplier, 10))
+    fetch_k = top_k * rerank_fetch_multiplier if rerank_enabled else top_k
+    fetch_k = max(top_k, min(fetch_k, 200))
     content_type = request.filters.get("content_type") if request and request.filters else None
     min_score = _coerce_float(
         request.filters.get("min_similarity", 0.0) if request and request.filters else 0.0,
@@ -747,8 +888,8 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
         return filtered
 
     logger.info(
-        f"[Milvus→Search] 参数：top_k={top_k}, content_type={content_type}, min_score={min_score}, "
-        f"source_documents={len(source_documents)}, doc_ids={len(doc_ids)}"
+        f"[Milvus→Search] 参数：top_k={top_k}, fetch_k={fetch_k}, content_type={content_type}, min_score={min_score}, "
+        f"source_documents={len(source_documents)}, doc_ids={len(doc_ids)}, rerank_enabled={rerank_enabled}"
     )
 
     def _want_images(text: str) -> bool:
@@ -789,7 +930,7 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
             candidate_text = await asyncio.to_thread(
                 retriever.search_chunks,
                 query=term,
-                k=top_k,
+                k=fetch_k,
                 content_type=content_type,
                 source_documents=source_documents or None,
                 doc_ids=doc_ids or None,
@@ -803,7 +944,7 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
                 if page_numbers:
                     img_k = max(20, min(200, max(int(top_k) * 4, 50)))
                 else:
-                    img_k = max(2, min(5, max(int(top_k) // 3, 2)))
+                    img_k = max(2, min(20, max(int(fetch_k) // 3, 2)))
                 candidate_images = await asyncio.to_thread(
                     retriever.search_chunks,
                     query=term,
@@ -854,7 +995,7 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
             results = await asyncio.to_thread(
                 retriever.search_chunks,
                 query=query,
-                k=top_k,
+                k=fetch_k,
                 content_type=content_type,
                 source_documents=source_documents or None,
                 doc_ids=doc_ids or None,
@@ -865,6 +1006,39 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"[Milvus→Search] 原始查询失败: {e}")
             results = []
+
+    rerank_diagnostics: Dict[str, Any] = {
+        "enabled": rerank_enabled,
+        "applied": False,
+        "reason": "skipped",
+        "model": os.getenv("RERANKER_MODEL", "qwen3-reranker-8b"),
+    }
+
+    # Rerank：在多源平衡前先做语义重排
+    if results and rerank_enabled:
+        rerank_query = (original_query or used_term or "").strip()
+        if rerank_query:
+            try:
+                results, rerank_diagnostics = await _rerank_retrieval_results(
+                    rerank_query,
+                    results,
+                )
+                logger.info(
+                    "[Milvus→Search] rerank applied=%s reason=%s candidates=%s",
+                    rerank_diagnostics.get("applied"),
+                    rerank_diagnostics.get("reason"),
+                    rerank_diagnostics.get("input_candidates"),
+                )
+            except Exception as e:
+                logger.warning("[Milvus→Search] rerank failed, fallback to original order: %s", e)
+                rerank_diagnostics = {
+                    "enabled": rerank_enabled,
+                    "applied": False,
+                    "reason": f"error: {e}",
+                    "model": os.getenv("RERANKER_MODEL", "qwen3-reranker-8b"),
+                }
+        else:
+            rerank_diagnostics["reason"] = "empty_query"
 
     # 重新平衡跨资料覆盖：限制同一文档的返回数量
     if results:
@@ -914,6 +1088,7 @@ async def node_search_milvus(state: MilvusState) -> Dict[str, Any]:
             "page_window": page_window,
             "strict_page_filter": strict_page_filter,
             "must_include_terms": must_include_terms,
+            "rerank": rerank_diagnostics,
         },
     }
 
@@ -946,23 +1121,126 @@ async def node_extract_knowledge_points(state: MilvusState) -> Dict[str, Any]:
         logger.info("[Milvus→ExtractKP] 无检索结果,跳过知识点提取")
         return {"extracted_knowledge_points": []}
 
-    logger.info(f"[Milvus→ExtractKP] 开始从 {len(retrieval_results)} 条结果中提取知识点")
+    meta = request.metadata if request and request.metadata else {}
+    kp_mode = "balanced"
+    if isinstance(meta.get("kp_mode"), str):
+        kp_mode = meta.get("kp_mode", "balanced").strip().lower()
+    elif meta.get("thinking_mode") or meta.get("deep_search") or meta.get("search_mode") == "deep_search":
+        kp_mode = "deep"
+    elif meta.get("quality_priority") is True:
+        kp_mode = "quality"
 
-    top_n = _coerce_int(os.getenv("MILVUS_KP_TOP_N", "5"), 5)
-    top_results = retrieval_results[:max(1, top_n)]
+    mode_defaults = {
+        # 质量优先（更细致，但更慢）
+        "quality": {
+            "top_n": 6,
+            "batch_size": 1,
+            "max_chars": 1200,
+            "min_similarity": 0.0,
+            "max_concurrency": 2,
+        },
+        # 思考模式（未来前端开关）
+        "deep": {
+            "top_n": 8,
+            "batch_size": 1,
+            "max_chars": 1400,
+            "min_similarity": 0.0,
+            "max_concurrency": 2,
+        },
+        # 默认：兼顾质量与速度（略偏质量）
+        "balanced": {
+            "top_n": 5,
+            "batch_size": 2,
+            "max_chars": 900,
+            "min_similarity": 0.05,
+            "max_concurrency": 3,
+        },
+        # 速度优先
+        "fast": {
+            "top_n": 3,
+            "batch_size": 3,
+            "max_chars": 600,
+            "min_similarity": 0.1,
+            "max_concurrency": 4,
+        },
+    }
 
-    max_concurrency = _coerce_int(os.getenv("MILVUS_KP_MAX_CONCURRENCY", "3"), 3)
+    defaults = mode_defaults.get(kp_mode, mode_defaults["balanced"])
+
+    min_similarity = _coerce_float(
+        os.getenv("MILVUS_KP_MIN_SIMILARITY", str(defaults["min_similarity"])),
+        defaults["min_similarity"],
+    )
+    filtered_results = [
+        r for r in retrieval_results
+        if float(r.get("similarity", 0.0) or 0.0) >= min_similarity
+    ]
+    if not filtered_results:
+        logger.info("[Milvus→ExtractKP] 无符合相似度阈值的结果,跳过知识点提取")
+        return {"extracted_knowledge_points": []}
+
+    logger.info(f"[Milvus→ExtractKP] 开始从 {len(filtered_results)} 条结果中提取知识点")
+
+    top_n = _coerce_int(os.getenv("MILVUS_KP_TOP_N", str(defaults["top_n"])), defaults["top_n"])
+    top_results = filtered_results[:max(1, top_n)]
+
+    max_chars = _coerce_int(
+        os.getenv("MILVUS_KP_MAX_CHARS", str(defaults["max_chars"])),
+        defaults["max_chars"],
+    )
+    max_chars = max(200, max_chars)
+
+    batch_size = _coerce_int(
+        os.getenv("MILVUS_KP_BATCH_SIZE", str(defaults["batch_size"])),
+        defaults["batch_size"],
+    )
+    batch_size = max(1, batch_size)
+
+    max_concurrency = _coerce_int(
+        os.getenv("MILVUS_KP_MAX_CONCURRENCY", str(defaults["max_concurrency"])),
+        defaults["max_concurrency"],
+    )
     max_concurrency = max(1, max_concurrency)
     semaphore = asyncio.Semaphore(max_concurrency)
 
+    logger.info(
+        "[Milvus→ExtractKP] 模式=%s, top_n=%s, batch_size=%s, max_chars=%s, min_similarity=%.2f",
+        kp_mode,
+        top_n,
+        batch_size,
+        max_chars,
+        min_similarity,
+    )
+
+    meta_by_chunk: Dict[str, Dict[str, Any]] = {}
+    for result in top_results:
+        chunk_id = str(result.get("chunk_id") or "").strip()
+        if not chunk_id:
+            continue
+        meta_by_chunk[chunk_id] = {
+            "chunk_id": chunk_id,
+            "source_document": result.get("source_document", ""),
+            "section": result.get("section", ""),
+            "page_number": result.get("page_number"),
+            "similarity": result.get("similarity", 0.0),
+        }
+
     extracted_points: List[Dict[str, Any]] = []
+
+    def _truncate_content(text: str) -> str:
+        text = (text or "").strip()
+        if not text:
+            return ""
+        if len(text) <= max_chars:
+            return text
+        return text[:max_chars]
 
     try:
         llm = await get_rewrite_llm()
 
         async def extract_from_result(idx: int, result: Dict[str, Any]) -> List[Dict[str, Any]]:
-            content = result.get("content", "")
-            if not content or len(content.strip()) < 20:
+            content = _truncate_content(result.get("content", ""))
+            if not content or len(content) < 20:
                 return []
 
             source_doc = result.get("source_document", "")
@@ -976,22 +1254,6 @@ async def node_extract_knowledge_points(state: MilvusState) -> Dict[str, Any]:
 2. 包含明确的数值、尺寸或标准
 3. 能够直接指导设计工作
 
-请从文本中提取1-3个最重要的知识点,以JSON格式返回:
-```json
-{
-  "knowledge_points": [
-    {
-      "title": "简洁的标题",
-      "content": "具体的规范内容",
-      "category": "类别(如:尺寸要求、功能要求、安全规范等)",
-      "applicable_spaces": ["适用空间1", "适用空间2"],
-      "priority": "强制/推荐/可选",
-      "source_ref": "来源引用"
-    }
-  ]
-}
-```
-
 如果文本中没有明确的设计规范,返回空数组。"""
 
             user_prompt = f"""用户查询: {query}
@@ -1001,7 +1263,7 @@ async def node_extract_knowledge_points(state: MilvusState) -> Dict[str, Any]:
 页码: {page_number or '未知'}
 
 文本内容:
-{content[:1000]}
+{content}
 
 请提取其中的结构化知识点。"""
 
@@ -1083,7 +1345,135 @@ async def node_extract_knowledge_points(state: MilvusState) -> Dict[str, Any]:
 
             return []
 
-        tasks = [extract_from_result(idx, result) for idx, result in enumerate(top_results)]
+        async def extract_from_batch(batch_idx: int, batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            snippets: List[str] = []
+            for idx, result in enumerate(batch, start=1):
+                content = _truncate_content(result.get("content", ""))
+                if not content or len(content) < 20:
+                    continue
+                source_doc = result.get("source_document", "")
+                section = result.get("section", "")
+                page_number = result.get("page_number")
+                chunk_id = str(result.get("chunk_id") or "").strip()
+                snippets.append(
+                    f"[{idx}] chunk_id: {chunk_id}\n"
+                    f"来源: {source_doc or '未知'}\n"
+                    f"章节: {section or '未知'}\n"
+                    f"页码: {page_number or '未知'}\n"
+                    f"内容:\n{content}\n"
+                )
+
+            if not snippets:
+                return []
+
+            system_prompt = """你是医疗建筑设计领域的专家。你的任务是对多个文本片段分别提取结构化的知识点。
+
+要求:
+1. 每个片段输出 1-3 个最重要的知识点
+2. 必须是明确、可执行的设计规范或技术要求（包含数值、标准或条件）
+3. 如果片段中没有明确规范,对应 knowledge_points 为空数组
+4. 输出必须严格符合给定 JSON 结构
+"""
+
+            user_prompt = (
+                f"用户查询: {query}\n\n"
+                "请针对以下片段逐个提取知识点:\n\n"
+                + "\n".join(snippets)
+            )
+
+            async with semaphore:
+                # 1) Structured Output（带重试）
+                max_attempts = 3
+                last_error: Exception | None = None
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        structured: KnowledgePointsBatchResult = await call_structured_llm(
+                            llm=llm,
+                            pydantic_model=KnowledgePointsBatchResult,
+                            messages=[
+                                SystemMessage(content=system_prompt),
+                                HumanMessage(content=user_prompt),
+                            ],
+                        )
+                        points: List[Dict[str, Any]] = []
+                        for item in structured.items:
+                            chunk_id = str(item.chunk_id or "").strip()
+                            for kp in item.knowledge_points:
+                                point = _model_to_dict(kp)
+                                meta = meta_by_chunk.get(chunk_id, {})
+                                point.update(meta)
+                                if "chunk_id" not in point:
+                                    point["chunk_id"] = chunk_id
+                                points.append(point)
+                        logger.info(
+                            f"[Milvus→ExtractKP] 批量提取成功: 批次 {batch_idx+1}, "
+                            f"{len(points)} 个知识点"
+                        )
+                        return points
+                    except Exception as e:
+                        last_error = e
+                        if attempt < max_attempts and _is_transient_error(e):
+                            delay = min(2.0 * attempt, 6.0)
+                            logger.warning(
+                                "[Milvus→ExtractKP] 批量结构化瞬时错误，%s/%s 次重试后等待 %.1fs: %s",
+                                attempt,
+                                max_attempts,
+                                delay,
+                                e,
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        logger.warning("[Milvus→ExtractKP] 批量结构化输出失败，降级为手动解析: %s", e)
+                        break
+
+                # 2) 手动解析兜底
+                try:
+                    from backend.app.utils.llm_output_parser import parse_llm_output
+
+                    raw_result = await llm.ainvoke([
+                        SystemMessage(content=system_prompt),
+                        HumanMessage(content=user_prompt),
+                    ])
+
+                    parsed_result = parse_llm_output(
+                        output=raw_result,
+                        pydantic_model=KnowledgePointsBatchResult,
+                        fallback_parser=None,
+                    )
+
+                    points: List[Dict[str, Any]] = []
+                    if parsed_result and parsed_result.items:
+                        for item in parsed_result.items:
+                            chunk_id = str(item.chunk_id or "").strip()
+                            for kp in item.knowledge_points:
+                                point = _model_to_dict(kp)
+                                meta = meta_by_chunk.get(chunk_id, {})
+                                point.update(meta)
+                                if "chunk_id" not in point:
+                                    point["chunk_id"] = chunk_id
+                                points.append(point)
+                        logger.info(
+                            f"[Milvus→ExtractKP] 批量手动解析成功: 批次 {batch_idx+1}, "
+                            f"{len(points)} 个知识点"
+                        )
+                        return points
+                    logger.warning(f"[Milvus→ExtractKP] 批量手动解析失败: 批次 {batch_idx+1}")
+                except Exception as e:
+                    logger.warning(f"[Milvus→ExtractKP] 批量手动解析异常: 批次 {batch_idx+1}, 错误: {e}")
+                    if last_error is not None:
+                        logger.debug("[Milvus→ExtractKP] Structured Output 最后一次错误: %s", last_error)
+
+            return []
+
+        if batch_size <= 1:
+            tasks = [extract_from_result(idx, result) for idx, result in enumerate(top_results)]
+        else:
+            batches = [
+                top_results[i:i + batch_size]
+                for i in range(0, len(top_results), batch_size)
+            ]
+            tasks = [extract_from_batch(idx, batch) for idx, batch in enumerate(batches)]
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:

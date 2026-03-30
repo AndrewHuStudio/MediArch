@@ -2,7 +2,7 @@
 import sys
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from datetime import datetime
 import time
 

@@ -17,7 +17,7 @@ export const handleImageUpload = (
       const loader = new THREE.TextureLoader()
       loader.load(
         dataUrl,
-        (texture) => {
+        (texture: any) => {
           console.log(`Texture loaded successfully with dimensions: ${texture.image.width}x${texture.image.height}`)
 
           texture.flipY = true
@@ -35,7 +35,7 @@ export const handleImageUpload = (
           }))
         },
         undefined,
-        (error) => {
+        (error: unknown) => {
           console.error("TextureLoader failed to load texture:", error)
         },
       )

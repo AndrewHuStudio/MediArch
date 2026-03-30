@@ -8,13 +8,13 @@
 import {
   ChatRequest,
   ChatResponse,
-  StreamCallbacks,
   Citation,
   KnowledgeGraphData,
   SessionListResponse,
   SessionHistoryResponse,
   QuickHealthResponse,
 } from './types'
+import type { StreamCallbacks } from './client'
 
 // 导入 Markdown 内容（在 Next.js 中，需要使用动态导入）
 const MOCK_MARKDOWN_CONTENT = `这是一个关于"医疗建筑设计有哪些规范要求？"的专业回答。

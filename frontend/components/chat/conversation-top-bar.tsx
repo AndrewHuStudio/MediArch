@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useT } from "@/lib/i18n"
 
 interface ConversationTopBarProps {
   title: string
@@ -32,6 +33,7 @@ export function ConversationTopBar({
 }: ConversationTopBarProps) {
   const [isRenaming, setIsRenaming] = useState(false)
   const [draftTitle, setDraftTitle] = useState(title)
+  const { t } = useT()
 
   useEffect(() => {
     if (!isRenaming) {
@@ -86,7 +88,7 @@ export function ConversationTopBar({
               size="icon"
               className="text-gray-300 hover:bg-white/10 h-8 w-8"
               onClick={handleRenameCancel}
-              aria-label="取消重命名"
+              aria-label={t('chat.aria.cancelRename')}
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -96,7 +98,7 @@ export function ConversationTopBar({
               className="text-emerald-300 hover:bg-emerald-500/10 disabled:text-gray-500 h-8 w-8"
               onClick={handleRenameConfirm}
               disabled={renameDisabled}
-              aria-label="确认重命名"
+              aria-label={t('chat.aria.confirmRename')}
             >
               <Check className="h-3.5 w-3.5" />
             </Button>
@@ -110,7 +112,7 @@ export function ConversationTopBar({
                   variant="ghost"
                   size="icon"
                   className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 flex-shrink-0"
-                  aria-label="对话操作"
+                  aria-label={t('chat.aria.actions')}
                 >
                   <EllipsisVertical className="h-4 w-4" />
                 </Button>
@@ -124,7 +126,7 @@ export function ConversationTopBar({
                   }}
                 >
                   <PencilLine className="h-4 w-4" />
-                  重命名
+                  {t('chat.rename')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="gap-2 focus:bg-white/10"
@@ -134,7 +136,7 @@ export function ConversationTopBar({
                   }}
                 >
                   {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                  {isPinned ? "取消固定" : "固定对话"}
+                  {isPinned ? t('chat.unpin') : t('chat.pin')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="gap-2 text-red-300 focus:bg-red-500/10 focus:text-red-100"
@@ -144,7 +146,7 @@ export function ConversationTopBar({
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
-                  删除
+                  {t('chat.delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

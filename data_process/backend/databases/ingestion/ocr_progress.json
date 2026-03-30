@@ -1,0 +1,44 @@
+{
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-90\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-90\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-04T21:20:45.093855",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-91\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-91\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-04T21:23:03.100636",
+    "engine": null
+  }
+}

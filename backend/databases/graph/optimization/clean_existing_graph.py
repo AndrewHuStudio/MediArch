@@ -22,7 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase, Session
 from neo4j import GraphDatabase, Record
 from rich import box

@@ -41,23 +41,20 @@ cp ../../.env.example ../../.env
 ### 2. 启动开发服务器
 
 ```bash
-# 方式1：使用 main.py（推荐开发环境）
+# 方式1：使用项目模块入口（Windows 推荐）
+python -m backend.api
+
+# 方式2：直接运行 main.py
 python backend/api/main.py
-
-# 方式2：使用 uvicorn（更灵活）
-uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
-
-# 方式3：使用 uvicorn 并自定义配置
-uvicorn backend.api.main:app --reload --port 8000 --log-level info
 ```
 
 ### 3. 访问API文档
 
 启动后，访问以下地址：
 
-- **Swagger UI**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
-- **OpenAPI JSON**: http://localhost:8000/api/openapi.json
+- **Swagger UI**: http://localhost:8010/api/docs
+- **ReDoc**: http://localhost:8010/api/redoc
+- **OpenAPI JSON**: http://localhost:8010/api/openapi.json
 
 ---
 
@@ -452,7 +449,7 @@ REQUEST_TIMEOUT_S=60
 
 ```bash
 export ENVIRONMENT=production
-python backend/api/main.py
+python -m backend.api
 ```
 
 ---
@@ -462,11 +459,11 @@ python backend/api/main.py
 ### 开发环境
 
 ```bash
-# 使用内置的 uvicorn 开发服务器
-python backend/api/main.py
+# 使用项目模块入口（Windows 推荐）
+python -m backend.api
 
-# 或使用 uvicorn 命令
-uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
+# 或直接运行 main.py
+python backend/api/main.py
 ```
 
 ### 生产环境

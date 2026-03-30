@@ -6,7 +6,8 @@ import re
 import ast
 from typing import List, Dict, Any, Optional
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
+from backend.llm_env import get_api_key, get_kg_base_url, get_kg_model, get_kg_timeout
 from openai import OpenAI
 
 load_dotenv()
@@ -27,13 +28,12 @@ class LLMClient:
         model: Optional[str] = None,
         request_timeout: Optional[float] = None,
     ):
-        self.api_key = api_key or os.getenv("KG_OPENAI_API_KEY")
-        self.base_url = base_url or os.getenv("KG_OPENAI_BASE_URL")
-        self.model = model or os.getenv("KG_OPENAI_MODEL", "gpt-4o-mini")
-        timeout_env = os.getenv("KG_OPENAI_TIMEOUT")
+        self.api_key = api_key or get_api_key()
+        self.base_url = base_url or get_kg_base_url()
+        self.model = model or get_kg_model("gpt-4o-mini")
         self.request_timeout = (
             request_timeout
-            or (float(timeout_env) if timeout_env not in {None, ""} else 120.0)
+            or get_kg_timeout(120.0)
         )
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
 

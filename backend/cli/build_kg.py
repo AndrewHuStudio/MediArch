@@ -14,8 +14,9 @@
    # 基础用法
    python -m backend.cli.build_kg
 
-   # 指定自定义 Schema
-   python -m backend.cli.build_kg --schema path/to/schema.json
+   # 先在环境变量中配置 Schema
+   set KG_SCHEMA_PATH=backend/databases/graph/schemas/medical_architecture.json
+   python -m backend.cli.build_kg
 
    # 跳过磁盘检查
    python -m backend.cli.build_kg --skip-disk-check

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { FileText, ExternalLink } from 'lucide-react'
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 export interface PDFSource {
   id: string
@@ -39,6 +40,7 @@ interface PDFSourceCardProps {
 
 export function PDFSourceCard({ source, index, onClick }: PDFSourceCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const { t } = useT()
 
   return (
     <motion.div
@@ -83,7 +85,7 @@ export function PDFSourceCard({ source, index, onClick }: PDFSourceCardProps) {
       {/* PDF Info */}
       <div className="p-2 space-y-1">
         <h4 className="text-xs font-semibold text-white truncate">{source.title}</h4>
-        <p className="text-xs text-gray-400">第 {source.pageNumber} 页</p>
+        <p className="text-xs text-gray-400">{t('pdf.page', { n: source.pageNumber })}</p>
         {isHovered && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -91,7 +93,7 @@ export function PDFSourceCard({ source, index, onClick }: PDFSourceCardProps) {
             className="flex items-center gap-1 text-xs text-blue-400"
           >
             <ExternalLink className="w-3 h-3" />
-            <span>查看详情</span>
+            <span>{t('pdf.viewDetail')}</span>
           </motion.div>
         )}
       </div>

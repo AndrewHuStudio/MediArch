@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict, field
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 # 添加项目根目录到 sys.path（用于 CLI 直接运行）
 if __name__ == "__main__":

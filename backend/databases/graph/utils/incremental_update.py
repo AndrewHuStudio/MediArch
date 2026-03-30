@@ -11,7 +11,7 @@
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from pymongo import MongoClient
 import argparse
 

@@ -3,6 +3,8 @@
 import { useState } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
+import { Globe } from "lucide-react"
+import { useT } from "@/lib/i18n"
 
 interface NavItem {
   label: string
@@ -13,30 +15,30 @@ interface NavItem {
   }[]
 }
 
-const navItems: NavItem[] = [
-  {
-    label: "首页",
-    href: "/",
-    dropdown: [
-      {
-        label: "智能问答",
-        href: "/chat",
-      },
-    ],
-  },
-  {
-    label: "知识库",
-    href: "/#section-1", // Link to knowledge base section on landing page
-  },
-  {
-    label: "实验室",
-    href: "/#section-2", // Link to team section on landing page
-  },
-]
-// </CHANGE>
-
 export function ChatHeader() {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
+  const { t, locale, setLocale } = useT()
+
+  const navItems: NavItem[] = [
+    {
+      label: t('chatHeader.home'),
+      href: "/",
+      dropdown: [
+        {
+          label: t('chatHeader.chat'),
+          href: "/chat",
+        },
+      ],
+    },
+    {
+      label: t('chatHeader.kb'),
+      href: "/#section-1",
+    },
+    {
+      label: t('chatHeader.lab'),
+      href: "/#section-2",
+    },
+  ]
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
@@ -85,9 +87,17 @@ export function ChatHeader() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              {/* </CHANGE> */}
             </div>
           ))}
+          <button
+            onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
+            className="flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            <span className={locale === 'zh' ? 'text-white' : ''}>{t('chatHeader.lang.zh')}</span>
+            <span className="text-gray-600">/</span>
+            <span className={locale === 'en' ? 'text-white' : ''}>{t('chatHeader.lang.en')}</span>
+          </button>
         </nav>
       </div>
     </header>

@@ -1,3 +1,4 @@
+name: MediArch
 services:
   postgres:
     image: postgres:15-alpine
@@ -10,12 +11,50 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - E:/MediArch-Data/postgres:/var/lib/postgresql/data
+      - E:/docker-data/mediarch/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - mediarch-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mediarch-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+      API_HOST: 0.0.0.0
+      API_PORT: 8010
+      CHECKPOINT_BACKEND: postgres
+      STORE_BACKEND: postgres
+      SESSION_STORE_BACKEND: postgres
+      REQUIRE_POSTGRES_PERSISTENCE: "true"
+      PERSISTENCE_POSTGRES_URI: postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+      POSTGRES_CHECKPOINT_URI: postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+      POSTGRES_STORE_URI: postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+      POSTGRES_SESSION_STORE_URI: postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+      NEO4J_URI: bolt://neo4j:7687
+      MONGODB_URI: mongodb://admin:mediarch2024@mongodb:27017/
+      MILVUS_HOST: milvus
+      NEXT_PUBLIC_API_URL: http://localhost:8010
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      milvus:
+        condition: service_started
+      neo4j:
+        condition: service_started
+    ports:
+      - "8010:8010"
     networks:
       - mediarch-network
 
@@ -30,8 +69,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: mediarch2024
       MONGO_INITDB_DATABASE: mediarch
     volumes:
-      - E:/MediArch-Data/mongodb:/data/db
-      - E:/MediArch-Data/mongodb_config:/data/configdb
+      - E:/docker-data/mediarch/mongodb:/data/db
+      - E:/docker-data/mediarch/mongodb_config:/data/configdb
     networks:
       - mediarch-network
 
@@ -45,7 +84,7 @@ services:
       ETCD_QUOTA_BACKEND_BYTES: "8589934592"
       ETCD_SNAPSHOT_COUNT: "50000"
     volumes:
-      - E:/MediArch-Data/etcd:/etcd
+      - E:/docker-data/mediarch/etcd:/etcd
     command: >
       etcd -advertise-client-urls=http://127.0.0.1:2379
            -listen-client-urls http://0.0.0.0:2379
@@ -62,7 +101,7 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_BROWSER: "off"
     volumes:
-      - E:/MediArch-Data/minio:/minio_data
+      - E:/docker-data/mediarch/minio:/minio_data
     command: minio server /minio_data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -88,7 +127,7 @@ services:
       DATA_COORD_SEGMENT_MAX_SIZE: "512"
       LOG_LEVEL: info
     volumes:
-      - E:/MediArch-Data/milvus:/var/lib/milvus
+      - E:/docker-data/mediarch/milvus:/var/lib/milvus
     ports:
       - "19530:19530"
       - "9091:9091"
@@ -110,8 +149,8 @@ services:
       NEO4J_dbms_security_procedures_allowlist: "apoc.*"
       NEO4J_server_memory_heap_max__size: 2G
     volumes:
-      - E:/MediArch-Data/neo4j:/data
-      - E:/MediArch-Data/neo4j_logs:/logs
+      - E:/docker-data/mediarch/neo4j/data:/data
+      - E:/docker-data/mediarch/neo4j/logs:/logs
     networks:
       - mediarch-network
 

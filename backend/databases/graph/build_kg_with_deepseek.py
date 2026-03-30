@@ -5,7 +5,8 @@ from pathlib import Path
 from datetime import datetime
 import time
 from typing import Optional
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
+from backend.llm_env import get_api_key, get_kg_base_url, get_kg_model
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn
 from rich.panel import Panel
@@ -32,6 +33,13 @@ else:
 from backend.databases.graph.builders.kg_builder import MedicalKGBuilder
 
 console = Console()
+
+
+def require_schema_path() -> str:
+    schema_path = (os.getenv("KG_SCHEMA_PATH") or "").strip()
+    if not schema_path:
+        raise RuntimeError("KG_SCHEMA_PATH environment variable is required.")
+    return schema_path
 
 
 def check_disk_space():
@@ -188,10 +196,10 @@ def main():
 
     console.print()  # 空行
 
-    # 验证环境变量（支持两种前缀：KG_OPENAI_* 或 OPENAI_*）
-    api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-    base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-    model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL")
+    # 验证环境变量
+    api_key = get_api_key()
+    base_url = get_kg_base_url()
+    model = get_kg_model("")
 
     required_vars = {
         "API Key": api_key,
@@ -207,11 +215,11 @@ def main():
         console.print(f"[red]✗ 缺少以下配置：{', '.join(missing_vars)}[/red]")
         console.print("\n[yellow]请在 .env 文件中配置以下变量：[/yellow]")
         if "API Key" in missing_vars:
-            console.print("  OPENAI_API_KEY=your-api-key")
+            console.print("  MEDIARCH_API_KEY=your-api-key")
         if "API Base URL" in missing_vars:
-            console.print("  OPENAI_BASE_URL=https://api.openai.com/v1")
+            console.print("  MEDIARCH_KG_BASE_URL=https://api.openai.com/v1")
         if "Model" in missing_vars:
-            console.print("  OPENAI_MODEL=deepseek-v3")
+            console.print("  MEDIARCH_KG_MODEL=deepseek-v3")
         if "MongoDB URI" in missing_vars:
             console.print("  MONGODB_URI=mongodb://...")
         if "Neo4j URI" in missing_vars:
@@ -219,7 +227,7 @@ def main():
         return
 
     # Schema 路径
-    schema_path = os.getenv("KG_SCHEMA_PATH", "backend/databases/graph/schemas/medical_architecture.json")
+    schema_path = require_schema_path()
 
     # 配置表格
     config_table = Table(show_header=False, box=box.SIMPLE, padding=(0, 1))
@@ -229,6 +237,7 @@ def main():
     config_table.add_row("API Base", base_url)
     config_table.add_row("MongoDB", os.getenv('MONGODB_URI').split('@')[0]+'@...')
     config_table.add_row("Neo4j", os.getenv('NEO4J_URI'))
+    config_table.add_row("KG Schema", schema_path)
     console.print(Panel(config_table, title="[bold]配置信息[/bold]", border_style="blue"))
     
     start_time = datetime.now()
@@ -237,7 +246,7 @@ def main():
         # 步骤0：先初始化构建器（这会触发构建策略选择）
         # 必须在 Progress 之前完成，以确保用户输入正常工作
         console.print("\n[dim]正在初始化构建器...[/dim]")
-        builder = MedicalKGBuilder(schema_path=schema_path)
+        builder = MedicalKGBuilder()
         console.print("[green][OK] 构建器初始化完成[/green]\n")
 
         # 步骤0.5：检查并清除失败的缓存

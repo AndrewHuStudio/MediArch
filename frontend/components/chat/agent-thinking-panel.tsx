@@ -4,6 +4,7 @@ import { useEffect, useRef, useMemo } from "react"
 import { Brain, CheckCircle2, Circle, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AILoader } from "@/components/ui/ai-loader"
+import { useT } from "@/lib/i18n"
 
 interface AgentThinkingPanelProps {
   activeAgentIndex: number
@@ -26,6 +27,7 @@ export default function AgentThinkingPanel({
   completedAgents = new Set(),
 }: AgentThinkingPanelProps) {
   const agentRefs = useRef<(HTMLDivElement | null)[]>([])
+  const { t } = useT()
 
   // 当前运行的智能体列表（支持并行）
   const runningAgents = useMemo(() => {
@@ -74,7 +76,7 @@ export default function AgentThinkingPanel({
           border: "border-blue-500/30",
           dot: "bg-blue-400 animate-pulse",
           text: "text-blue-300",
-          label: "当前活跃",
+          label: t('agent.status.thinking'),
           loaderActive: true,
           loaderColor: "blue" as const,
         }
@@ -84,7 +86,7 @@ export default function AgentThinkingPanel({
           border: "border-green-500/50",
           dot: "bg-green-400",
           text: "text-green-300",
-          label: "正在合成",
+          label: t('agent.status.synthesizing'),
           loaderActive: true,
           loaderColor: "green" as const,
         }
@@ -95,7 +97,7 @@ export default function AgentThinkingPanel({
           border: "border-gray-500/30",
           dot: "bg-gray-400",
           text: "text-gray-400",
-          label: "等待输入",
+          label: t('agent.status.idle'),
           loaderActive: false,
           loaderColor: "blue" as const,
         }
@@ -137,7 +139,7 @@ export default function AgentThinkingPanel({
     <div className="box-border flex h-full min-h-0 flex-col rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md">
       <div className="mb-4 flex flex-shrink-0 items-center gap-2">
         <Brain className="h-5 w-5 text-blue-400" />
-        <h3 className="text-sm font-semibold text-white">智能体思考</h3>
+        <h3 className="text-sm font-semibold text-white">{t('agent.title')}</h3>
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col gap-3">
@@ -148,12 +150,12 @@ export default function AgentThinkingPanel({
             <span className={`h-2 w-2 rounded-full ${cardStyle.dot}`} />
           </div>
           <div className="relative z-10 text-sm text-white/90">
-            {isThinking ? currentThought : "等待下一次提问"}
+            {isThinking ? currentThought : t('agent.waitingNext')}
           </div>
         </div>
 
         <div className="flex-1 space-y-2 overflow-hidden">
-          <p className="text-xs text-white/60">智能体进度</p>
+          <p className="text-xs text-white/60">{t('agent.progress')}</p>
           <div className="custom-scrollbar flex-1 space-y-2 overflow-y-auto pr-1">
             {agents.map((agent, index) => {
               const style = getAgentStyle(agent, index)

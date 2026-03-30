@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import * as d3 from "d3"
 import { Maximize2, X, Share2, GitBranch, ChevronUp, ChevronDown } from "lucide-react"
+import { useT } from "@/lib/i18n"
 
 interface KnowledgeGraphSectionProps {
   onNavigate: (sectionIndex: number) => void
@@ -39,6 +40,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
   const [graphView, setGraphView] = useState<ViewMode>("force")
   const [isPreviewActive, setIsPreviewActive] = useState(false)
   const sectionRef = useRef<HTMLElement | null>(null)
+  const { t } = useT()
 
   const previewSvgRef = useRef<SVGSVGElement | null>(null)
   const fullscreenSvgRef = useRef<SVGSVGElement | null>(null)
@@ -106,7 +108,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
         <button
           onClick={() => onNavigate(1)}
           className="text-white/60 hover:text-white transition-colors animate-bounce"
-          aria-label="跳转到知识库"
+          aria-label={t('kg.aria.jumpKb')}
         >
           <ChevronUp className="w-6 h-6" />
         </button>
@@ -117,7 +119,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
         <button
           onClick={() => onNavigate(3)}
           className="text-white/60 hover:text-white transition-colors animate-bounce"
-          aria-label="跳转到下一页"
+          aria-label={t('kg.aria.jumpNext')}
         >
           <ChevronDown className="w-6 h-6" />
         </button>
@@ -125,45 +127,45 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
 
       <div className="relative z-10 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1.1fr_1.2fr] gap-10 px-6 py-16">
         <div className="space-y-6">
-          <p className="text-sm text-cyan-200 tracking-[0.3em] uppercase">KNOWLEDGE GRAPH</p>
+          <p className="text-sm text-cyan-200 tracking-[0.3em] uppercase">{t('kg.sectionLabel')}</p>
           <h2 className="text-4xl md:text-5xl font-semibold leading-tight bg-gradient-to-br from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
-            图谱知识网络
+            {t('kg.title')}
           </h2>
           <p className="text-base text-white/80 leading-relaxed">
-            通过 D3.js 实时渲染的全景知识图谱，串联标准规范、政策文件与顶级设计案例，辅助快速识别重点实体与关联路径。
+            {t('kg.desc')}
           </p>
 
           <div className="grid grid-cols-2 gap-6 pt-4">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-              <p className="text-3xl font-bold">8800+</p>
-              <p className="text-sm text-white/70">医疗建筑实体节点</p>
-              <span className="text-xs text-cyan-200 mt-2 inline-flex">规范、案例、科室、设备</span>
+              <p className="text-3xl font-bold">{t('kg.stat.nodes')}</p>
+              <p className="text-sm text-white/70">{t('kg.stat.nodesLabel')}</p>
+              <span className="text-xs text-cyan-200 mt-2 inline-flex">{t('kg.stat.nodesDetail')}</span>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-              <p className="text-3xl font-bold">21000+</p>
-              <p className="text-sm text-white/70">关系链接</p>
-              <span className="text-xs text-cyan-200 mt-2 inline-flex">空间流线、标准约束、策略</span>
+              <p className="text-3xl font-bold">{t('kg.stat.links')}</p>
+              <p className="text-sm text-white/70">{t('kg.stat.linksLabel')}</p>
+              <span className="text-xs text-cyan-200 mt-2 inline-flex">{t('kg.stat.linksDetail')}</span>
             </div>
           </div>
 
           <div className="space-y-3 text-sm text-white/70">
-            <p>· 智能聚类展示四大类知识脉络</p>
-            <p>· 支持与检索结果联动，快速定位证据</p>
-            <p>· 大模型辅助解释复杂关联，生成决策提示</p>
+            <p>{t('kg.feature.1')}</p>
+            <p>{t('kg.feature.2')}</p>
+            <p>{t('kg.feature.3')}</p>
           </div>
 
           <button
             onClick={() => onNavigate(1)}
             className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
-            跳转知识库
+            {t('kg.btn.jumpKb')}
           </button>
         </div>
 
         <div className="relative rounded-[32px] border border-white/10 bg-black/60 p-6 backdrop-blur-3xl">
           <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
           <div className="relative z-10 flex items-center justify-between text-sm text-white/70 mb-4">
-            <div className="uppercase tracking-[0.3em] text-xs text-cyan-200">Graph Preview</div>
+            <div className="uppercase tracking-[0.3em] text-xs text-cyan-200">{t('kg.preview')}</div>
             <button
               onClick={() => {
                 setGraphView("force")
@@ -172,7 +174,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
               className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
             >
               <Maximize2 className="h-3.5 w-3.5" />
-              全屏探索
+              {t('kg.btn.fullscreen')}
             </button>
           </div>
           <svg ref={previewSvgRef} className="relative z-10 h-[420px] w-full" />
@@ -190,7 +192,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
             <div className="flex flex-wrap items-center justify-between gap-4 px-8 pt-8 text-white">
               <div>
                 <p className="text-sm uppercase tracking-[0.4em] text-cyan-200">Knowledge Graph</p>
-                <h3 className="text-2xl font-semibold mt-2">全屏探索 · 图谱/径向切换</h3>
+                <h3 className="text-2xl font-semibold mt-2">{t('kg.fullscreenTitle')}</h3>
               </div>
               <div className="flex items-center gap-3">
                 <div className="inline-flex rounded-full border border-white/20 p-1">
@@ -201,7 +203,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
                     }`}
                   >
                     <Share2 className="h-4 w-4" />
-                    知识图谱
+                    {t('kg.viewForce')}
                   </button>
                   <button
                     onClick={() => setGraphView("radial")}
@@ -210,13 +212,13 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
                     }`}
                   >
                     <GitBranch className="h-4 w-4" />
-                    径向树
+                    {t('kg.viewRadial')}
                   </button>
                 </div>
                 <button
                   onClick={() => setIsFullscreen(false)}
                   className="rounded-full border border-white/20 p-2 text-white transition hover:bg-white/10"
-                  aria-label="关闭图谱全屏"
+                  aria-label={t('kg.aria.closeFullscreen')}
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -347,7 +349,7 @@ function renderForceGraph(
           if (!event.active) simulation.alphaTarget(0)
           d.fx = null
           d.fy = null
-        }),
+        }) as any,
     )
 
   const labels = container
@@ -380,10 +382,10 @@ function renderForceGraph(
 
   simulation.on("tick", () => {
     link
-      .attr("x1", (d) => ((d.source as GraphNode).x as number) ?? 0)
-      .attr("y1", (d) => ((d.source as GraphNode).y as number) ?? 0)
-      .attr("x2", (d) => ((d.target as GraphNode).x as number) ?? 0)
-      .attr("y2", (d) => ((d.target as GraphNode).y as number) ?? 0)
+      .attr("x1", (d) => (((d.source as ForceNode).x as number) ?? 0))
+      .attr("y1", (d) => (((d.source as ForceNode).y as number) ?? 0))
+      .attr("x2", (d) => (((d.target as ForceNode).x as number) ?? 0))
+      .attr("y2", (d) => (((d.target as ForceNode).y as number) ?? 0))
 
     node.attr("cx", (d) => d.x ?? 0).attr("cy", (d) => d.y ?? 0)
     labels.attr("x", (d) => d.x ?? 0).attr("y", (d) => (d.y ?? 0) - d.value - 4)
@@ -427,7 +429,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
 
   const root = d3.hierarchy<TreeNode>(treeData)
   const cluster = d3.cluster<TreeNode>().size([2 * Math.PI, radius])
-  cluster(root)
+  const pointRoot = cluster(root)
 
   const linkGenerator = d3.linkRadial<d3.HierarchyPointLink<TreeNode>, d3.HierarchyPointNode<TreeNode>>()
   linkGenerator.angle((d) => d.x)
@@ -439,7 +441,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
     .attr("stroke", "rgba(255,255,255,0.35)")
     .attr("stroke-width", 1)
     .selectAll("path")
-    .data(root.links())
+    .data(pointRoot.links())
     .join("path")
     .attr("d", (d) => {
       // 初始状态：所有连线都从中心点开始
@@ -455,9 +457,9 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
   const node = g
     .append("g")
     .selectAll("g")
-    .data(root.descendants())
+    .data(pointRoot.descendants())
     .join("g")
-    .attr("transform", (d) => `rotate(${(d.x * 180) / Math.PI - 90}) translate(0,0)`)
+    .attr("transform", (d) => `rotate(${(((d.x ?? 0) * 180) / Math.PI) - 90}) translate(0,0)`)
 
   node
     .append("circle")
@@ -473,9 +475,9 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
   const labels = node
     .append("text")
     .attr("dy", "0.31em")
-    .attr("x", (d) => (d.x < Math.PI === !d.children ? 8 : -8))
-    .attr("text-anchor", (d) => (d.x < Math.PI === !d.children ? "start" : "end"))
-    .attr("transform", (d) => (d.x >= Math.PI ? "rotate(180)" : null))
+    .attr("x", (d) => ((d.x ?? 0) < Math.PI === !d.children ? 8 : -8))
+    .attr("text-anchor", (d) => ((d.x ?? 0) < Math.PI === !d.children ? "start" : "end"))
+    .attr("transform", (d) => ((d.x ?? 0) >= Math.PI ? "rotate(180)" : null))
     .attr("fill", "rgba(255,255,255,0.85)")
     .attr("font-size", (d) => (d.depth <= 1 ? 12 : 10))
     .attr("opacity", 0) // 初始透明
@@ -486,7 +488,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
     .transition()
     .duration(800)
     .delay((d) => d.depth * 150) // 按层级延迟
-    .attr("transform", (d) => `rotate(${(d.x * 180) / Math.PI - 90}) translate(${d.y},0)`)
+    .attr("transform", (d) => `rotate(${(((d.x ?? 0) * 180) / Math.PI) - 90}) translate(${d.y ?? 0},0)`)
 
   node.select("circle")
     .transition()
@@ -504,7 +506,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
     .transition()
     .duration(800)
     .delay((d: any) => d.target.depth * 150)
-    .attr("d", (d) => linkGenerator(d))
+    .attr("d", (d) => linkGenerator(d as d3.HierarchyPointLink<TreeNode>))
     .attr("opacity", 1)
 
   return () => {

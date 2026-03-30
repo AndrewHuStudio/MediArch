@@ -10,6 +10,7 @@ Milvus 写入器（优化版 v2 - 2025-01-22）
 - 更健壮的维度与内容裁剪
 """
 
+import os
 from typing import List, Dict, Optional, Tuple
 from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 import numpy as np
@@ -21,6 +22,7 @@ class MilvusWriter:
 
     COLLECTION_NAME = "mediarch_chunks"
     VECTOR_DIM = 3072
+    DEFAULT_FALLBACK_PORTS = ("19532", "29532")
 
     def __init__(
         self,
@@ -31,7 +33,9 @@ class MilvusWriter:
         nlist: int = 1024,
         auto_load: bool = True,
     ):
-        connections.connect("default", host=host, port=port)
+        self.host = str(host)
+        self.port = str(port)
+        self.connected_port = self._connect_with_fallback()
         self.metric_type = metric_type.upper()
         self.index_type = index_type.upper()
         self.nlist = int(nlist)
@@ -40,6 +44,32 @@ class MilvusWriter:
         if auto_load:
             self.collection.load()
             self._loaded = True
+
+    def _port_candidates(self) -> List[str]:
+        candidates = [self.port]
+        if self.host in {"localhost", "127.0.0.1", "::1"}:
+            fallback_env = os.getenv("MILVUS_PORT_FALLBACKS", "")
+            fallback_ports = [
+                p.strip()
+                for p in fallback_env.split(",")
+                if p and p.strip()
+            ] or list(self.DEFAULT_FALLBACK_PORTS)
+            for p in fallback_ports:
+                if p not in candidates:
+                    candidates.append(p)
+        return candidates
+
+    def _connect_with_fallback(self) -> str:
+        errors: List[str] = []
+        for port in self._port_candidates():
+            try:
+                connections.connect("default", host=self.host, port=port)
+                return str(port)
+            except Exception as e:
+                errors.append(f"{self.host}:{port} -> {e}")
+        raise RuntimeError(
+            "Milvus connection failed. Tried endpoints: " + " | ".join(errors)
+        )
     
     def _ensure_collection_and_index(self):
         """确保 collection 与 index 存在且匹配"""

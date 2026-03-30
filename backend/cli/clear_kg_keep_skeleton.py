@@ -9,7 +9,7 @@
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase
 from pymongo import MongoClient
 

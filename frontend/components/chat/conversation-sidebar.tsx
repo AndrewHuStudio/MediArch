@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { usePageTransition } from "@/components/page-transition"
+import { useT } from "@/lib/i18n"
+import { formatConversationTimestamp } from "@/lib/i18n/ui-copy"
 
 interface Conversation {
   id: string
@@ -27,7 +29,7 @@ interface ConversationSidebarProps {
 const CONVERSATION_STORAGE_PREFIX = "mediarch-conversation-"
 
 // 辅助函数：从 localStorage 获取所有对话（只显示有消息的对话）
-const getAllConversations = (): Conversation[] => {
+const getAllConversations = (defaultTitle: string): Conversation[] => {
   const conversations: Conversation[] = []
 
   try {
@@ -43,7 +45,7 @@ const getAllConversations = (): Conversation[] => {
           if (parsed.messages && parsed.messages.length > 0) {
             conversations.push({
               id: parsed.id,
-              title: parsed.title || "新的对话",
+              title: parsed.title || defaultTitle,
               timestamp: new Date(parsed.timestamp),
               preview: parsed.summary || parsed.messages?.[0]?.content?.slice(0, 50),
               isPinned: parsed.isPinned || false,
@@ -82,11 +84,12 @@ export function ConversationSidebar({
   onConversationSelect,
 }: ConversationSidebarProps) {
   const { startTransition } = usePageTransition()
+  const { locale, t } = useT()
   const [conversations, setConversations] = useState<Conversation[]>([])
 
   // 从 localStorage 加载对话历史
   const loadConversations = () => {
-    const allConversations = getAllConversations()
+    const allConversations = getAllConversations(t('chat.defaultTitle'))
     setConversations(allConversations)
   }
 
@@ -109,13 +112,13 @@ export function ConversationSidebar({
       window.removeEventListener("storage", handleStorageChange)
       clearInterval(interval)
     }
-  }, [])
+  }, [t])
 
   // 删除对话
   const handleDeleteConversation = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
 
-    const shouldDelete = window.confirm("确定要删除这条对话吗？\n删除后内容将无法恢复。")
+    const shouldDelete = window.confirm(t('chat.deleteConfirm'))
     if (!shouldDelete) return
 
     deleteConversationFromStorage(id)
@@ -137,17 +140,7 @@ export function ConversationSidebar({
   }
 
   const formatTimestamp = (date: Date) => {
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / (1000 * 60))
-    const hours = Math.floor(diff / (1000 * 60 * 60))
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-
-    if (minutes < 1) return "刚刚"
-    if (minutes < 60) return `${minutes}分钟前`
-    if (hours < 24) return `${hours}小时前`
-    if (days < 7) return `${days}天前`
-    return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" })
+    return formatConversationTimestamp(date, locale, t)
   }
 
   const handleGoHome = () => {
@@ -179,7 +172,7 @@ export function ConversationSidebar({
           )}
         >
           <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && <span className="text-sm">返回首页</span>}
+          {!isCollapsed && <span className="text-sm">{t('chat.goHome')}</span>}
         </Button>
 
         <Button
@@ -191,7 +184,7 @@ export function ConversationSidebar({
           )}
         >
           <MessageSquarePlus className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && <span className="text-sm">新建对话</span>}
+          {!isCollapsed && <span className="text-sm">{t('chat.newConversation')}</span>}
         </Button>
       </div>
 
@@ -206,11 +199,11 @@ export function ConversationSidebar({
               transition={{ duration: 0.2 }}
               className="space-y-1"
             >
-              <div className="px-2 py-1 text-xs text-gray-400 font-medium">历史对话</div>
+              <div className="px-2 py-1 text-xs text-gray-400 font-medium">{t('chat.history')}</div>
               {conversations.length === 0 ? (
                 <div className="px-2 py-8 text-center">
-                  <p className="text-xs text-gray-500">暂无对话记录</p>
-                  <p className="text-xs text-gray-600 mt-1">点击上方创建新对话</p>
+                  <p className="text-xs text-gray-500">{t('chat.noHistory')}</p>
+                  <p className="text-xs text-gray-600 mt-1">{t('chat.noHistoryHint')}</p>
                 </div>
               ) : (
                 conversations.map((conversation) => (

@@ -1,6 +1,11 @@
-# Secrets
+# Secrets / environment
 .env
 *.env
+*.env.*
+!.env.example
+!.env.sample
+frontend/.env.local
+backend/.env
 
 # Local AI/tool state
 .claude/
@@ -17,6 +22,7 @@ node_modules/
 dist/
 build/
 out/
+dist-test/
 pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
@@ -26,6 +32,7 @@ yarn-error.log*
 # Backend data (large / machine-generated)
 backups/
 logs/
+data_process/tasks_state.json
 backend/databases/documents/
 backend/databases/documents_ocr/
 backend/databases/**/nul
@@ -49,3 +56,15 @@ ENV/
 .DS_Store
 Thumbs.db
 nul
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Coverage / reports
+coverage/
+.coverage
+htmlcov/
+
+.tmp/
+data_process/documents/书籍报告/*.pdf

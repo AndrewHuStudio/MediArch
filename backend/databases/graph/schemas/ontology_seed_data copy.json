@@ -1,0 +1,448 @@
+{
+  "_comment": "Standard Healthcare Spatial Skeleton - Pre-injected Data",
+  "_description": "This is the backbone of the knowledge graph. All entities extracted from documents should be attached to these concept nodes.",
+  "_update_log": "Optimized the taxonomy of design methods to align with the problem-domain framework (flow/position/cleanliness/sensation/time).",
+
+  "hospital": {
+    "name": "General Hospital",
+    "label": "Hospital",
+    "is_concept": true,
+    "description": "Standard general hospital node, globally unique",
+    "level": "General",
+    "source": "Pre-injected knowledge",
+    "seed_version": "2.0",
+    "seed_source": "ontology_seed_data_v2"
+  },
+
+  "design_method_categories": [
+    {
+      "name": "Circulation Design Methods",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "Addresses 'flow': optimization of people, logistics, and clean-dirty circulation, including corridor design, AGV routing, and elevator configuration.",
+      "problem_domain": "flow",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "Spatial Layout Methods",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "Addresses 'position': functional zoning, spatial organization, and plan layout, including nursing-unit layouts and centralized radial layouts.",
+      "problem_domain": "position",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "Infection Control Methods",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "Addresses 'cleanliness': clean-zone partitioning, contamination control, and sterilization, including the three-zone method and negative-pressure isolation.",
+      "problem_domain": "cleanliness",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "Environmental Control Methods",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "Addresses 'sensation': air quality, acoustic-lighting conditions, and landscape integration, including medical-street daylighting, roof gardens, and natural ventilation.",
+      "problem_domain": "sensation",
+      "seed_source": "ontology_seed_data_v2"
+    },
+    {
+      "name": "Efficiency Optimization Methods",
+      "label": "DesignMethodCategory",
+      "is_concept": true,
+      "description": "Addresses 'time': space utilization, process optimization, and operational efficiency, including modular design and standardized consultation rooms.",
+      "problem_domain": "time",
+      "seed_source": "ontology_seed_data_v2"
+    }
+  ],
+
+  "design_methods_seed": [
+    {
+      "title": "Dual-Corridor Design",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Circulation Design Methods",
+      "problem_domain": "flow",
+      "description": "Separates clean and contaminated circulation by introducing dedicated clean and dirty corridors to avoid cross-contamination.",
+      "methodology_type": "Circulation Planning",
+      "applicable_spaces": ["Surgical Department", "Delivery Suite", "Intensive Care Unit"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Code for Hospital Design"
+    },
+    {
+      "title": "AGV Logistics Route Optimization",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Circulation Design Methods",
+      "problem_domain": "flow",
+      "description": "Uses an automated guided vehicle (AGV) system to optimize routes for medicines, supplies, and waste, reducing labor cost and cross-infection risk.",
+      "methodology_type": "Intelligent Logistics",
+      "applicable_spaces": ["Inpatient Department", "Surgical Department", "Central Sterile Supply Department", "Pharmacy"],
+      "applicability": "Optional",
+      "design_phase": "Preliminary Design",
+      "seed_source": "Technical Guidelines for Smart Hospital Construction"
+    },
+    {
+      "title": "Nursing Unit Model",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Spatial Layout Methods",
+      "problem_domain": "position",
+      "description": "Uses the nursing unit as the basic module, integrating patient rooms, nurse stations, treatment rooms, and other functions to improve management and care.",
+      "methodology_type": "Modular Layout",
+      "applicable_spaces": ["Inpatient Department", "Nursing Unit"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Guidelines for Hospital Architectural Design"
+    },
+    {
+      "title": "Centralized Radial Layout",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Spatial Layout Methods",
+      "problem_domain": "position",
+      "description": "Places core support functions, such as nurse stations, pharmacies, and treatment rooms, at the center, with wards or consultation rooms arranged around them to optimize staff circulation.",
+      "methodology_type": "Functional Zoning",
+      "applicable_spaces": ["Outpatient Department", "Inpatient Department", "Emergency Department"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Research on Hospital Design Optimization"
+    },
+    {
+      "title": "Three-Zone Partitioning",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Infection Control Methods",
+      "problem_domain": "cleanliness",
+      "description": "Divides healthcare spaces into clean, semi-contaminated, and contaminated zones, using physical separation and pressure gradients to prevent cross-infection.",
+      "methodology_type": "Zoning",
+      "applicable_spaces": ["Surgical Department", "Central Sterile Supply Department", "ICU", "Infectious Disease Ward"],
+      "applicability": "Mandatory",
+      "design_phase": "All Phases",
+      "seed_source": "GB 51039-2014"
+    },
+    {
+      "title": "Negative-Pressure Isolation",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Infection Control Methods",
+      "problem_domain": "cleanliness",
+      "description": "Establishes negative-pressure environments in infectious wards and contaminated areas to control airflow direction and prevent pathogen spread.",
+      "methodology_type": "Environmental Control",
+      "applicable_spaces": ["Infectious Disease Ward", "Negative-Pressure Isolation Ward", "ICU"],
+      "applicability": "Mandatory",
+      "design_phase": "Preliminary Design",
+      "seed_source": "Code for Infectious Disease Hospital Design"
+    },
+    {
+      "title": "Medical Street Daylighting Design",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Environmental Control Methods",
+      "problem_domain": "sensation",
+      "description": "Introduces a linear internal public space ('medical street') to bring in daylight through skylights, side windows, and atria, improving the patient experience.",
+      "methodology_type": "Daylighting Design",
+      "applicable_spaces": ["Outpatient Department", "Inpatient Department", "Medical Technology Department"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Innovative Practice in Hospital Architectural Design"
+    },
+    {
+      "title": "Roof Garden Integration",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Environmental Control Methods",
+      "problem_domain": "sensation",
+      "description": "Introduces roof garden spaces in inpatient and rehabilitation areas to provide a healing environment for patients and staff.",
+      "methodology_type": "Landscape Integration",
+      "applicable_spaces": ["Inpatient Department", "Rehabilitation Zone", "Psychiatric Unit"],
+      "applicability": "Optional",
+      "design_phase": "Schematic Design",
+      "seed_source": "Research on Healing Healthcare Architecture Design"
+    },
+    {
+      "title": "Modular Design",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Efficiency Optimization Methods",
+      "problem_domain": "time",
+      "description": "Uses standardized modular combinations to enable rapid construction, flexible adjustment, and phased expansion, shortening both construction and renovation cycles.",
+      "methodology_type": "Construction Optimization",
+      "applicable_spaces": ["Outpatient Department", "Inpatient Department", "Medical Technology Department"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Technical Guidelines for Prefabricated Healthcare Buildings"
+    },
+    {
+      "title": "Standardized Consultation Room",
+      "label": "DesignMethod",
+      "is_concept": true,
+      "category": "Efficiency Optimization Methods",
+      "problem_domain": "time",
+      "description": "Designs standardized consultation room units with unified dimensions, equipment, and process layouts to improve clinical efficiency and space utilization.",
+      "methodology_type": "Standardized Design",
+      "applicable_spaces": ["Outpatient Department", "Health Examination Center"],
+      "applicability": "Recommended",
+      "design_phase": "Schematic Design",
+      "seed_source": "Research on Outpatient Building Design Optimization"
+    }
+  ],
+
+  "departments": [
+    {
+      "name": "Emergency Department",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "Primary organizational unit for emergency and acute care services",
+      "parent": "General Hospital",
+      "functional_zones": [
+        {
+          "name": "Public Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "Public Zone",
+          "spaces": [
+            {"name": "Entrance Hall", "label": "Space", "is_concept": true},
+            {"name": "Registration and Billing Hall", "label": "Space", "is_concept": true},
+            {"name": "Nurse Station", "label": "Space", "is_concept": true},
+            {"name": "Infusion Room", "label": "Space", "is_concept": true},
+            {"name": "Dirty Utility Room", "label": "Space", "is_concept": true},
+            {"name": "Observation Room", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Resuscitation Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Resuscitation Room", "label": "Space", "is_concept": true},
+            {"name": "Emergency Operating Room", "label": "Space", "is_concept": true},
+            {"name": "Emergency Intensive Care Unit", "label": "Space", "is_concept": true},
+            {"name": "Emergency Treatment Room", "label": "Space", "is_concept": true},
+            {"name": "Gastric Lavage Room", "label": "Space", "is_concept": true},
+            {"name": "Resuscitation Hall", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Emergency Treatment Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Examination Room", "label": "Space", "is_concept": true},
+            {"name": "Treatment Room", "label": "Space", "is_concept": true},
+            {"name": "Debridement Room", "label": "Space", "is_concept": true},
+            {"name": "Dressing Room", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Diagnostic and Support Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Registration Office", "label": "Space", "is_concept": true},
+            {"name": "Medical Records Room", "label": "Space", "is_concept": true},
+            {"name": "Pharmacy", "label": "Space", "is_concept": true},
+            {"name": "Billing Office", "label": "Space", "is_concept": true},
+            {"name": "Laboratory", "label": "Space", "is_concept": true},
+            {"name": "X-Ray Room", "label": "Space", "is_concept": true},
+            {"name": "Functional Examination Room", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Outpatient Department",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "Primary organizational unit for outpatient medical services",
+      "parent": "General Hospital",
+      "functional_zones": [
+        {
+          "name": "Outpatient Public Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "Public Zone",
+          "spaces": [
+            {"name": "Outpatient Lobby", "label": "Space", "is_concept": true},
+            {"name": "Registration Hall", "label": "Space", "is_concept": true},
+            {"name": "Information Desk", "label": "Space", "is_concept": true},
+            {"name": "Pre-Triage Desk", "label": "Space", "is_concept": true},
+            {"name": "Triage Desk", "label": "Space", "is_concept": true},
+            {"name": "Billing Counter", "label": "Space", "is_concept": true},
+            {"name": "Outpatient Pharmacy", "label": "Space", "is_concept": true},
+            {"name": "Medication Waiting Area", "label": "Space", "is_concept": true},
+            {"name": "Outpatient Office", "label": "Space", "is_concept": true},
+            {"name": "Public Restroom", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Specialty Consultation Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": false,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Surgical Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Internal Medicine Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Gynecology Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Obstetrics Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Pediatrics Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "ENT Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Ophthalmology Consultation Room", "label": "Space", "is_concept": true},
+            {"name": "Traditional Chinese Medicine Consultation Room", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Examination and Treatment Zone",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Testing Room", "label": "Space", "is_concept": true},
+            {"name": "Blood Collection Room", "label": "Space", "is_concept": true},
+            {"name": "Injection Room", "label": "Space", "is_concept": true},
+            {"name": "Surgical Dressing Room", "label": "Space", "is_concept": true},
+            {"name": "Surgical Trauma Treatment Room", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Medical Technology Department",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "Department for medical technology support services",
+      "parent": "General Hospital",
+      "functional_zones": [
+        {
+          "name": "Surgical Department",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clean Zone",
+          "spaces": [
+            {"name": "Patient Preparation Area", "label": "Space", "is_concept": true},
+            {"name": "Operating Room", "label": "Space", "is_concept": true},
+            {"name": "Clinical Support Area", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Radiology and Imaging Center",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Patient Waiting Area", "label": "Space", "is_concept": true},
+            {"name": "Physician Diagnostic Area", "label": "Space", "is_concept": true},
+            {"name": "CT Room", "label": "Space", "is_concept": true},
+            {"name": "MRI Room", "label": "Space", "is_concept": true},
+            {"name": "DR Room", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Laboratory Department",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "General Laboratory Area", "label": "Space", "is_concept": true},
+            {"name": "Microbiology Laboratory Area", "label": "Space", "is_concept": true},
+            {"name": "Mycology and Virology Laboratory Area", "label": "Space", "is_concept": true},
+            {"name": "Ancillary Room", "label": "Space", "is_concept": true},
+            {"name": "Storage Room", "label": "Space", "is_concept": true},
+            {"name": "Physician Office Area", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Dialysis Unit",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clean Zone",
+          "spaces": [
+            {"name": "Dialysis Preparation Area", "label": "Space", "is_concept": true},
+            {"name": "Dialysis Treatment Area", "label": "Space", "is_concept": true},
+            {"name": "Dialysis Support Area", "label": "Space", "is_concept": true},
+            {"name": "Dialysis Staff Area", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Central Sterile Supply Department",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clean Zone",
+          "spaces": [
+            {"name": "Decontamination Area", "label": "Space", "is_concept": true, "zone_type": "Contaminated Zone"},
+            {"name": "Inspection and Packaging Area", "label": "Space", "is_concept": true, "zone_type": "Clean Area"},
+            {"name": "Sterilization Area", "label": "Space", "is_concept": true, "zone_type": "Clean Area"},
+            {"name": "Sterile Storage Area", "label": "Space", "is_concept": true, "zone_type": "Sterile Zone"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Inpatient Department",
+      "label": "DepartmentGroup",
+      "is_concept": true,
+      "description": "Primary unit for inpatient medical services",
+      "parent": "General Hospital",
+      "functional_zones": [
+        {
+          "name": "Admission and Discharge Unit",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Public Zone",
+          "spaces": [
+            {"name": "Admission and Discharge Hall", "label": "Space", "is_concept": true},
+            {"name": "Procedure Service Counter", "label": "Space", "is_concept": true},
+            {"name": "Payment Processing Counter", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Nursing Unit",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clinical Zone",
+          "spaces": [
+            {"name": "Patient Room", "label": "Space", "is_concept": true},
+            {"name": "Ward Nurse Station", "label": "Space", "is_concept": true},
+            {"name": "Physician Office", "label": "Space", "is_concept": true},
+            {"name": "Treatment Room", "label": "Space", "is_concept": true},
+            {"name": "Medication Preparation Room", "label": "Space", "is_concept": true},
+            {"name": "Soiled Utility Room", "label": "Space", "is_concept": true},
+            {"name": "Clean Utility Room", "label": "Space", "is_concept": true}
+          ]
+        },
+        {
+          "name": "Intensive Care Unit",
+          "label": "FunctionalZone",
+          "is_concept": true,
+          "is_physical": true,
+          "zone_type": "Clean Zone",
+          "spaces": [
+            {"name": "ICU Patient Room", "label": "Space", "is_concept": true},
+            {"name": "ICU Nurse Station", "label": "Space", "is_concept": true},
+            {"name": "ICU On-Call Room", "label": "Space", "is_concept": true},
+            {"name": "ICU Family Waiting Area", "label": "Space", "is_concept": true}
+          ]
+        }
+      ]
+    }
+  ]
+}

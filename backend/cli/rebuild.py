@@ -49,7 +49,7 @@ from datetime import datetime
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 # 导入核心服务
 from backend.app.services.rebuild_service import DatabaseRebuildService

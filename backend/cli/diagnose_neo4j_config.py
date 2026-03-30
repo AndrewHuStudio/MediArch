@@ -20,7 +20,7 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase
 
 # 加载环境变量
@@ -302,12 +302,12 @@ def generate_recommendations():
 [E] 如果数据卷指向变化
     检查 docker-compose.yml 第113行:
       volumes:
-        - E:/MediArch-Data/neo4j:/data
+        - F:/meadiarch_data/neo4j:/data
     确认该路径是否正确，且包含你之前的数据
 
 [F] 如果 verify、build_kg、API 连接不一致
     确保所有模块都加载了相同的 .env 文件:
-      from dotenv import load_dotenv
+      from backend.env_loader import load_dotenv
       load_dotenv()  # 默认加载项目根目录的 .env
     """)
 

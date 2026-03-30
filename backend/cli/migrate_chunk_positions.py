@@ -30,7 +30,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 def _load_env() -> None:
     try:
-        from dotenv import load_dotenv
+        from backend.env_loader import load_dotenv
 
         env_path = PROJECT_ROOT / ".env"
         if env_path.exists():

@@ -43,11 +43,7 @@ export function BookDetails({ book, isVisible, textColor }: BookDetailsProps) {
         <p className={`text-xl font-normal transition-colors duration-700 ${secondaryTextClass}`}>{book.subtitle}</p>
 
         <div className={`flex items-center gap-2 text-sm transition-colors duration-700 ${mutedTextClass}`}>
-          <span>by {book.author}</span>
-          <span>•</span>
-          <span>Published {book.publishedYear}</span>
-          <span>•</span>
-          <span>{book.pages} pages</span>
+          <span>{book.metaLine}</span>
         </div>
       </div>
 

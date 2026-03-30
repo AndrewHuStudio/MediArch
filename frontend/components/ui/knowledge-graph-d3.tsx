@@ -6,6 +6,8 @@ import * as d3 from "d3"
 import { motion, AnimatePresence } from "framer-motion"
 import { Maximize2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useT } from "@/lib/i18n"
+import { getKnowledgeGraphNodeTypeItems } from "@/lib/i18n/ui-copy"
 
 export interface GraphNode {
   id: string
@@ -23,6 +25,9 @@ export interface GraphLink {
   source: string | GraphNode
   target: string | GraphNode
   label: string
+  isSynthetic?: boolean
+  isVisualBridge?: boolean
+  properties?: Record<string, unknown>
 }
 
 export interface GraphData {
@@ -45,24 +50,11 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
   const selectedNodeIdRef = useRef<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const { t } = useT()
 
   // 计算节点类型统计 - 包含所有可能的类型
   const nodeTypeStats = useMemo(() => {
-    // 定义所有可能的节点类型
-    const allTypes = [
-      { type: "Hospital", label: "医院", color: "#8B7355" },
-      { type: "DepartmentGroup", label: "部门", color: "#5B7FA8" },
-      { type: "FunctionalZone", label: "功能分区", color: "#7B68A8" },
-      { type: "Space", label: "空间", color: "#5A9B7D" },
-      { type: "DesignMethod", label: "设计方法", color: "#C17A4F" },
-      { type: "DesignMethodCategory", label: "设计方法分类", color: "#A89968" },
-      { type: "Case", label: "案例", color: "#C97B9E" },
-      { type: "Source", label: "资料来源", color: "#B85C6F" },
-      { type: "KnowledgePoint", label: "知识点", color: "#5BA5A8" },
-      { type: "MedicalService", label: "医疗服务", color: "#8B7BA8" },
-      { type: "MedicalEquipment", label: "医疗设备", color: "#6B8BA8" },
-      { type: "TreatmentMethod", label: "治疗方法", color: "#9B7BA8" },
-    ]
+    const allTypes = getKnowledgeGraphNodeTypeItems(t)
 
     // 统计当前图谱中的节点数量
     const counts = new Map<string, number>()
@@ -75,7 +67,11 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       ...typeInfo,
       count: counts.get(typeInfo.type) || 0
     }))
-  }, [data])
+  }, [data, t])
+  const nodeTypeLabelMap = useMemo(
+    () => Object.fromEntries(nodeTypeStats.map((item) => [item.type, item.label])),
+    [nodeTypeStats],
+  )
 
   useEffect(() => {
     setIsMounted(true)
@@ -165,7 +161,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       DesignMethodCategory: "#A89968",  // 柔和金色 - 设计方法分类
       Case: "#C97B9E",                  // 柔和粉色 - 案例
       Source: "#B85C6F",                // 柔和红色 - 资料来源
-      KnowledgePoint: "#5BA5A8",        // 柔和青色 - 知识点
+      KnowledgePoint: "#B8A858",       // 柔和黄绿色 - 知识点
       MedicalService: "#8B7BA8",        // 柔和蓝紫色 - 医疗服务
       MedicalEquipment: "#6B8BA8",      // 柔和钢蓝色 - 医疗设备
       TreatmentMethod: "#9B7BA8",       // 柔和兰花紫 - 治疗方法
@@ -207,9 +203,10 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .data(links)
       .enter()
       .append("line")
-      .attr("stroke", "#64748b")
-      .attr("stroke-width", isFullscreenMode ? 2 : 1.5)
-      .attr("stroke-opacity", 0.7)
+      .attr("stroke", (d: any) => (d.isVisualBridge ? "#94a3b8" : "#64748b"))
+      .attr("stroke-width", (d: any) => (d.isVisualBridge ? (isFullscreenMode ? 1.5 : 1.2) : (isFullscreenMode ? 2 : 1.5)))
+      .attr("stroke-opacity", (d: any) => (d.isVisualBridge ? 0.4 : 0.7))
+      .attr("stroke-dasharray", (d: any) => (d.isVisualBridge ? (isFullscreenMode ? "10 6" : "7 5") : null))
       .attr("marker-end", `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})`)
 
     const linkLabel = container
@@ -224,6 +221,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .attr("font-weight", "500")
       .attr("text-anchor", "middle")
       .attr("pointer-events", "none")
+      .attr("opacity", (d: any) => (d.isVisualBridge ? 0.55 : 1))
       .style("text-shadow", "0 0 3px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.6)")
       .text((d) => d.label)
 
@@ -251,7 +249,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
             if (!event.active) simulation.alphaTarget(0)
             d.fx = null
             d.fy = null
-          }),
+          }) as any,
       )
 
     node
@@ -310,10 +308,13 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
 
       link
         .attr("stroke-opacity", (d: any) => {
-          if (!nodeId) return 0.7
+          if (!nodeId) return d.isVisualBridge ? 0.4 : 0.7
           const sid = d?.source?.id || d?.source
           const tid = d?.target?.id || d?.target
-          return sid === nodeId || tid === nodeId ? 0.9 : 0.1
+          if (sid === nodeId || tid === nodeId) {
+            return d.isVisualBridge ? 0.65 : 0.9
+          }
+          return 0.1
         })
         .attr("marker-end", (d: any) => {
           if (!nodeId) return `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})`
@@ -443,7 +444,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
           size="icon"
           onClick={handleExpandClick}
           className="absolute top-2 right-2 bg-transparent hover:bg-white/10 text-white border-none p-1.5 h-auto w-auto"
-          title="全屏查看"
+          title={t('graph.expand')}
         >
           <Maximize2 className="w-4 h-4" />
         </Button>
@@ -451,16 +452,16 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
         {selectedNode && (
           <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
             <p className="text-xs text-white">
-              已选中: {selectedNode.label} <span className="text-gray-400">({selectedNode.type})</span>
+              {t('graph.selected')}: {selectedNode.label} <span className="text-gray-400">({nodeTypeLabelMap[selectedNode.type] || selectedNode.type})</span>
             </p>
-            <p className="text-[10px] text-gray-400">点击空白取消聚焦</p>
+            <p className="text-[10px] text-gray-400">{t('graph.clearSelection')}</p>
           </div>
         )}
 
         {hoveredNode && !selectedNode && (
           <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
             <p className="text-xs text-white">
-              节点: {hoveredNode.label} <span className="text-gray-400">({hoveredNode.type})</span>
+              {t('graph.node')}: {hoveredNode.label} <span className="text-gray-400">({nodeTypeLabelMap[hoveredNode.type] || hoveredNode.type})</span>
             </p>
           </div>
         )}
@@ -488,14 +489,14 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                   <div className="absolute top-8 left-8 right-8 z-10 flex items-center justify-between">
                     <h2 className="text-2xl font-semibold text-white flex items-center gap-3">
                       <span className="text-yellow-400">🔗</span>
-                      知识图谱
+                      {t('graph.fullscreenTitle')}
                     </h2>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={handleCloseClick}
                       className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg"
-                      title="关闭"
+                      title={t('graph.close')}
                     >
                       <X className="w-6 h-6" />
                     </Button>
@@ -504,7 +505,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                   {/* 节点类型统计图例 - 仅在全屏模式显示 */}
                   {nodeTypeStats.length > 0 && (
                     <div className="absolute top-24 left-8 z-10 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 p-4 max-w-xs">
-                      <h3 className="text-sm font-semibold text-white mb-3">节点类型统计</h3>
+                      <h3 className="text-sm font-semibold text-white mb-3">{t('graph.nodeTypeStats')}</h3>
                       <div className="space-y-2">
                         {nodeTypeStats.map(stat => (
                           <div key={stat.type} className="flex items-center justify-between gap-4">

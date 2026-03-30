@@ -9,7 +9,7 @@
 """
 
 import os
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase
 from pymongo import MongoClient
 
@@ -88,12 +88,16 @@ class KGAnalyzer:
             result = session.run("MATCH (n) RETURN count(n) as total")
             stats["total_nodes"] = result.single()["total"]
             
-            # 2. 实体节点数（Level 2）
-            result = session.run("MATCH (n:Entity {level: 2}) RETURN count(n) as total")
+            # 2. 实体/核心节点数（当前模型使用真实标签，level=2 表示主实体节点）
+            result = session.run(
+                "MATCH (n) WHERE coalesce(n.level, 2) = 2 RETURN count(n) as total"
+            )
             stats["entity_nodes"] = result.single()["total"]
             
-            # 3. 属性节点数（Level 1）
-            result = session.run("MATCH (n:Attribute) RETURN count(n) as total")
+            # 3. Level 1 节点数（当前模型默认不单独创建 Attribute 节点）
+            result = session.run(
+                "MATCH (n) WHERE coalesce(n.level, 2) = 1 RETURN count(n) as total"
+            )
             stats["attribute_nodes"] = result.single()["total"]
             
             # 4. 关系总数
@@ -104,7 +108,8 @@ class KGAnalyzer:
             print("\n[Checks] 数据质量检查：")
             dup = session.run(
                 """
-                MATCH (a:Entity)-[r]->(b:Entity)
+                MATCH (a)-[r]->(b)
+                WHERE coalesce(a.level, 2) = 2 AND coalesce(b.level, 2) = 2
                 WITH a.id as s, type(r) as t, b.id as o, count(*) as c
                 WHERE c > 1
                 RETURN count(*) as dup_triplets
@@ -114,8 +119,8 @@ class KGAnalyzer:
 
             dangling = session.run(
                 """
-                MATCH (a:Entity)-[r]->(b)
-                WHERE NOT b:Entity
+                MATCH (a)-[r]->(b)
+                WHERE coalesce(a.level, 2) = 2 AND coalesce(b.level, 2) <> 2
                 RETURN count(r) as dangling
                 """
             ).single()["dangling"]
@@ -124,8 +129,8 @@ class KGAnalyzer:
             # 5. 节点统计
             print("\n1. 节点统计:")
             print(f"   - 总节点数: {stats['total_nodes']}")
-            print(f"   - 实体节点 (Level 2): {stats['entity_nodes']}")
-            print(f"   - 属性节点 (Level 1): {stats['attribute_nodes']}")
+            print(f"   - 主实体节点 (Level 2): {stats['entity_nodes']}")
+            print(f"   - Level 1节点: {stats['attribute_nodes']}")
             print(f"   - 关系总数: {stats['total_relationships']}")
             
             # 6. 实体类型分布（Top 10）
@@ -135,8 +140,9 @@ class KGAnalyzer:
             print("-" * 60)
             
             result = session.run("""
-                MATCH (n:Entity {level: 2})
-                WHERE n.schema_type IS NOT NULL
+                MATCH (n)
+                WHERE coalesce(n.level, 2) = 2
+                  AND n.schema_type IS NOT NULL
                 RETURN n.schema_type as type, count(*) as count
                 ORDER BY count DESC
                 LIMIT 10
@@ -171,7 +177,8 @@ class KGAnalyzer:
             print("\n4. 实体连接度分析:")
             print("-" * 60)
             result = session.run("""
-                MATCH (n:Entity {level: 2})
+                MATCH (n)
+                WHERE coalesce(n.level, 2) = 2
                 OPTIONAL MATCH (n)-[r]-()
                 WITH n, count(r) as degree
                 RETURN 
@@ -192,12 +199,13 @@ class KGAnalyzer:
             print("-" * 80)
             
             result = session.run("""
-                MATCH (n:Entity {level: 2})
+                MATCH (n)
+                WHERE coalesce(n.level, 2) = 2
                 OPTIONAL MATCH (n)-[r]-()
                 WITH n, count(r) as degree
                 ORDER BY degree DESC
                 LIMIT 10
-                RETURN n.name as name, n.schema_type as type, degree
+                RETURN coalesce(n.name, n.title, n.id) as name, n.schema_type as type, degree
             """)
             
             for record in result:
@@ -218,25 +226,25 @@ class KGAnalyzer:
         
         chunks = mongodb_stats["total_chunks"]
         entities = neo4j_stats["entity_nodes"]
-        attributes = neo4j_stats["attribute_nodes"]
+        level1_nodes = neo4j_stats["attribute_nodes"]
         relationships = neo4j_stats["total_relationships"]
         
         print(f"\n1. 平均每个Chunk提取:")
         if chunks > 0:
             print(f"   - 实体数: {entities/chunks:.2f} 个")
-            print(f"   - 属性数: {attributes/chunks:.2f} 个")
             print(f"   - 关系数: {relationships/chunks:.2f} 个")
+            print(f"   - Level 1节点数: {level1_nodes/chunks:.2f} 个")
         
         print(f"\n2. 平均每个实体:")
         if entities > 0:
-            print(f"   - 属性数: {attributes/entities:.2f} 个")
             print(f"   - 关系数: {relationships/entities:.2f} 个")
+        print("   - 属性已内嵌到实体/关系属性中，不再单独统计 Attribute 节点")
         
         print(f"\n3. 节点分布:")
-        total_nodes = entities + attributes
+        total_nodes = entities + level1_nodes
         if total_nodes > 0:
             print(f"   - 实体节点占比: {entities/total_nodes*100:.1f}%")
-            print(f"   - 属性节点占比: {attributes/total_nodes*100:.1f}%")
+            print(f"   - Level 1节点占比: {level1_nodes/total_nodes*100:.1f}%")
     
     def evaluate_normalcy(self, mongodb_stats, neo4j_stats):
         """评估数据规模是否正常"""
@@ -246,7 +254,8 @@ class KGAnalyzer:
         
         chunks = mongodb_stats["total_chunks"]
         entities = neo4j_stats["entity_nodes"]
-        attributes = neo4j_stats["attribute_nodes"]
+        level1_nodes = neo4j_stats["attribute_nodes"]
+        relationships = neo4j_stats["total_relationships"]
         total_nodes = neo4j_stats["total_nodes"]
         
         warnings = []
@@ -260,17 +269,20 @@ class KGAnalyzer:
         else:
             print(f"[OK] 实体提取数量正常 (平均{entities_per_chunk:.1f}个/chunk)")
         
-        # 检查2: 每个实体的属性数
-        attrs_per_entity = attributes / entities if entities > 0 else 0
-        if attrs_per_entity > 5:
-            warnings.append(f"[Warning] 平均每个实体有{attrs_per_entity:.1f}个属性，可能偏多")
-        elif attrs_per_entity < 0.5:
-            warnings.append(f"[Warning] 平均每个实体只有{attrs_per_entity:.1f}个属性，可能偏少")
+        # 检查2: 当前模型将属性内嵌到节点/边属性中，不再单独要求 Attribute 节点
+        print("[OK] 属性已内嵌到实体/关系属性中，不以 Attribute 节点数量评估质量")
+
+        # 检查3: 每个实体的关系数
+        rels_per_entity = relationships / entities if entities > 0 else 0
+        if rels_per_entity > 8:
+            warnings.append(f"[Warning] 平均每个实体有{rels_per_entity:.1f}条关系，可能偏多")
+        elif rels_per_entity < 0.2:
+            warnings.append(f"[Warning] 平均每个实体只有{rels_per_entity:.1f}条关系，可能偏少")
         else:
-            print(f"[OK] 属性提取数量正常 (平均{attrs_per_entity:.1f}个/实体)")
+            print(f"[OK] 关系提取数量正常 (平均{rels_per_entity:.1f}条/实体)")
         
-        # 检查3: 总节点数
-        expected_nodes_min = chunks * 3  # 保守估计
+        # 检查4: 总节点数
+        expected_nodes_min = chunks * 2  # 当前模型不单独创建属性节点，适当下调下界
         expected_nodes_max = chunks * 15  # 激进估计
         
         if total_nodes < expected_nodes_min:
@@ -299,7 +311,8 @@ class KGAnalyzer:
   - 使用了 {mongodb_stats['doc_count']} 个PDF文档
   - 生成了 {chunks} 个chunks（文本块）
   - 提取了 {entities} 个实体节点
-  - 提取了 {attributes} 个属性节点
+  - 生成了 {relationships} 条关系
+  - Level 1节点数为 {level1_nodes}（当前模型不再单独创建属性节点）
   - 总计 {total_nodes} 个节点
 """)
         else:
@@ -311,10 +324,11 @@ class KGAnalyzer:
         """查看示例三元组"""
         with self.neo4j_driver.session() as session:
             result = session.run("""
-                MATCH (a:Entity {level: 2})-[r:RELATION]->(b:Entity {level: 2})
-                RETURN a.name as subject, 
-                       r.type as relation, 
-                       b.name as object
+                MATCH (a)-[r]->(b)
+                WHERE coalesce(a.level, 2) = 2 AND coalesce(b.level, 2) = 2
+                RETURN coalesce(a.name, a.title, a.id) as subject, 
+                       type(r) as relation, 
+                       coalesce(b.name, b.title, b.id) as object
                 LIMIT $limit
             """, limit=limit)
             
@@ -332,9 +346,11 @@ class KGAnalyzer:
         """搜索包含关键词的实体"""
         with self.neo4j_driver.session() as session:
             result = session.run("""
-                MATCH (n:Entity)
-                WHERE n.name CONTAINS $keyword
-                RETURN n.name as name, 
+                MATCH (n)
+                WHERE (coalesce(n.name, '') CONTAINS $keyword
+                       OR coalesce(n.title, '') CONTAINS $keyword)
+                  AND coalesce(n.level, 2) = 2
+                RETURN coalesce(n.name, n.title, n.id) as name, 
                        n.level as level,
                        n.schema_type as type
                 LIMIT 20
@@ -417,4 +433,3 @@ def main():
 if __name__ == "__main__":
     from .graph_tools import cmd_analyze
     cmd_analyze()
-

@@ -20,12 +20,13 @@ Milvus Agent ─┘
 from __future__ import annotations
 
 import logging
+import os
 import re
 import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set
 
-from backend.app.agents.base_agent import AgentItem
+from backend.app.agents.base_agent import AgentItem, add_items_with_dedup
 
 logger = logging.getLogger("knowledge_fusion")
 
@@ -178,7 +179,12 @@ def _infer_node_type_from_neo4j(item: AgentItem) -> str:
         节点类型（Hospital, DepartmentGroup, FunctionalZone, Space, DesignMethod等）
     """
     # 优先使用 entity_type（如果有）
-    entity_type = item.entity_type or ""
+    entity_type = getattr(item, "entity_type", None) or ""
+    if not entity_type:
+        attrs = item.attrs or {}
+        entity_type = attrs.get("entity_type") or ""
+    if not entity_type:
+        entity_type = item.label or ""
 
     # 检查常见的 schema 标签
     if entity_type in ["Hospital", "DepartmentGroup", "FunctionalZone", "Space",
@@ -201,7 +207,8 @@ def _infer_node_type_from_name(name: str, label: str = "") -> str:
     Returns:
         节点类型
     """
-    name_lower = name.lower()
+    name_lower = (name or "").lower()
+    label = label or ""
     label_lower = label.lower()
 
     # 检查标签
@@ -209,6 +216,9 @@ def _infer_node_type_from_name(name: str, label: str = "") -> str:
         if label in ["Hospital", "DepartmentGroup", "FunctionalZone", "Space",
                      "DesignMethod", "DesignMethodCategory", "Case", "Source"]:
             return label
+
+    if _looks_like_source_document(name):
+        return "Source"
 
     # 医院
     if "医院" in name or "hospital" in name_lower:
@@ -262,6 +272,47 @@ def _infer_source_type(source_name: str) -> str:
         return "学术文献"
     else:
         return "项目文档"
+
+
+def _looks_like_source_document(name: str) -> bool:
+    normalized = (name or "").strip().lower()
+    if not normalized:
+        return False
+    if normalized.endswith((".pdf", ".doc", ".docx", ".txt", ".md")):
+        return True
+    return any(token in normalized for token in ["规范", "指南", "图集", "标准", "研究"])
+
+
+def _source_doc_node_id(source_name: str) -> str:
+    stable_hash = hashlib.md5(str(source_name).encode("utf-8")).hexdigest()[:10]
+    return f"doc_{stable_hash}"
+
+
+def _derive_fallback_knowledge_name(item: AgentItem, source_doc: str) -> str:
+    attrs = item.attrs or {}
+    base_name = (item.name or "").strip()
+    section = str(attrs.get("section") or "").strip()
+    snippet = (item.snippet or "").strip()
+
+    for citation in (item.citations or []):
+        if not snippet:
+            snippet = str(citation.get("snippet") or "").strip()
+        if not section:
+            section = str(citation.get("section") or "").strip()
+        if snippet and section:
+            break
+
+    if base_name and base_name != source_doc and not _looks_like_source_document(base_name):
+        return base_name
+
+    if section:
+        return section
+
+    if snippet:
+        condensed = re.sub(r"\s+", " ", snippet).strip()
+        return condensed[:50] + "..." if len(condensed) > 50 else condensed
+
+    return "知识片段"
 
 
 def fuse_retrieval_results(
@@ -437,12 +488,19 @@ def build_unified_hints(
             entity_names_set.add(item.name)
             search_terms_set.add(item.name)
 
-    # ========== 合并去重 ==========
-    hints.entity_names = list(entity_names_set)[:max_entities]
-    hints.entity_types = list(entity_types_set)
-    hints.chunk_ids = list(chunk_ids_set)[:max_chunks]
-    hints.sections = list(sections_set)
-    hints.search_terms = list(search_terms_set)[:30]  # 限制搜索词数量
+    # ========== 合并去重 & 稳定排序 ==========
+    def _sorted_limited(values: Set[str], limit: Optional[int] = None) -> List[str]:
+        items = sorted(values)
+        return items[:limit] if limit is not None else items
+
+    hints.entity_names = _sorted_limited(entity_names_set, max_entities)
+    hints.entity_types = _sorted_limited(entity_types_set)
+    hints.chunk_ids = _sorted_limited(chunk_ids_set, max_chunks)
+    hints.sections = _sorted_limited(sections_set)
+    hints.search_terms = _sorted_limited(search_terms_set, 30)  # 限制搜索词数量
+
+    if hints.page_ranges:
+        hints.page_ranges = sorted(set(hints.page_ranges), key=lambda r: (r[0], r[1]))
 
     # 统计
     hints.neo4j_entity_count = len(neo4j_items)
@@ -486,21 +544,34 @@ def build_answer_graph_data(
     seen_node_ids: Set[str] = set()
     seen_edge_keys: Set[str] = set()
 
+    def _get_env_int(name: str) -> Optional[int]:
+        raw = os.getenv(name)
+        if raw is None:
+            return None
+        try:
+            value = int(raw)
+        except ValueError:
+            return None
+        return value if value > 0 else None
+
+    max_kp_nodes = _get_env_int("KNOWLEDGE_FUSION_MAX_KP_NODES")
+    max_citations = _get_env_int("KNOWLEDGE_FUSION_MAX_CITATIONS")
+
     # ========== 从 Neo4j 结果构建核心实体节点 ==========
     for item in neo4j_items:
-        node_id = item.entity_id or f"neo4j_{item.name or id(item)}"
+        node_type = _infer_node_type_from_neo4j(item)
+        node_name = item.name or "未命名实体"
+        is_source_node = node_type == "Source" or _looks_like_source_document(node_name)
+        node_id = _source_doc_node_id(node_name) if is_source_node else (item.entity_id or f"neo4j_{node_name or id(item)}")
 
         if node_id in seen_node_ids:
             continue
         seen_node_ids.add(node_id)
 
-        # 从 Neo4j 节点标签推断节点类型（使用 schema 定义的标签）
-        node_type = _infer_node_type_from_neo4j(item)
-
         # 创建核心实体节点
         node = GraphNode(
             id=node_id,
-            name=item.name or "未命名实体",
+            name=node_name,
             type=node_type,
             properties=item.attrs or {},
             score=item.score,
@@ -510,19 +581,29 @@ def build_answer_graph_data(
         # 处理关联边
         for edge in (item.edges or []):
             target_name = edge.get("target", "")
-            target_id = edge.get("target_id") or f"neo4j_{target_name}"
             relation_type = edge.get("type", "RELATED_TO")
+            target_type = _infer_node_type_from_name(target_name, edge.get("target_label") or "")
+            is_source_target = relation_type == "MENTIONED_IN" or target_type == "Source" or _looks_like_source_document(target_name)
+            target_id = _source_doc_node_id(target_name) if target_name and is_source_target else (edge.get("target_id") or f"neo4j_{target_name}")
 
             # 创建关联实体节点（如果不存在）
             if target_id not in seen_node_ids and target_name:
                 seen_node_ids.add(target_id)
-                # 从边的目标节点推断类型
-                target_type = _infer_node_type_from_name(target_name, edge.get("target_label"))
                 related_node = GraphNode(
                     id=target_id,
                     name=target_name,
                     type=target_type,
-                    properties=edge.get("properties", {}),
+                    properties={
+                        **(edge.get("properties", {}) or {}),
+                        **(
+                            {
+                                "source": target_name,
+                                "source_type": _infer_source_type(target_name),
+                                "title": target_name,
+                            }
+                            if is_source_target else {}
+                        ),
+                    },
                 )
                 graph_data.nodes.append(related_node)
 
@@ -547,8 +628,7 @@ def build_answer_graph_data(
         # 提取文档来源
         attrs = item.attrs or {}
         source_doc = attrs.get("source_document") or item.name or "未知文档"
-        stable_hash = hashlib.md5(str(source_doc).encode("utf-8")).hexdigest()[:10]
-        doc_id = f"doc_{stable_hash}"
+        doc_id = _source_doc_node_id(source_doc)
 
         # 创建文档源节点（使用 Source 类型，符合 schema）
         if doc_id not in doc_nodes:
@@ -571,6 +651,8 @@ def build_answer_graph_data(
         if extracted_kps:
             # 使用提取的结构化知识点
             for kp in extracted_kps:
+                if max_kp_nodes is not None and len(knowledge_nodes) >= max_kp_nodes:
+                    break
                 kp_title = kp.get("title", "未命名知识点")
                 kp_content = kp.get("content", "")
                 kp_category = kp.get("category", "")
@@ -612,13 +694,15 @@ def build_answer_graph_data(
                     ))
         else:
             # 回退：如果没有提取知识点，使用原始chunk内容
+            if max_kp_nodes is not None and len(knowledge_nodes) >= max_kp_nodes:
+                continue
             snippet = ""
             for citation_dict in (item.citations or []):
                 snippet = citation_dict.get("snippet", "")
                 if snippet:
                     break
 
-            item_name = item.name or "未命名知识点"
+            item_name = _derive_fallback_knowledge_name(item, source_doc)
             knowledge_id = f"kp_{hashlib.md5((item_name + source_doc).encode('utf-8')).hexdigest()[:10]}"
 
             knowledge_node = GraphNode(
@@ -626,7 +710,7 @@ def build_answer_graph_data(
                 name=item_name[:50] + "..." if len(item_name) > 50 else item_name,
                 type="KnowledgePoint",
                 properties={
-                    "content": item_name,
+                    "content": snippet or item.snippet or item_name,
                     "snippet": snippet[:200] if snippet else "",
                     "score": item.score,
                     "source_document": source_doc,
@@ -647,21 +731,24 @@ def build_answer_graph_data(
                 ))
 
         # 处理引用信息
-        for citation_dict in (item.citations or []):
-            citation = Citation(
-                chunk_id=citation_dict.get("chunk_id", ""),
-                source=citation_dict.get("source", source_doc),
-                page_number=citation_dict.get("page_number"),
-                page_range=citation_dict.get("page_range"),
-                section=citation_dict.get("section"),
-                heading=citation_dict.get("heading"),
-                sub_section=citation_dict.get("sub_section"),
-                positions=citation_dict.get("positions"),
-                content_type=citation_dict.get("content_type", "text"),
-                snippet=citation_dict.get("snippet", ""),
-                image_url=citation_dict.get("image_url"),
-            )
-            graph_data.citations.append(citation)
+        if max_citations is None or len(graph_data.citations) < max_citations:
+            for citation_dict in (item.citations or []):
+                if max_citations is not None and len(graph_data.citations) >= max_citations:
+                    break
+                citation = Citation(
+                    chunk_id=citation_dict.get("chunk_id", ""),
+                    source=citation_dict.get("source", source_doc),
+                    page_number=citation_dict.get("page_number"),
+                    page_range=citation_dict.get("page_range"),
+                    section=citation_dict.get("section"),
+                    heading=citation_dict.get("heading"),
+                    sub_section=citation_dict.get("sub_section"),
+                    positions=citation_dict.get("positions"),
+                    content_type=citation_dict.get("content_type", "text"),
+                    snippet=citation_dict.get("snippet", ""),
+                    image_url=citation_dict.get("image_url"),
+                )
+                graph_data.citations.append(citation)
 
     # 添加文档节点
     for doc_id, doc_node in doc_nodes.items():
@@ -683,8 +770,7 @@ def build_answer_graph_data(
         for citation_dict in (item.citations or []):
             source_doc = citation_dict.get("source", "")
             if source_doc:
-                stable_hash = hashlib.md5(str(source_doc).encode("utf-8")).hexdigest()[:10]
-                doc_id = f"doc_{stable_hash}"
+                doc_id = _source_doc_node_id(source_doc)
                 edge_key = f"{node_id}-MENTIONED_IN-{doc_id}"
 
                 if edge_key not in seen_edge_keys:
@@ -715,6 +801,10 @@ def build_answer_graph_data(
         graph_data, knowledge_nodes, seen_edge_keys
     )
 
+    # ========== 新增：桥接分散的连通分量 ==========
+    # 为答案展示补充弱语义桥接边，保留原始图谱关系的同时避免组件完全散开。
+    _bridge_disconnected_components(graph_data, seen_edge_keys)
+
     # 统计信息
     graph_data.total_entities = len([n for n in graph_data.nodes if n.type not in ["Source", "KnowledgePoint"]])
     graph_data.total_relations = len(graph_data.edges)
@@ -728,6 +818,176 @@ def build_answer_graph_data(
     )
 
     return graph_data
+
+
+def _bridge_disconnected_components(
+    graph_data: AnswerGraphData,
+    seen_edge_keys: Set[str],
+) -> None:
+    """为多个连通分量补充合成桥接边，便于前端整体展示。"""
+    if len(graph_data.nodes) <= 1:
+        return
+
+    node_by_id = {node.id: node for node in graph_data.nodes}
+    adjacency: Dict[str, Set[str]] = {node.id: set() for node in graph_data.nodes}
+
+    for edge in graph_data.edges:
+        if edge.source not in adjacency or edge.target not in adjacency:
+            continue
+        adjacency[edge.source].add(edge.target)
+        adjacency[edge.target].add(edge.source)
+
+    components: List[Set[str]] = []
+    remaining = set(adjacency.keys())
+
+    while remaining:
+        start = remaining.pop()
+        stack = [start]
+        component = {start}
+        while stack:
+            current = stack.pop()
+            for neighbor in adjacency.get(current, set()):
+                if neighbor in remaining:
+                    remaining.remove(neighbor)
+                    component.add(neighbor)
+                    stack.append(neighbor)
+        components.append(component)
+
+    if len(components) <= 1:
+        return
+
+    type_priority = {
+        "Hospital": 90,
+        "DepartmentGroup": 80,
+        "FunctionalZone": 70,
+        "Space": 60,
+        "DesignMethod": 50,
+        "DesignMethodCategory": 45,
+        "MedicalService": 40,
+        "MedicalEquipment": 40,
+        "TreatmentMethod": 40,
+        "KnowledgePoint": 35,
+        "Case": 30,
+        "Source": 20,
+    }
+
+    def _name_terms(name: str) -> Set[str]:
+        normalized = re.sub(r"\s+", "", (name or "").lower())
+        if not normalized:
+            return set()
+
+        if re.search(r"[\u4e00-\u9fff]", normalized):
+            terms = {normalized}
+            for size in range(min(4, len(normalized)), 1, -1):
+                for idx in range(0, len(normalized) - size + 1):
+                    token = normalized[idx : idx + size]
+                    if re.fullmatch(r"[\u4e00-\u9fff]+", token):
+                        terms.add(token)
+            return terms
+
+        return {
+            token
+            for token in re.split(r"[^a-z0-9]+", normalized)
+            if len(token) >= 3
+        }
+
+    def _candidate_nodes(component_ids: Set[str]) -> List[GraphNode]:
+        candidates = [node_by_id[node_id] for node_id in component_ids if node_id in node_by_id]
+        candidates.sort(
+            key=lambda node: (
+                type_priority.get(node.type, 10),
+                len((node.name or "").strip()),
+            ),
+            reverse=True,
+        )
+        return candidates[:8]
+
+    def _bridge_score(left: GraphNode, right: GraphNode) -> float:
+        left_name = (left.name or "").strip().lower()
+        right_name = (right.name or "").strip().lower()
+        score = float(type_priority.get(left.type, 10) + type_priority.get(right.type, 10)) / 10.0
+
+        if left_name and right_name:
+            shorter, longer = sorted([left_name, right_name], key=len)
+            if len(shorter) >= 2 and shorter in longer:
+                score += 18 + min(len(shorter), 8)
+
+            overlap = _name_terms(left_name) & _name_terms(right_name)
+            if overlap:
+                score += max(min(len(term), 6) for term in overlap) * 4
+
+        if left.type == right.type:
+            score += 8
+
+        pair_types = {left.type, right.type}
+        if pair_types == {"KnowledgePoint", "Space"}:
+            score += 20
+        elif pair_types == {"KnowledgePoint", "FunctionalZone"}:
+            score += 14
+        elif "Source" in pair_types:
+            score -= 6
+
+        return score
+
+    components.sort(
+        key=lambda component: (
+            len(component),
+            sum(type_priority.get(node_by_id[node_id].type, 10) for node_id in component if node_id in node_by_id),
+        ),
+        reverse=True,
+    )
+
+    connected_ids = set(components[0])
+    bridge_count = 0
+
+    for component in components[1:]:
+        source_candidates = _candidate_nodes(component)
+        target_candidates = _candidate_nodes(connected_ids)
+        if not source_candidates or not target_candidates:
+            continue
+
+        best_pair: Optional[tuple[GraphNode, GraphNode]] = None
+        best_score = float("-inf")
+
+        for source_node in source_candidates:
+            for target_node in target_candidates:
+                score = _bridge_score(source_node, target_node)
+                if score > best_score:
+                    best_score = score
+                    best_pair = (source_node, target_node)
+
+        if not best_pair:
+            continue
+
+        source_node, target_node = best_pair
+        edge_key = f"{source_node.id}-BRIDGED_TO-{target_node.id}"
+        reverse_key = f"{target_node.id}-BRIDGED_TO-{source_node.id}"
+        if edge_key in seen_edge_keys or reverse_key in seen_edge_keys:
+            connected_ids.update(component)
+            continue
+
+        seen_edge_keys.add(edge_key)
+        graph_data.edges.append(
+            GraphEdge(
+                source=source_node.id,
+                target=target_node.id,
+                relation="BRIDGED_TO",
+                weight=0.35,
+                properties={
+                    "synthetic": True,
+                    "visual_bridge": True,
+                    "reason": "connect_components",
+                    "bridge_score": round(best_score, 2),
+                },
+            )
+        )
+        adjacency[source_node.id].add(target_node.id)
+        adjacency[target_node.id].add(source_node.id)
+        connected_ids.update(component)
+        bridge_count += 1
+
+    if bridge_count:
+        logger.info("[KnowledgeFusion] Added %d synthetic bridge edges", bridge_count)
 
 
 def _enhance_graph_hierarchy(
@@ -1085,19 +1345,9 @@ def _merge_and_deduplicate_items(
     milvus_items: List[AgentItem],
 ) -> List[AgentItem]:
     """合并并去重 items"""
-    all_items = list(neo4j_items) + list(milvus_items)
+    deduplicated = add_items_with_dedup(neo4j_items, milvus_items)
 
-    # 基于 entity_id 去重
-    seen_ids: Set[str] = set()
-    deduplicated: List[AgentItem] = []
-
-    for item in all_items:
-        key = item.entity_id or str(id(item))
-        if key not in seen_ids:
-            seen_ids.add(key)
-            deduplicated.append(item)
-
-    # 按分数排序
+    # 按分数排序（保持旧行为）
     deduplicated.sort(key=lambda x: x.score or 0.0, reverse=True)
 
     return deduplicated

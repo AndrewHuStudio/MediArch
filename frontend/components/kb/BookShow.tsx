@@ -2,7 +2,6 @@
 
 import { Suspense, useRef, useState, useEffect } from "react"
 import dynamic from "next/dynamic"
-import type * as THREE from "three"
 import { TexturePreloader } from "@/components/book-showcase/texture-preloader"
 import type { BookParams, MaterialProps } from "@/components/book-showcase/types"
 
@@ -28,7 +27,7 @@ interface BookShowProps {
 }
 
 export function BookShow({ coverFront, coverBack, bookIndex = 0 }: BookShowProps) {
-  const meshRef = useRef<THREE.Mesh | null>(null)
+  const meshRef = useRef<any>(null)
   const [isReady, setIsReady] = useState(false)
   const [texturesLoaded, setTexturesLoaded] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)

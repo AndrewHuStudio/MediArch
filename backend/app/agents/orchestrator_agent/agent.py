@@ -12,6 +12,8 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 from langgraph.graph import END, StateGraph
 
 from backend.app.agents.base_agent import AgentRequest, call_structured_llm, get_llm_manager
+from backend.app.agents.online_search_policy import decide_online_search_usage
+from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 try:
     from openai import RateLimitError as OpenAIRateLimitError
@@ -28,8 +30,43 @@ logger = logging.getLogger("orchestrator_agent")
 
 # 默认配置
 DEFAULT_WORKERS = ["neo4j_agent", "milvus_agent", "mongodb_agent", "online_search_agent"]
+DEFAULT_LOCAL_WORKERS = ["neo4j_agent", "milvus_agent", "mongodb_agent"]
 DEFAULT_TOP_K = 20 
 DEFAULT_TIMEOUT_MS = 3000
+
+_HEALTHCARE_ARCHITECTURE_TERMS = (
+    "医院",
+    "医疗",
+    "门诊",
+    "急诊",
+    "住院部",
+    "护理单元",
+    "病房",
+    "手术室",
+    "医技",
+    "护士站",
+    "icu",
+    "ccu",
+    "核医学",
+    "放射",
+    "导向",
+    "候诊",
+    "洁污",
+    "流线",
+    "建筑设计",
+    "设计规范",
+    "空间",
+    "科室",
+)
+
+
+def _resolve_optional_timeout_seconds(env_name: str, default: int) -> Optional[int]:
+    raw = os.getenv(env_name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = default
+    return None if value <= 0 else value
 
 
 # ============================================================================
@@ -81,13 +118,14 @@ class IntentAnalysisResult(BaseModel):
 
 def _init_orchestrator_llm():
     """初始化 Orchestrator LLM"""
-    api_key = os.getenv("MEDIARCH_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         raise ValueError("缺少 MEDIARCH_API_KEY（orchestrator_agent）")
     
-    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
-    model = os.getenv("ORCHESTRATOR_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = get_llm_base_url()
+    model = os.getenv("ORCHESTRATOR_MODEL") or get_llm_model("gpt-4o-mini")
+    model_provider = get_model_provider()
+    timeout_s = _resolve_optional_timeout_seconds("ORCHESTRATOR_TIMEOUT", 30)
     
     return init_chat_model(
         model=model,
@@ -96,7 +134,7 @@ def _init_orchestrator_llm():
         base_url=base_url,
         temperature=0.3,
         max_tokens=12000,
-        timeout=30,
+        timeout=timeout_s,
     )
 
 
@@ -153,6 +191,13 @@ def extract_query_from_messages(messages: List[BaseMessage]) -> str:
     return ""
 
 
+def _looks_like_healthcare_architecture_query(query: str) -> bool:
+    text = (query or "").strip().lower()
+    if not text:
+        return False
+    return any(term in text for term in _HEALTHCARE_ARCHITECTURE_TERMS)
+
+
 # ============================================================================
 # 节点函数
 # ============================================================================
@@ -176,10 +221,23 @@ async def node_extract_query(state: OrchestratorState) -> Dict[str, Any]:
 
 async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
     """分析用户意图"""
+    from backend.app.utils.llm_output_parser import parse_llm_output
+
     query = state.get("extracted_query", "")
     messages = state.get("messages", [])
     
     logger.info(f"[Orchestrator→AnalyzeIntent] 分析意图: {query}")
+
+    # 对明显的医疗建筑问题优先走规则判定，避免 LLM 超时或误判导致 benchmark 无法进入检索链路。
+    if _looks_like_healthcare_architecture_query(query):
+        return {
+            "is_hospital_related": True,
+            "rewritten_query": query,
+            "general_answer": "",
+            "diagnostics": {
+                "intent_reasoning": "rule_based_healthcare_architecture_match",
+            },
+        }
     
     # 构建上下文（最近3轮对话）
     recent_context = []
@@ -257,10 +315,11 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
 
     llm = await get_orchestrator_llm()
     max_attempts = 3
-    last_error: Exception | None = None
+    result: IntentAnalysisResult | None = None
+    structured_error: Exception | None = None
     for attempt in range(1, max_attempts + 1):
         try:
-            result: IntentAnalysisResult = await call_structured_llm(
+            result = await call_structured_llm(
                 llm=llm,
                 pydantic_model=IntentAnalysisResult,
                 messages=[
@@ -268,10 +327,10 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
                     HumanMessage(content=user_prompt),
                 ],
             )
-            last_error = None
+            structured_error = None
             break
         except Exception as e:
-            last_error = e
+            structured_error = e
             if attempt < max_attempts and _is_transient_error(e):
                 delay = min(2.0 * attempt, 6.0)
                 logger.warning(
@@ -283,19 +342,34 @@ async def node_analyze_intent(state: OrchestratorState) -> Dict[str, Any]:
                 )
                 await asyncio.sleep(delay)
                 continue
+            logger.warning("[Orchestrator→AnalyzeIntent] 结构化输出失败，降级为手动解析: %s", e)
+            break
+
+    if result is None:
+        try:
+            raw_result = await llm.ainvoke(
+                [
+                    SystemMessage(content=system_prompt),
+                    HumanMessage(content=user_prompt),
+                ]
+            )
+            parsed = parse_llm_output(
+                output=raw_result,
+                pydantic_model=IntentAnalysisResult,
+                fallback_parser=None,
+            )
+            if parsed is None:
+                raise ValueError("manual parse returned None")
+            result = parsed
+            logger.info("[Orchestrator→AnalyzeIntent] 手动解析成功，继续执行")
+        except Exception as e:
             logger.error("[Orchestrator→AnalyzeIntent] LLM 分析失败", exc_info=True)
+            if structured_error is not None:
+                logger.debug("[Orchestrator→AnalyzeIntent] Structured Output 最后一次错误: %s", structured_error)
             raise RuntimeError(
                 "Orchestrator 结构化输出失败；"
                 "请使用支持结构化输出的 OpenAI 兼容 API。"
             ) from e
-    else:
-        result = None  # for type checkers only
-
-    if last_error is not None:
-        raise RuntimeError(
-            "Orchestrator 结构化输出失败；"
-            "请使用支持结构化输出的 OpenAI 兼容 API。"
-        ) from last_error
 
     rewritten_query = result.rewritten_query.strip() if result.rewritten_query else ""
     if not rewritten_query:
@@ -322,6 +396,7 @@ async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
     rewritten_query = state.get("rewritten_query", "")
     general_answer = state.get("general_answer", "")
     available_workers = state.get("available_workers")
+    request = state.get("request")
     if available_workers is None:
         available_workers = DEFAULT_WORKERS
     
@@ -342,8 +417,18 @@ async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
             "diagnostics": {**diagnostics, "type": "general_question"},
         }
     
+    metadata = request.metadata if isinstance(request, AgentRequest) else {}
+    online_search_decision = decide_online_search_usage(
+        state.get("extracted_query", "") or rewritten_query,
+        include_online_search=bool((metadata or {}).get("include_online_search")),
+        deep_search=bool((metadata or {}).get("deep_search")),
+        thinking_mode=bool((metadata or {}).get("thinking_mode")),
+    )
+
     # 相关问题：选择 Workers
-    workers = [w for w in DEFAULT_WORKERS if w in available_workers]
+    workers = [w for w in DEFAULT_LOCAL_WORKERS if w in available_workers]
+    if online_search_decision["enabled"] and "online_search_agent" in available_workers:
+        workers.append("online_search_agent")
     if not workers:
         workers = list(available_workers or [])
         if not workers:
@@ -358,6 +443,9 @@ async def node_decide_action(state: OrchestratorState) -> Dict[str, Any]:
             **diagnostics,
             "type": "hospital_related",
             "rewritten": rewritten_query != state.get("extracted_query", ""),
+            "online_search_enabled": online_search_decision["enabled"],
+            "online_search_reason": online_search_decision["reason"],
+            "online_search_mode": online_search_decision["search_mode"],
         },
     }
 

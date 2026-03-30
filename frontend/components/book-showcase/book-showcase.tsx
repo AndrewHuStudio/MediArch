@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronRight, ChevronLeft, ChevronUp, ChevronDown } from "lucide-react"
 import { useRouter } from "next/navigation"
-import type * as THREE from "three"
 import type { BookParams, MaterialProps } from "./types"
 import { BookModel } from "./book-canvas"
 import { BookDetails } from "./book-details"
@@ -138,7 +137,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
 
   const [params, setParams] = useState<BookParams>(initialParams)
   const [materialProps, setMaterialProps] = useState<MaterialProps>(defaultMaterialProps)
-  const object2MeshRef = useRef<THREE.Mesh | null>(null)
+  const object2MeshRef = useRef<any>(null)
 
   const triggerHighlight = useCallback(() => {
     setHighlightTrigger((prev) => prev + 1)

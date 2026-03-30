@@ -1,4 +1,4 @@
-"""Milvus Agent - 只导出 graph"""
+"""MongoDB Agent - 只导出 graph"""
 
 from .agent import graph
 

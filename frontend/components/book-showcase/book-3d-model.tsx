@@ -19,20 +19,20 @@ export function Book({
 }: {
   params: BookParams
   materialProps: MaterialProps
-  meshRef: React.MutableRefObject<THREE.Mesh | null>
+  meshRef: React.MutableRefObject<any>
   onReady?: (ready: boolean) => void
   bookIndex?: number
   frontCoverUrl?: string
   backCoverUrl?: string
 }) {
   const { scene } = useGLTF("/models/book_red.glb")
-  const bookRef = useRef<any>()
-  const [bookScene, setBookScene] = useState<THREE.Object3D | null>(null)
-  const [object2Mesh, setObject2Mesh] = useState<THREE.Mesh | null>(null)
+  const bookRef = useRef<any>(null)
+  const [bookScene, setBookScene] = useState<any>(null)
+  const [object2Mesh, setObject2Mesh] = useState<any>(null)
   const [uvGenerated, setUvGenerated] = useState(false)
-  const [defaultTexture, setDefaultTexture] = useState<THREE.Texture | null>(null)
-  const [backCoverTexture, setBackCoverTexture] = useState<THREE.Texture | null>(null)
-  const [combinedTexture, setCombinedTexture] = useState<THREE.Texture | null>(null)
+  const [defaultTexture, setDefaultTexture] = useState<any>(null)
+  const [backCoverTexture, setBackCoverTexture] = useState<any>(null)
+  const [combinedTexture, setCombinedTexture] = useState<any>(null)
   const [currentBookIndex, setCurrentBookIndex] = useState<number>(bookIndex)
 
   const isReady = uvGenerated && combinedTexture && object2Mesh
@@ -62,7 +62,7 @@ export function Book({
 
       const loadTextureWithFallback = (
         path: string,
-        onLoad: (texture: THREE.Texture) => void,
+        onLoad: (texture: any) => void,
         onError: (error: any) => void,
       ) => {
         // Try to use preloaded image first
@@ -132,8 +132,8 @@ export function Book({
         const geode = sketchfabModel.getObjectByName("Geode")
         if (geode) {
           const object2 = geode.getObjectByName("Object_2")
-          if (object2 && (object2 as THREE.Mesh).material) {
-            const mesh = object2 as THREE.Mesh
+          if (object2 && (object2 as any).material) {
+            const mesh = object2 as any
             console.log("Found Object_2 - book cover material loaded")
 
             generateUVForBothCovers(mesh)
@@ -153,7 +153,7 @@ export function Book({
     }
   }, [bookScene, meshRef, uvGenerated])
 
-  const createCombinedTexture = (frontTexture: THREE.Texture, backTexture: THREE.Texture) => {
+  const createCombinedTexture = (frontTexture: any, backTexture: any) => {
     const canvas = document.createElement("canvas")
     const ctx = canvas.getContext("2d")
     if (!ctx) return null
@@ -192,7 +192,7 @@ export function Book({
     }
   }, [defaultTexture, backCoverTexture])
 
-  const applyMaterialToMesh = (mesh: THREE.Mesh, props: MaterialProps) => {
+  const applyMaterialToMesh = (mesh: any, props: MaterialProps) => {
     let material = mesh.userData.originalMaterial || mesh.material
     if (Array.isArray(material)) {
       material = material[0]

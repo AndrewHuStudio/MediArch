@@ -47,7 +47,7 @@ except ImportError as e:
     from indexing.pipeline import IngestionPipeline
     print("[OK] Successfully imported IngestionPipeline (alternative method)")
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 # 加载环境变量
 env_path = project_root / ".env"

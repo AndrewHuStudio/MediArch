@@ -27,6 +27,9 @@ _project_root = os.path.dirname(_backend_dir)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+if sys.platform == "win32" and hasattr(asyncio, "WindowsSelectorEventLoopPolicy"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,13 +39,33 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 # 导入路由
 from backend.api.routers import chat, health, knowledge_base, documents, knowledge_graph
+from data_process.api import router as data_process_router
 
 # 导入核心组件
 from backend.api.core.config import settings
 from backend.api.core.logging_config import setup_logging
+from backend.app.agents.postgres_deployment_policy import (
+    validate_required_postgres_persistence,
+)
 
 # 设置日志
 logger = setup_logging()
+
+
+def _validate_required_persistence_backends() -> None:
+    from backend.app.agents.mediarch_graph import (
+        CHECKPOINTER_RUNTIME_STATUS,
+        STORE_RUNTIME_STATUS,
+    )
+
+    validate_required_postgres_persistence(
+        require_postgres=settings.REQUIRE_POSTGRES_PERSISTENCE,
+        component_statuses={
+            "checkpointer": CHECKPOINTER_RUNTIME_STATUS,
+            "store": STORE_RUNTIME_STATUS,
+            "api_sessions": chat.SESSION_REPOSITORY_RUNTIME_STATUS,
+        },
+    )
 
 # ============================================================================
 # 生命周期管理
@@ -69,9 +92,26 @@ async def lifespan(app: FastAPI):
 
     # 启动时初始化
     try:
+        _validate_required_persistence_backends()
+
         # 预热 LangGraph MediArch Graph（可选，提升首次请求速度）
         if settings.PRELOAD_SUPERVISOR:
             from backend.app.agents.mediarch_graph import graph as mediarch_graph
+            from backend.app.agents.mediarch_graph import SQLITE_CHECKPOINT_PATH
+            from backend.app.agents.persistence import SQLiteCheckpointSaver
+            # 初始化异步 Postgres checkpointer（open pool + create tables）
+            _ckpt = getattr(mediarch_graph, 'checkpointer', None)
+            if _ckpt is not None and hasattr(_ckpt, '_pool'):
+                try:
+                    await _ckpt._pool.open()
+                    await _ckpt.setup()
+                    logger.info("[OK] AsyncPostgresSaver pool opened & tables created")
+                except Exception as ckpt_error:
+                    logger.warning(
+                        "[WARN] AsyncPostgresSaver init failed, fallback to SQLiteCheckpointSaver: %s",
+                        ckpt_error,
+                    )
+                    mediarch_graph.checkpointer = SQLiteCheckpointSaver(SQLITE_CHECKPOINT_PATH)
             logger.info("[OK] LangGraph MediArch Graph 预热成功")
 
         # 初始化数据库连接池（如需要）
@@ -285,6 +325,11 @@ app.include_router(
     tags=["Knowledge Graph"]
 )
 
+app.include_router(
+    data_process_router,
+    tags=["Data Processing"]
+)
+
 # ============================================================================
 # 根路径（健康检查）
 # ============================================================================
@@ -325,12 +370,6 @@ async def ping():
 # ============================================================================
 
 if __name__ == "__main__":
-    import uvicorn
+    from backend.api.__main__ import main
 
-    uvicorn.run(
-        "backend.api.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,  # 开发模式：代码变更自动重载
-        log_level="info",
-    )
+    main()

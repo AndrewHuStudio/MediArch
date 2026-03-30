@@ -10,7 +10,7 @@
 import argparse
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 load_dotenv()
 
@@ -72,7 +72,6 @@ def main():
 
     # 新增：build 子命令
     p_build = subparsers.add_parser("build", help="从 Mongo 构建知识图谱")
-    p_build.add_argument("--schema", type=str, default="backend/databases/graph/schemas/medical_architecture.json", help="Schema 路径")
     p_build.add_argument("--chunk-collection", type=str, help="MongoDB chunk 集合名，默认为环境变量或 mediarch_chunks")
 
     args = parser.parse_args()
@@ -85,7 +84,7 @@ def main():
         from backend.databases.graph.builders.kg_builder import MedicalKGBuilder
         if args.chunk_collection:
             os.environ["MONGODB_CHUNK_COLLECTION"] = args.chunk_collection
-        builder = MedicalKGBuilder(schema_path=args.schema)
+        builder = MedicalKGBuilder()
         print("[STEP] 从MongoDB读取文档chunks...")
         stats = builder.build_from_mongodb()
         print("[STEP] 写入Neo4j...")

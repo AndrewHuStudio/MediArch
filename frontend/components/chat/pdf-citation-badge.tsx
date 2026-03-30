@@ -1,6 +1,7 @@
 "use client"
 
 import type { PDFSource } from "./pdf-source-card"
+import { useT } from "@/lib/i18n"
 
 // 重新导出 PDFSource 类型以便其他文件导入
 export type { PDFSource } from "./pdf-source-card"
@@ -13,13 +14,14 @@ interface PDFCitationBadgeProps {
 }
 
 export function PDFCitationBadge({ source, citationNumber, onClick, style }: PDFCitationBadgeProps) {
+  const { t } = useT()
   return (
     <button
       type="button"
       className="absolute pointer-events-auto rounded-md border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-200 shadow-sm hover:bg-blue-500/20 transition-colors"
       style={style}
       onClick={onClick}
-      title={`${source.title} · 第 ${source.pageNumber} 页`}
+      title={`${source.title} · ${t('pdf.page', { n: source.pageNumber })}`}
     >
       {citationNumber}
     </button>

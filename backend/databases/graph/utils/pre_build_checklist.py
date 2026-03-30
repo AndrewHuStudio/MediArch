@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -17,7 +18,8 @@ from datetime import datetime
 project_root = Path(__file__).resolve().parents[4]
 sys.path.append(str(project_root))
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
+from backend.llm_env import get_api_key, get_kg_base_url, get_kg_model
 from pymongo import MongoClient
 from neo4j import GraphDatabase
 from pymilvus import connections, Collection
@@ -42,14 +44,61 @@ class PreBuildChecker:
         """添加警告"""
         self.warnings.append(message)
 
+    def _discover_kg_regression_tests(self) -> List[Path]:
+        """发现 KG 相关回归测试文件。"""
+        tests_dir = project_root / "backend" / "databases" / "graph" / "tests"
+        if not tests_dir.exists():
+            return []
+        return sorted(
+            path for path in tests_dir.glob("test_*.py") if path.is_file()
+        )
+
+    def _run_kg_regression_tests(self, test_files: List[Path]) -> Tuple[bool, str]:
+        """执行 KG 回归测试，并返回摘要。"""
+        if not test_files:
+            return False, "未发现 KG 回归测试文件"
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "pytest",
+            *[
+                str(path.relative_to(project_root)) if path.is_absolute() else str(path)
+                for path in test_files
+            ],
+            "-q",
+        ]
+
+        try:
+            completed = subprocess.run(
+                cmd,
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except Exception as e:
+            return False, f"pytest 执行失败: {e}"
+
+        output_lines = [
+            line.strip()
+            for line in (completed.stdout or "").splitlines() + (completed.stderr or "").splitlines()
+            if line.strip()
+        ]
+        summary = output_lines[-1] if output_lines else "pytest 未输出摘要"
+
+        if completed.returncode == 0:
+            return True, summary
+        return False, summary
+
     def check_environment_variables(self) -> bool:
         """检查环境变量配置"""
         print("\n[1/8] 检查环境变量配置...")
 
-        # KG 构建 LLM 配置（支持两种前缀：KG_OPENAI_* 或 OPENAI_*）
-        kg_api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        kg_base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-        kg_model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or ""
+        # KG 构建 LLM 配置
+        kg_api_key = get_api_key()
+        kg_base_url = get_kg_base_url()
+        kg_model = get_kg_model("")
 
         # 数据库配置（必需）
         required_db_vars = [
@@ -72,11 +121,11 @@ class PreBuildChecker:
 
         missing: List[str] = []
         if not kg_api_key:
-            missing.append("KG_OPENAI_API_KEY/OPENAI_API_KEY")
+            missing.append("MEDIARCH_API_KEY")
         if not kg_base_url:
-            missing.append("KG_OPENAI_BASE_URL/OPENAI_BASE_URL")
+            missing.append("MEDIARCH_KG_BASE_URL/MEDIARCH_LLM_BASE_URL")
         if not kg_model:
-            missing.append("KG_OPENAI_MODEL/OPENAI_MODEL")
+            missing.append("MEDIARCH_KG_MODEL/MEDIARCH_LLM_MODEL")
 
         for var in required_db_vars:
             if not os.getenv(var):
@@ -91,11 +140,7 @@ class PreBuildChecker:
         milvus_configured = all(os.getenv(v) for v in optional_milvus_vars)
 
         detail_parts = ["必需变量已配置"]
-        # 说明 KG LLM 使用的是哪一套前缀
-        if os.getenv("KG_OPENAI_API_KEY"):
-            detail_parts.append("KG LLM: KG_OPENAI_*")
-        else:
-            detail_parts.append("KG LLM: OPENAI_* (fallback)")
+        detail_parts.append("KG LLM: MEDIARCH_*")
 
         if vlm_configured:
             detail_parts.append("VLM已配置")
@@ -306,7 +351,11 @@ class PreBuildChecker:
         print("\n[7/8] 检查跨章节/跨文档引用能力...")
 
         # 检查schema中的MENTIONED_IN和REFERENCES关系
-        schema_path = Path("backend/databases/graph/schemas/medical_architecture.json")
+        schema_env = (os.getenv("KG_SCHEMA_PATH") or "").strip()
+        if not schema_env:
+            self.add_check("跨文档引用", False, "KG_SCHEMA_PATH 未配置")
+            return False
+        schema_path = Path(schema_env)
 
         if not schema_path.exists():
             self.add_check("跨文档引用", False, "schema文件不存在")
@@ -374,13 +423,18 @@ class PreBuildChecker:
                 self.add_check("KG构建器", False, f"缺少方法: {', '.join(missing_methods)}")
                 return False
 
-            # 检查单元测试是否通过
-            test_file = Path("backend/databases/graph/tests/test_kg_builder.py")
-            if test_file.exists():
-                detail = "核心方法就绪, 单元测试已通过 (27/27)"
+            test_files = self._discover_kg_regression_tests()
+            if test_files:
+                tests_ok, tests_detail = self._run_kg_regression_tests(test_files)
+                if tests_ok:
+                    detail = f"核心方法就绪, KG回归测试通过 ({tests_detail})"
+                else:
+                    self.add_check("KG回归测试", False, tests_detail)
+                    builder.close()
+                    return False
             else:
                 detail = "核心方法就绪"
-                self.add_warning("单元测试文件不存在，建议运行测试确保质量")
+                self.add_warning("未发现 KG 回归测试文件，建议补充稳定测试基线")
 
             self.add_check("KG构建器", True, detail)
 

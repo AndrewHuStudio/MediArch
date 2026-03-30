@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { Lightbulb } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 interface SuggestedQuestionsProps {
   questions: string[]
@@ -19,6 +20,7 @@ export function SuggestedQuestions({
 }: SuggestedQuestionsProps) {
   // 限制显示的问题数量，默认最多4个
   const displayQuestions = questions.slice(0, maxQuestions)
+  const { t } = useT()
 
   return (
     <motion.div
@@ -29,7 +31,7 @@ export function SuggestedQuestions({
     >
       <div className="flex items-center gap-2 mb-2">
         <Lightbulb className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-xs text-gray-400 font-medium">推荐问题</span>
+        <span className="text-xs text-gray-400 font-medium">{t('chat.suggestedQuestions')}</span>
       </div>
 
       {/* 使用 2x2 网格布局，更紧凑 */}

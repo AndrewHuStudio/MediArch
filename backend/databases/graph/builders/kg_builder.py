@@ -27,8 +27,15 @@ import time
 
 import nanoid
 import networkx as nx
-from dotenv import load_dotenv
-from backend.databases.graph.optimization.name_normalizer import canonicalize, compose_scope_key, load_alias_map
+from backend.env_loader import load_dotenv
+from backend.llm_env import get_api_key, get_kg_base_url, get_kg_model
+from backend.databases.graph.optimization.name_normalizer import (
+    canonicalize,
+    compose_scope_key,
+    detect_synonyms_llm,
+    load_alias_map,
+    normalize_numbers,
+)
 from neo4j import GraphDatabase
 from pymongo import MongoClient
 from backend.databases.graph.utils.call_llm_api import LLMClient
@@ -44,19 +51,36 @@ load_dotenv()
 
 class MedicalKGBuilder:
     """医疗建筑知识图谱构建器（Neo4j 图谱构建）"""
-    
-    def __init__(
-        self,
-        schema_path: str = "backend/databases/graph/schemas/medical_architecture_3.json"
-    ):
-        """
-        初始化构建器
 
-        Args:
-            schema_path: Schema文件路径
-        """
-        # 加载Schema（支持环境变量 KG_SCHEMA_PATH 覆盖）
-        resolved_schema_path = os.getenv("KG_SCHEMA_PATH", schema_path)
+    SCHEMA_ENV_VAR = "KG_SCHEMA_PATH"
+    SOURCE_TYPE_CREDIBILITY = {
+        "规范标准": 0.95,
+        "政策文件": 0.90,
+        "学术文献": 0.85,
+        "图集书籍": 0.80,
+        "项目文档": 0.70,
+        "会议纪要": 0.65,
+    }
+
+    @staticmethod
+    def _env_flag(name: str, default: str = "0") -> bool:
+        return os.getenv(name, default).lower() in {"1", "true", "yes"}
+
+    @staticmethod
+    def _env_int(name: str, default: int, minimum: Optional[int] = None) -> int:
+        try:
+            value = int(os.getenv(name, str(default)))
+        except Exception:
+            value = default
+        if minimum is not None:
+            value = max(minimum, value)
+        return value
+
+    def __init__(self, build_mode: Optional[str] = None):
+        """初始化构建器"""
+        self.build_mode = (str(build_mode).strip().lower() if build_mode is not None else None) or None
+        # 加载Schema：只允许通过环境变量配置
+        resolved_schema_path = self._require_schema_path()
         self.schema = self.load_schema(resolved_schema_path)
         # 同时支持 Labels / NodeConcepts 两种定义方式
         node_defs = self.schema.get("Labels") or self.schema.get("NodeConcepts") or []
@@ -167,10 +191,9 @@ class MedicalKGBuilder:
         )
         
         # 初始化LLM Client（统一封装）
-        # 支持两种环境变量前缀：KG_OPENAI_* 或 OPENAI_*（向下兼容）
-        api_key = os.getenv("KG_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("KG_OPENAI_BASE_URL") or os.getenv("OPENAI_BASE_URL")
-        model = os.getenv("KG_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+        api_key = get_api_key()
+        base_url = get_kg_base_url()
+        model = get_kg_model("gpt-4o-mini")
 
         self.llm_client = LLMClient(
             api_key=api_key,
@@ -181,14 +204,14 @@ class MedicalKGBuilder:
         # 是否将图片作为图节点进行回链（默认关闭，改为检索层召回）
         self.link_images = os.getenv("KG_LINK_IMAGES", "0").lower() in {"1", "true", "yes"}
         # 语义相似度消歧（候选建议）
-        self.enable_semantic_fusion = os.getenv("KG_ENTITY_FUSION", "0").lower() in {"1", "true", "yes"}
+        self.enable_semantic_fusion = self._env_flag("KG_ENTITY_FUSION", "0")
         self.fusion_ratio = float(os.getenv("KG_FUSION_RATIO", "0.90"))
-        self.fusion_max_pairs = int(os.getenv("KG_FUSION_MAX_PAIRS", "50"))
+        self.fusion_max_pairs = self._env_int("KG_FUSION_MAX_PAIRS", 50, minimum=1)
         # 自动别名链接（强匹配对写入别名边，不做节点合并）
-        self.auto_alias_links = os.getenv("KG_FUSION_AUTO_ALIAS", "0").lower() in {"1", "true", "yes"}
+        self.auto_alias_links = self._env_flag("KG_FUSION_AUTO_ALIAS", "0")
         self.alias_min_score = float(os.getenv("KG_FUSION_ALIAS_MIN_SCORE", "0.96"))
-        self.alias_min_overlap = int(os.getenv("KG_FUSION_ALIAS_MIN_REL_OVERLAP", "1"))
-        self.alias_max_edges = int(os.getenv("KG_FUSION_ALIAS_MAX_EDGES", "200"))
+        self.alias_min_overlap = self._env_int("KG_FUSION_ALIAS_MIN_REL_OVERLAP", 1, minimum=1)
+        self.alias_max_edges = self._env_int("KG_FUSION_ALIAS_MAX_EDGES", 200, minimum=1)
         # 实体别名映射（用于名称归一，影响稳定ID生成）
         self.alias_map = load_alias_map(os.getenv("KG_ALIAS_PATH", ""))
         # 抽取版本号：由 schema 哈希 + LLM 型号 组成，用于幂等与缓存
@@ -202,18 +225,38 @@ class MedicalKGBuilder:
             ("项目文档", {"项目", "方案", "案例", "report", "设计"}),
             ("会议纪要", {"会议", "纪要"}),
         ]
+        self.source_type_credibility = dict(self.SOURCE_TYPE_CREDIBILITY)
         self._source_node_cache: Dict[str, str] = {}
 
         # Schema 模式：strict（严格）/ soft（默认），soft 会对未知类型做启发式/LLM 归类
         self.schema_mode_soft = (os.getenv("KG_SCHEMA_MODE", "soft").lower() in {"soft", "0", "false"} and True) or (os.getenv("KG_SCHEMA_MODE", "soft").lower() == "soft")
         # 实体类型 LLM 兜底开关
-        self.entity_type_llm_fallback = os.getenv("KG_ENTITY_TYPE_LLM_FALLBACK", "0").lower() in {"1", "true", "yes"}
+        self.entity_type_llm_fallback = self._env_flag("KG_ENTITY_TYPE_LLM_FALLBACK", "0")
         # 关系验证 LLM 兜底开关
-        self.relation_llm_fallback = os.getenv("KG_RELATION_LLM_FALLBACK", "0").lower() in {"1", "true", "yes"}
+        self.relation_llm_fallback = self._env_flag("KG_RELATION_LLM_FALLBACK", "0")
+        self._relation_verification_cache: Dict[Tuple[str, str, str, str, str, str], bool] = {}
         
         # 构建选项
-        self.enable_cooccurrence_aug = os.getenv("KG_RELATION_COOC_AUG", "1").lower() in {"1", "true", "yes"}
-        self.drop_uncertain_relations = os.getenv("KG_RELATION_DROP_UNCERTAIN", "0").lower() in {"1", "true", "yes"}
+        self.enable_cooccurrence_aug = self._env_flag("KG_RELATION_COOC_AUG", "1")
+        self.drop_uncertain_relations = self._env_flag("KG_RELATION_DROP_UNCERTAIN", "0")
+        self.use_schema_guidance = self._env_flag("KG_USE_SCHEMA_GUIDANCE", "1")
+        self.ea_max_rounds = self._env_int("KG_EA_MAX_ROUNDS", 3, minimum=1)
+        self.ea_convergence_threshold = self._env_int(
+            "KG_EA_CONVERGENCE_THRESHOLD", 2, minimum=0
+        )
+        self.enable_rules_aug = self._env_flag("KG_RULES_AUG", "1")
+        self.enable_latent_discovery = self._env_flag("KG_LATENT_DISCOVERY", "1")
+        self.relation_refine_with_llm = self._env_flag("KG_RELATION_REFINE_LLM", "1")
+        self.cooccur_window = (
+            self._env_int("KG_COOCCUR_WINDOW", 3, minimum=0)
+            if os.getenv("KG_COOCCUR_WINDOW") is not None
+            else None
+        )
+        self.cooccur_min_support = (
+            self._env_int("KG_COOCCUR_MIN_SUPPORT", 3, minimum=1)
+            if os.getenv("KG_COOCCUR_MIN_SUPPORT") is not None
+            else None
+        )
 
         cooccur_pairs_env = os.getenv("KG_COOCCUR_ALLOWED_TYPES", "").strip()
         if not cooccur_pairs_env:
@@ -247,7 +290,7 @@ class MedicalKGBuilder:
                 if a and b:
                     self.cooccur_allowed_pairs.add((a, b))
                     self.cooccur_allowed_pairs.add((b, a))
-        self.cooccur_write_cooccur = os.getenv("KG_COOCCUR_WRITE_CO_OCCUR", "0").lower() in {"1", "true", "yes"}
+        self.cooccur_write_cooccur = self._env_flag("KG_COOCCUR_WRITE_CO_OCCUR", "0")
 
         self.last_write_summary: Dict[str, Any] = {}
 
@@ -289,6 +332,39 @@ class MedicalKGBuilder:
         # 扩展允许的关系类型，加入弱证据关系
         if isinstance(self.allowed_relation_types, set):
             self.allowed_relation_types.add("CO_OCCUR")
+
+    def apply_runtime_profile(
+        self,
+        *,
+        use_schema_guidance: Optional[bool] = None,
+        ea_max_rounds: Optional[int] = None,
+        ea_convergence_threshold: Optional[int] = None,
+        enable_rules_aug: Optional[bool] = None,
+        enable_latent_discovery: Optional[bool] = None,
+        relation_refine_with_llm: Optional[bool] = None,
+    ) -> None:
+        """覆写运行时阶段配置，避免策略层散落依赖环境变量。"""
+        if use_schema_guidance is not None:
+            self.use_schema_guidance = bool(use_schema_guidance)
+        if ea_max_rounds is not None:
+            self.ea_max_rounds = max(1, int(ea_max_rounds))
+        if ea_convergence_threshold is not None:
+            self.ea_convergence_threshold = max(0, int(ea_convergence_threshold))
+        if enable_rules_aug is not None:
+            self.enable_rules_aug = bool(enable_rules_aug)
+        if enable_latent_discovery is not None:
+            self.enable_latent_discovery = bool(enable_latent_discovery)
+        if relation_refine_with_llm is not None:
+            self.relation_refine_with_llm = bool(relation_refine_with_llm)
+
+    @classmethod
+    def _require_schema_path(cls) -> str:
+        schema_path = (os.getenv(cls.SCHEMA_ENV_VAR) or "").strip()
+        if not schema_path:
+            raise RuntimeError(
+                f"{cls.SCHEMA_ENV_VAR} environment variable is required."
+            )
+        return schema_path
 
     def _load_concept_node_index(self) -> Dict[str, Dict[str, str]]:
         """
@@ -434,6 +510,8 @@ class MedicalKGBuilder:
         - 稳定 ID = hash(标准化名字 + 类型 + 作用域)
         - 已存在则只追加 chunk_id / 补充描述
         """
+        scope_key = compose_scope_key(scope_chain or [])
+
         # 0) 概念节点：优先引用预注入骨架（全局唯一，避免重复创建）
         if entity_type:
             label = self.concept_to_label.get(entity_type)
@@ -450,6 +528,8 @@ class MedicalKGBuilder:
                         props["chunk_ids"] = chunk_ids
                         # 以 schema_type 驱动后续写入标签匹配
                         props.setdefault("schema_type", entity_type)
+                        if scope_key and not props.get("scope_key"):
+                            props["scope_key"] = scope_key
                         if description:
                             existing_desc = props.get("description")
                             if not existing_desc or (description not in existing_desc and len(description) > len(existing_desc)):
@@ -463,6 +543,8 @@ class MedicalKGBuilder:
                             "attributes": [],
                             "schema_type": entity_type,
                         }
+                        if scope_key:
+                            properties["scope_key"] = scope_key
                         if description:
                             properties["description"] = description
                         self.graph.add_node(
@@ -488,6 +570,8 @@ class MedicalKGBuilder:
             props["chunk_ids"] = chunk_ids
             if entity_type and not props.get("schema_type"):
                 props["schema_type"] = entity_type
+            if scope_key and not props.get("scope_key"):
+                props["scope_key"] = scope_key
             if description:
                 existing_desc = props.get("description")
                 if not existing_desc:
@@ -506,6 +590,8 @@ class MedicalKGBuilder:
         }
         if entity_type:
             properties["schema_type"] = entity_type
+        if scope_key:
+            properties["scope_key"] = scope_key
         if description:
             properties["description"] = description
 
@@ -589,6 +675,11 @@ class MedicalKGBuilder:
             or chunk_data.get("doc_type")
             or chunk_data.get("doc_category")
         )
+        credibility_map = getattr(
+            self,
+            "source_type_credibility",
+            self.SOURCE_TYPE_CREDIBILITY,
+        )
         node_id = self._generate_stable_entity_id(normalized_title, "资料来源")
         chunk_id = str(chunk_data.get("chunk_id") or chunk_data.get("_id") or "")
         doc_id = str(chunk_data.get("doc_id") or "")
@@ -605,12 +696,15 @@ class MedicalKGBuilder:
                 props["source_type"] = source_type
             if normalized_title and not props.get("title"):
                 props["title"] = normalized_title
+            if props.get("credibility") is None:
+                props["credibility"] = credibility_map.get(source_type, 0.75)
             self.graph.nodes[node_id]["properties"] = props
         else:
             properties = {
                 "title": normalized_title,
                 "schema_type": "资料来源",
                 "source_type": source_type,
+                "credibility": credibility_map.get(source_type, 0.75),
                 "chunk_ids": [chunk_id] if chunk_id else [],
                 "doc_ids": [doc_id] if doc_id else [],
             }
@@ -884,25 +978,33 @@ class MedicalKGBuilder:
     
     def load_schema(self, schema_path: str) -> Dict[str, Any]:
         """加载领域schema"""
-        try:
-            with open(schema_path, 'r', encoding='utf-8') as f:
-                schema = json.load(f)
-                node_defs = schema.get('Labels') or schema.get('NodeConcepts') or []
-                label_count = len(node_defs)
-                print(f"[OK] Loaded schema with {label_count} label types, "
-                      f"{len(schema.get('Relations', []))} relation types")
-                return schema
-        except FileNotFoundError:
-            print(f"[WARN] Schema file not found: {schema_path}")
-            return {}
+        if not os.path.exists(schema_path):
+            raise FileNotFoundError(
+                f"Schema file not found: {schema_path}. "
+                "Please ensure medical_architecture.json exists."
+            )
+        with open(schema_path, 'r', encoding='utf-8') as f:
+            schema = json.load(f)
+            node_defs = schema.get('Labels') or schema.get('NodeConcepts') or []
+            label_count = len(node_defs)
+            print(f"[OK] Loaded schema with {label_count} label types, "
+                  f"{len(schema.get('Relations', []))} relation types")
+            return schema
     
-    def get_construction_prompt(self, chunk_text: str, content_type: str = "text") -> str:
+    def get_construction_prompt(
+        self,
+        chunk_text: str,
+        content_type: str = "text",
+        known_entities: Optional[str] = None,
+        round_idx: int = 0,
+    ) -> str:
         """
         生成实体和关系提取的Prompt
 
         优化点：根据content_type（text/image/table）使用不同的提取策略
         """
-        schema_str = json.dumps(self.schema, ensure_ascii=False, indent=2)
+        use_schema_guidance = getattr(self, "use_schema_guidance", True)
+        schema_str = json.dumps(self.schema, ensure_ascii=False, indent=2) if use_schema_guidance else ""
 
         # 根据content_type选择前缀提示
         if content_type == "image":
@@ -939,16 +1041,30 @@ class MedicalKGBuilder:
 
 """
 
-        prompt = f"""{type_specific_intro}
-**领域Schema**（参考，但不限于）：
-{schema_str}
+        schema_section = ""
+        if use_schema_guidance:
+            schema_section = f"**领域Schema**（参考，但不限于）：\n{schema_str}\n\n"
 
-**提取规则**：
-1. **实体类型**：优先且尽量只使用 Schema 的 Labels 类型（医院／部门／功能分区／空间／设计方法／医疗服务／医疗设备／治疗方法／案例／资料来源）
+        entity_type_rule = (
+            "1. **实体类型**：优先且尽量只使用 Schema 的 Labels 类型（医院／部门／功能分区／空间／设计方法分类／设计方法／医疗服务／医疗设备／治疗方法／案例／资料来源）"
+            if use_schema_guidance
+            else "1. **实体类型**：根据文本语义抽取清晰、稳定的实体类型，不强制受 Schema 限制，但名称必须简洁一致"
+        )
+        relation_type_rule = (
+            "2. **关系类型**：优先使用 Schema 中的 Relations（MENTIONED_IN / CONTAINS / CONNECTED_TO / ADJACENT_TO / REQUIRES / GUIDES / PROVIDES / PERFORMED_IN / USES / SUPPORTS / REFERENCES / REFERS_TO / IS_TYPE_OF / RELATES_TO）"
+            if use_schema_guidance
+            else "2. **关系类型**：根据文本语义抽取最贴近事实的关系，不强制受 Schema 关系集合限制"
+        )
+
+        prompt = f"""{type_specific_intro}
+{schema_section}**提取规则**：
+{entity_type_rule}
+
    - **医院**：独立医疗机构（如：综合医院、专科医院、诊所、社区卫生中心）
    - **部门**：医院内的一级组织单元（如：门诊部、急诊部、住院部、医技部）
    - **功能分区**：部门内的功能区块（如：手术部、ICU、急救区、检查治疗区、公共区）
    - **空间**：最小物理单元（如：手术间、病房、诊室、治疗室、门厅、护士站）
+   - **设计方法分类**：设计方法的上位分类（如：动线设计、净化设计、感控设计、采光设计、时效设计）
    - **设计方法**：设计原则、技术指标、工艺流程（如：洁净手术部三区划分、风压梯度控制、气流组织设计）
    - **医疗服务**：诊疗、护理、检查等服务项目（如：急诊抢救、血液透析、CT检查）
    - **医疗设备**：用于诊疗/监护的设备（如：手术机器人、呼吸机、透析机）
@@ -957,7 +1073,7 @@ class MedicalKGBuilder:
    - ⚠️ 注意区分：急救中心、手术部→功能分区；急诊部→部门；综合医院→医院
    - 🔥 **重要**：PDF文件名（如"XX.pdf"）、带书名号的书籍名（如《XX》）必须识别为"资料来源"，不要误识别为其他类型
 
-2. **关系类型**：优先使用 Schema 中的 Relations（MENTIONED_IN / CONTAINS / CONNECTED_TO / ADJACENT_TO / REQUIRES / GUIDES / PROVIDES / PERFORMED_IN / USES / SUPPORTS / REFERENCES / REFERS_TO）
+{relation_type_rule}
 
    **重点A - 空间连接网络**（核心要求）：
    * 当 chunk 中出现 ≥2 个空间或功能分区时，必须判定它们之间的空间关系（CONNECTED_TO / ADJACENT_TO / CONTAINS / REQUIRES）
@@ -1128,8 +1244,128 @@ class MedicalKGBuilder:
 
 请返回JSON格式的提取结果："""
 
+        if known_entities and round_idx > 0:
+            prompt += (
+                f"\n\n--- 已提取的实体（第 {round_idx + 1} 轮补充提取）---\n"
+                "以下实体已在前几轮中提取，请勿重复输出，重点发现此前遗漏的实体、属性和关系：\n"
+                f"{known_entities}\n"
+                "请优先补充被提及但尚未抽取的空间、设备、服务、设计方法，以及与已知实体相关的新关系。"
+            )
+
         return prompt
-    
+
+    @staticmethod
+    def _format_known_entities(entities: Dict[str, Any]) -> str:
+        lines: List[str] = []
+        for name, info in (entities or {}).items():
+            entity_type = info.get("type", "未知") if isinstance(info, dict) else "未知"
+            lines.append(f"- {name} ({entity_type})")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _merge_extraction_round(
+        aggregate: Dict[str, Any],
+        extracted: Dict[str, Any],
+    ) -> int:
+        all_entities = aggregate.setdefault("entities", {})
+        all_attributes = aggregate.setdefault("attributes", {})
+        all_triples = aggregate.setdefault("triples", [])
+
+        new_entity_count = 0
+        for name, info in (extracted.get("entities") or {}).items():
+            if name not in all_entities:
+                all_entities[name] = info
+                new_entity_count += 1
+                continue
+            if isinstance(info, dict) and isinstance(all_entities.get(name), dict):
+                existing = all_entities[name]
+                if info.get("type") and not existing.get("type"):
+                    existing["type"] = info["type"]
+                if len(info.get("description", "")) > len(existing.get("description", "")):
+                    existing["description"] = info["description"]
+
+        for name, attrs in (extracted.get("attributes") or {}).items():
+            if name not in all_attributes:
+                all_attributes[name] = dict(attrs) if isinstance(attrs, dict) else attrs
+                continue
+            if isinstance(attrs, dict) and isinstance(all_attributes.get(name), dict):
+                all_attributes[name].update(attrs)
+            elif attrs and not all_attributes.get(name):
+                all_attributes[name] = attrs
+
+        seen_triples = {
+            tuple(triple)
+            for triple in all_triples
+            if isinstance(triple, (list, tuple)) and len(triple) == 3
+        }
+        for triple in (extracted.get("triples") or []):
+            if not isinstance(triple, (list, tuple)) or len(triple) != 3:
+                continue
+            triple_key = tuple(triple)
+            if triple_key in seen_triples:
+                continue
+            all_triples.append(list(triple))
+            seen_triples.add(triple_key)
+
+        return new_entity_count
+
+    def _extract_entities_multi_round(
+        self,
+        chunk_text: str,
+        content_type: str = "text",
+    ) -> Optional[Dict[str, Any]]:
+        max_rounds = max(
+            1, int(getattr(self, "ea_max_rounds", self._env_int("KG_EA_MAX_ROUNDS", 3, minimum=1)))
+        )
+        convergence_threshold = max(
+            0,
+            int(
+                getattr(
+                    self,
+                    "ea_convergence_threshold",
+                    self._env_int("KG_EA_CONVERGENCE_THRESHOLD", 2, minimum=0),
+                )
+            ),
+        )
+
+        aggregate: Dict[str, Any] = {
+            "entities": {},
+            "attributes": {},
+            "triples": [],
+        }
+        prev_entity_count = 0
+
+        for round_idx in range(max_rounds):
+            known_entities = None
+            if round_idx > 0 and aggregate["entities"]:
+                known_entities = self._format_known_entities(aggregate["entities"])
+
+            prompt = self.get_construction_prompt(
+                chunk_text,
+                content_type,
+                known_entities=known_entities,
+                round_idx=round_idx,
+            )
+            extracted = self.extract_with_llm(prompt)
+            if not extracted:
+                break
+
+            self._merge_extraction_round(aggregate, extracted)
+            current_entity_count = len(aggregate["entities"])
+            delta = current_entity_count - prev_entity_count
+            prev_entity_count = current_entity_count
+
+            if round_idx > 0 and delta < convergence_threshold:
+                break
+
+        if (
+            not aggregate["entities"]
+            and not aggregate["attributes"]
+            and not aggregate["triples"]
+        ):
+            return None
+        return aggregate
+
     def extract_with_llm(self, prompt: str) -> Optional[Dict]:
         """
         调用LLM提取实体和关系
@@ -1322,6 +1558,320 @@ class MedicalKGBuilder:
         except Exception as e:
             print(f"[WARN] LLM relation verification failed: {e}")
             return False
+
+    def _relation_verification_cache_key(
+        self,
+        subj: str,
+        subj_type: str,
+        relation: str,
+        obj: str,
+        obj_type: str,
+        context: str = "",
+    ) -> Tuple[str, str, str, str, str, str]:
+        return (
+            str(subj or "").strip().lower(),
+            str(subj_type or "").strip().lower(),
+            str(relation or "").strip().upper(),
+            str(obj or "").strip().lower(),
+            str(obj_type or "").strip().lower(),
+            str(context or "")[:300].strip().lower(),
+        )
+
+    @staticmethod
+    def _semantic_entity_level(name: str, entity_type: str) -> str:
+        name_text = str(name or "").strip().lower()
+        type_text = str(entity_type or "").strip().lower()
+        text = f"{name_text} {type_text}".lower()
+        equipment_like_type_tokens = [
+            "医疗设备", "家具", "医疗用品", "暖通", "给排水", "强电", "弱电",
+        ]
+        if any(token in name_text for token in ["门诊部", "急诊部", "住院部", "医技科", "护理单元", "部门"]):
+            return "department"
+        if any(token in name_text for token in ["中心", "手术部", "icu", "分区", "功能分区", "病区", "治疗区", "单元"]):
+            return "zone"
+        if any(token in name_text for token in ["间", "室", "走廊", "大厅", "房", "病房", "候诊厅", "诊室", "空间"]):
+            return "space"
+        if any(token in type_text for token in equipment_like_type_tokens):
+            return "equipment"
+        if any(token in name_text for token in ["设备", "透析机", "ct", "mri", "直线加速器", "床", "仪", "机"]):
+            return "equipment"
+        if any(token in name_text for token in ["规范", "标准", "文献", "资料", "来源", "指南", ".pdf", ".doc"]):
+            return "source"
+        if any(token in name_text for token in ["医院", "诊所", "卫生院", "医疗中心"]):
+            return "hospital"
+        if (
+            any(token in name_text for token in ["分类", "类别", "类型"])
+            and any(token in name_text for token in ["方法", "设计"])
+        ):
+            return "method_category"
+        if any(token in name_text for token in ["方法", "策略", "原则", "设计方法", "设计", "疗法", "治疗"]):
+            return "method"
+        if any(token in name_text for token in ["服务", "诊疗", "检查", "护理", "康复"]):
+            return "service"
+        if any(token in text for token in ["医院", "诊所", "卫生院", "医疗中心"]):
+            return "hospital"
+        if any(token in text for token in ["科", "门诊部", "急诊部", "住院部", "医技科", "部门", "护理单元"]):
+            return "department"
+        if any(token in text for token in ["中心", "手术部", "icu", "分区", "功能分区", "病区", "治疗区", "单元", "病房区"]):
+            return "zone"
+        if any(token in text for token in ["间", "室", "走廊", "大厅", "房", "区", "空间", "病房", "候诊厅", "诊室"]):
+            return "space"
+        if any(token in text for token in equipment_like_type_tokens):
+            return "equipment"
+        if any(token in text for token in ["设备", "透析机", "ct", "mri", "直线加速器", "床", "仪", "机"]):
+            return "equipment"
+        if (
+            any(token in text for token in ["分类", "类别", "类型"])
+            and any(token in text for token in ["方法", "设计"])
+        ):
+            return "method_category"
+        if any(token in text for token in ["方法", "策略", "原则", "设计方法", "设计", "分类"]):
+            return "method"
+        if any(token in text for token in ["服务", "诊疗", "检查", "护理", "康复"]):
+            return "service"
+        if any(token in text for token in ["规范", "标准", "文献", "资料", "来源", "指南", ".pdf", ".doc"]):
+            return "source"
+        return ""
+
+    @staticmethod
+    def _looks_like_attribute_fragment(text: str) -> bool:
+        value = str(text or "").strip().lower()
+        if not value:
+            return False
+        if ":" in value or "：" in value:
+            return True
+        if any(token in value for token in ["不小于", "不大于", ">=", "<=", "≥", "≤"]):
+            return True
+        if re.search(r"\d+\s*(m²|㎡|m|mm|cm|%|℃|°c)$", value, re.IGNORECASE):
+            return True
+        if re.search(r"\d+\s*[x×]\s*\d+", value, re.IGNORECASE):
+            return True
+        return False
+
+    def _classify_relation_verification_need(
+        self,
+        subj: str,
+        subj_type: str,
+        relation: str,
+        obj: str,
+        obj_type: str,
+        context: str = "",
+    ) -> Dict[str, str]:
+        relation_name = str(relation or "").strip().upper()
+        normalized_subj_type = self.type_synonyms.get(subj_type, subj_type)
+        normalized_obj_type = self.type_synonyms.get(obj_type, obj_type)
+        allowed = self.relation_constraints.get(relation_name)
+
+        page_ref_pattern = re.compile(r"^(?:p{1,2}\.?\s*\d+|\d+\s*页|page\s*\d+)$", re.IGNORECASE)
+        if page_ref_pattern.match(str(subj or "").strip()) or page_ref_pattern.match(str(obj or "").strip()):
+            return {"action": "reject", "reason": "page_reference_target"}
+
+        if not allowed:
+            return {"action": "skip", "reason": "no_constraint"}
+
+        subjects_allowed, objects_allowed = allowed
+        mismatch = (normalized_subj_type not in subjects_allowed) or (normalized_obj_type not in objects_allowed)
+        if not mismatch:
+            return {"action": "skip", "reason": "schema_match"}
+        if not self.relation_llm_fallback:
+            return {"action": "reject", "reason": "schema_mismatch"}
+
+        subj_level = self._semantic_entity_level(subj, normalized_subj_type)
+        obj_level = self._semantic_entity_level(obj, normalized_obj_type)
+
+        if relation_name == "MENTIONED_IN":
+            return {"action": "accept", "reason": "mention_source_allowed"}
+
+        looks_like_attribute_fragment = getattr(
+            self,
+            "_looks_like_attribute_fragment",
+            MedicalKGBuilder._looks_like_attribute_fragment,
+        )
+
+        if relation_name == "CONTAINS":
+            allowed_pairs = {
+                ("hospital", "department"),
+                ("hospital", "zone"),
+                ("hospital", "space"),
+                ("department", "zone"),
+                ("department", "space"),
+                ("zone", "space"),
+            }
+            if subj_level == "method_category" and obj_level in {"method", "method_category"}:
+                return {"action": "accept", "reason": "semantic_contains_method_category_allow"}
+            if looks_like_attribute_fragment(obj):
+                return {"action": "reject", "reason": "semantic_contains_attribute_fragment_reject"}
+            rejected_pairs = {
+                ("hospital", "equipment"),
+                ("hospital", "service"),
+                ("hospital", "method"),
+                ("hospital", "method_category"),
+                ("method", "equipment"),
+                ("method", "space"),
+                ("method", "zone"),
+                ("method", "department"),
+                ("equipment", "equipment"),
+                ("equipment", "service"),
+                ("equipment", "method"),
+                ("equipment", "method_category"),
+                ("equipment", "space"),
+                ("equipment", "zone"),
+                ("equipment", "department"),
+                ("zone", "equipment"),
+                ("zone", "service"),
+                ("zone", "method"),
+                ("zone", "method_category"),
+                ("space", "equipment"),
+                ("space", "service"),
+                ("space", "method"),
+                ("space", "method_category"),
+                ("source", "hospital"),
+                ("source", "department"),
+                ("source", "zone"),
+                ("source", "space"),
+            }
+            if subj_level == "equipment":
+                return {"action": "reject", "reason": "semantic_contains_equipment_reject"}
+            if (subj_level, obj_level) in allowed_pairs:
+                return {"action": "accept", "reason": "semantic_contains_allow"}
+            if (subj_level, obj_level) in rejected_pairs:
+                return {"action": "reject", "reason": "semantic_contains_reject"}
+            if subj_level and obj_level and subj_level == obj_level:
+                return {"action": "reject", "reason": "same_level_contains_reject"}
+
+        if relation_name == "GUIDES":
+            if subj_level == "method" and obj_level in {"hospital", "department", "zone", "space", "method"}:
+                return {"action": "accept", "reason": "semantic_guides_allow"}
+            if subj_level == "method" and obj_level == "method_category":
+                return {"action": "accept", "reason": "semantic_guides_method_category_allow"}
+            if subj_level and subj_level != "method":
+                return {"action": "reject", "reason": "semantic_guides_non_method_reject"}
+            if subj_level == "method" and obj_level in {"equipment", "source"}:
+                return {"action": "reject", "reason": "semantic_guides_reject"}
+
+        if relation_name == "RELATES_TO":
+            if looks_like_attribute_fragment(obj):
+                return {"action": "reject", "reason": "semantic_relates_to_attribute_fragment_reject"}
+            if subj_level == "method" and obj_level == "method":
+                return {"action": "accept", "reason": "semantic_relates_to_allow"}
+            if subj_level and obj_level and (subj_level != "method" or obj_level != "method"):
+                return {"action": "reject", "reason": "semantic_relates_to_non_method_reject"}
+            if subj_level and obj_level and "source" in {subj_level, obj_level}:
+                return {"action": "reject", "reason": "semantic_relates_to_reject"}
+
+        if relation_name == "REFERENCES":
+            if subj_level == "source" and obj_level == "source":
+                return {"action": "accept", "reason": "semantic_references_allow"}
+            if subj_level or obj_level:
+                return {"action": "reject", "reason": "semantic_references_reject"}
+
+        if relation_name == "USES":
+            if subj_level in {"method", "service"} and obj_level == "equipment":
+                return {"action": "accept", "reason": "semantic_uses_allow"}
+            if subj_level in {"space", "zone", "department"} and obj_level == "equipment":
+                return {"action": "accept", "reason": "semantic_uses_space_allow"}
+            if subj_level == "equipment":
+                return {"action": "reject", "reason": "semantic_uses_reject"}
+            if subj_level == "method" and obj_level == "method":
+                return {"action": "reject", "reason": "semantic_uses_reject"}
+            if subj_level in {"space", "zone", "department", "method", "service"} and obj_level in {"method", "method_category", "service", "hospital", "department", "zone", "space"}:
+                return {"action": "reject", "reason": "semantic_uses_non_equipment_reject"}
+
+        if relation_name == "SUPPORTS":
+            if subj_level in {"equipment", "space", "zone"} and obj_level in {"method", "service"}:
+                return {"action": "accept", "reason": "semantic_supports_allow"}
+            if subj_level in {"method", "method_category", "service"}:
+                return {"action": "reject", "reason": "semantic_supports_non_method_reject"}
+            if subj_level in {"equipment", "space", "zone"} and obj_level in {"equipment", "space", "zone", "department", "hospital"}:
+                return {"action": "reject", "reason": "semantic_supports_non_method_reject"}
+            if subj_level == "source" or obj_level == "source":
+                return {"action": "reject", "reason": "semantic_supports_reject"}
+
+        if relation_name == "PROVIDES":
+            if subj_level in {"department", "zone", "space"} and obj_level == "service":
+                return {"action": "accept", "reason": "semantic_provides_service_allow"}
+            if obj_level and obj_level != "service":
+                return {"action": "reject", "reason": "semantic_provides_non_service_reject"}
+
+        if relation_name == "CONNECTED_TO":
+            if subj_level == "equipment" and obj_level == "equipment":
+                return {"action": "accept", "reason": "semantic_connected_to_equipment_allow"}
+            if subj_level in {"space", "zone", "department"} and obj_level == "equipment":
+                return {"action": "accept", "reason": "semantic_connected_to_space_equipment_allow"}
+            if subj_level == "equipment" and obj_level in {"space", "zone", "department"}:
+                return {"action": "accept", "reason": "semantic_connected_to_space_equipment_allow"}
+            if subj_level in {"space", "zone", "department"} and obj_level in {"space", "zone", "department"}:
+                return {"action": "accept", "reason": "semantic_connected_to_space_allow"}
+            if "source" in {subj_level, obj_level} or "method" in {subj_level, obj_level}:
+                return {"action": "reject", "reason": "semantic_connected_to_reject"}
+
+        if relation_name == "ADJACENT_TO":
+            if subj_level == "equipment" and obj_level == "equipment":
+                return {"action": "accept", "reason": "semantic_adjacent_to_equipment_allow"}
+            if subj_level in {"space", "zone", "department"} and obj_level in {"space", "zone", "department"}:
+                return {"action": "accept", "reason": "semantic_adjacent_to_space_allow"}
+            if {subj_level, obj_level} & {"space", "zone", "department"} and {subj_level, obj_level} & {"equipment"}:
+                return {"action": "accept", "reason": "semantic_adjacent_to_space_equipment_allow"}
+            if "source" in {subj_level, obj_level} or "method" in {subj_level, obj_level}:
+                return {"action": "reject", "reason": "semantic_adjacent_to_reject"}
+
+        if relation_name == "PERFORMED_IN":
+            if subj_level in {"method", "service"} and obj_level in {"space", "zone", "department"}:
+                return {"action": "accept", "reason": "semantic_performed_in_allow"}
+            if subj_level in {"space", "zone", "department", "equipment", "hospital", "source"}:
+                return {"action": "reject", "reason": "semantic_performed_in_reject"}
+
+        if relation_name == "REQUIRES":
+            if subj_level in {"space", "zone", "service", "department"} and obj_level in {"space", "zone", "equipment", "service"}:
+                return {"action": "accept", "reason": "semantic_requires_allow"}
+            if subj_level in {"method", "method_category", "source", "equipment", "hospital"}:
+                return {"action": "reject", "reason": "semantic_requires_reject"}
+            if subj_level in {"space", "zone", "service", "department"} and obj_level in {"method", "method_category", "department", "hospital", "source"}:
+                return {"action": "reject", "reason": "semantic_requires_non_dependency_reject"}
+
+        if relation_name == "IS_TYPE_OF":
+            if subj_level == "method" and obj_level in {"method_category", "method"}:
+                return {"action": "accept", "reason": "semantic_is_type_of_allow"}
+            if subj_level and subj_level != "method":
+                return {"action": "reject", "reason": "semantic_is_type_of_subject_reject"}
+            if subj_level and obj_level and obj_level in {"space", "zone", "department", "hospital", "equipment", "source"}:
+                return {"action": "reject", "reason": "semantic_is_type_of_reject"}
+
+        return {"action": "review", "reason": "needs_llm"}
+
+    def _llm_verify_relations_batch(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not items:
+            return []
+
+        prompt_items = []
+        for idx, item in enumerate(items):
+            prompt_items.append({
+                "batch_index": idx,
+                "subject": item.get("subject"),
+                "subject_type": item.get("subject_type"),
+                "relation": item.get("relation"),
+                "object": item.get("object"),
+                "object_type": item.get("object_type"),
+                "context": str(item.get("context") or "")[:300],
+            })
+
+        prompt = (
+            "你是医疗建筑领域专家。请逐条判断以下关系在医疗建筑设计领域是否合理。\n"
+            "返回 JSON 数组，每个元素格式："
+            "{\"batch_index\": 0, \"reasonable\": true/false, \"reason\": \"简短理由\"}\n"
+            "只返回 JSON 数组，不要其他文字。\n\n"
+            f"待判断关系:\n{json.dumps(prompt_items, ensure_ascii=False)}"
+        )
+
+        try:
+            resp = self.llm_client.chat_json(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            return resp if isinstance(resp, list) else []
+        except Exception as e:
+            print(f"[WARN] Batch LLM relation verification failed: {e}")
+            return []
     
     def _add_attributes_to_graph(
         self, 
@@ -1419,9 +1969,7 @@ class MedicalKGBuilder:
             cached = extracted is not None  # 标记是否从缓存读取
 
             if not extracted:
-                # 新增：根据content_type生成针对性prompt
-                prompt = self.get_construction_prompt(content, content_type)
-                extracted = self.extract_with_llm(prompt)
+                extracted = self._extract_entities_multi_round(content, content_type)
                 if not extracted:
                     # 失败的不缓存，下次会自动重试
                     return False
@@ -1475,18 +2023,6 @@ class MedicalKGBuilder:
                     continue
                 filtered_triples.append(triple)
             triples = filtered_triples
-
-            if not triples and not attributes:
-                # 如果是从缓存读取的，删除无效缓存
-                if cached:
-                    try:
-                        self.extractions_collection.delete_one({
-                            "chunk_id": str(chunk_id),
-                            "version": self.extraction_version
-                        })
-                    except Exception:
-                        pass
-                return False
 
             # ✅ 只有验证通过后才缓存（非缓存数据）
             if not cached:
@@ -1552,7 +2088,12 @@ class MedicalKGBuilder:
                     )
 
                 # 注册chunk实体，用于后续共现增强
-                self._register_chunk_entities(str(chunk_id), entity_types, chunk)
+                self._register_chunk_entities(
+                    str(chunk_id),
+                    entity_types,
+                    chunk,
+                    entity_node_ids=entity_node_ids,
+                )
                 # 图片回链（可选）：默认关闭，避免大量图片进入图；由检索层通过 Mongo 返回
                 if self.link_images:
                     try:
@@ -1577,137 +2118,189 @@ class MedicalKGBuilder:
             print(f"[ERROR] Processing chunk failed: {e}")
             return False
     
+    def _add_single_triple_to_graph(
+        self,
+        triple: List,
+        chunk_id: str,
+        entity_types: Dict,
+        entity_descriptions: Dict = None,
+        content: str = "",
+        verification_override: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """添加单个三元组到图，并允许复用已缓存的 LLM 校验结果。"""
+        if entity_descriptions is None:
+            entity_descriptions = {}
+
+        if len(triple) != 3:
+            return {"added": False, "verification_used": False, "verification_result": None}
+
+        subj, pred, obj = triple
+
+        subj_node_id = self._find_or_create_entity(
+            subj, chunk_id, entity_types.get(subj), entity_descriptions.get(subj),
+            scope_chain=self._infer_scope_chain(subj, entity_types)
+        )
+        obj_node_id = self._find_or_create_entity(
+            obj, chunk_id, entity_types.get(obj), entity_descriptions.get(obj),
+            scope_chain=self._infer_scope_chain(obj, entity_types)
+        )
+
+        relation_normalized = normalize_relation(pred)
+        if relation_normalized == "SKIP":
+            return {"added": False, "verification_used": False, "verification_result": None}
+
+        confidence = 0.85
+        extra_props: Dict[str, Any] = {}
+        refined_relation = False
+        if relation_normalized in {"RELATED_TO", "UNKNOWN", ""}:
+            relation_normalized, confidence, extra_props = self._refine_relation(
+                subj,
+                entity_types.get(subj),
+                obj,
+                entity_types.get(obj),
+                pred,
+                content
+            )
+            refined_relation = True
+
+        if self.drop_uncertain_relations and relation_normalized == "CO_OCCUR":
+            return {"added": False, "verification_used": False, "verification_result": None}
+
+        if (
+            self.allowed_relation_types
+            and relation_normalized not in self.allowed_relation_types
+            and relation_normalized not in {"BELONGS_TO", "REQUIRED_BY"}
+        ):
+            print(
+                f"[INFO] Skip relation '{pred}' -> '{relation_normalized}' (chunk={chunk_id})"
+            )
+            return {"added": False, "verification_used": False, "verification_result": None}
+
+        verification_used = False
+        verification_result: Optional[bool] = None
+
+        try:
+            subj_type = entity_types.get(subj)
+            obj_type = entity_types.get(obj)
+            if subj_type in self.type_synonyms:
+                subj_type = self.type_synonyms[subj_type]
+            if obj_type in self.type_synonyms:
+                obj_type = self.type_synonyms[obj_type]
+            allowed = self.relation_constraints.get(relation_normalized)
+            if allowed:
+                subjects_allowed, objects_allowed = allowed
+                mismatch = (subj_type not in subjects_allowed) or (obj_type not in objects_allowed)
+                if mismatch:
+                    allow_mismatch = os.getenv("KG_RELATION_ALLOW_MISMATCH", "0").lower() in {"1", "true", "yes"}
+                    if self.relation_llm_fallback:
+                        verification_used = True
+                        if verification_override is None:
+                            cache = getattr(self, "_relation_verification_cache", None)
+                            if cache is None:
+                                cache = {}
+                                self._relation_verification_cache = cache
+                            cache_key = self._relation_verification_cache_key(
+                                subj,
+                                subj_type,
+                                relation_normalized,
+                                obj,
+                                obj_type,
+                                content,
+                            )
+                            if cache_key in cache:
+                                verification_result = bool(cache[cache_key])
+                            else:
+                                verification_result = self._llm_verify_relation(
+                                    subj, subj_type, relation_normalized, obj, obj_type, content
+                                )
+                                cache[cache_key] = bool(verification_result)
+                        else:
+                            verification_result = bool(verification_override)
+                        if not verification_result and not allow_mismatch:
+                            return {
+                                "added": False,
+                                "verification_used": verification_used,
+                                "verification_result": verification_result,
+                            }
+                        if not verification_result and allow_mismatch:
+                            print(
+                                f"[WARN] Allowing mismatched endpoints (LLM unlikely): {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
+                            )
+                    else:
+                        if not allow_mismatch:
+                            print(
+                                f"[INFO] Skip relation by endpoint types: {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
+                            )
+                            return {"added": False, "verification_used": False, "verification_result": None}
+                        print(
+                            f"[WARN] Allowing mismatched endpoints: {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
+                        )
+        except Exception:
+            pass
+
+        doc_id = self.chunk_doc_map.get(chunk_id, "") if hasattr(self, "chunk_doc_map") and self.chunk_doc_map else ""
+        edge_attrs = {
+            "relation": relation_normalized,
+            "chunk_id": chunk_id,
+            "chunk_ids": [chunk_id],
+            "original_relation": pred,
+            "confidence": confidence,
+            "support_doc_ids": [doc_id] if doc_id else [],
+            "support_count": 1,
+        }
+        if refined_relation and extra_props:
+            edge_attrs.update(extra_props)
+
+        self.graph.add_edge(
+            subj_node_id,
+            obj_node_id,
+            **edge_attrs
+        )
+
+        inverse_relation = get_inverse_relation(relation_normalized)
+        if (
+            inverse_relation
+            and (
+                inverse_relation in self.allowed_relation_types
+                or inverse_relation in {"BELONGS_TO", "REQUIRED_BY"}
+            )
+        ):
+            inverse_attrs = {
+                "relation": inverse_relation,
+                "chunk_id": chunk_id,
+                "chunk_ids": [chunk_id],
+                "original_relation": f"inverse_of_{pred}",
+                "confidence": confidence,
+                "is_inverse": True,
+            }
+            if refined_relation and extra_props:
+                inverse_attrs.update(extra_props)
+
+            self.graph.add_edge(
+                obj_node_id,
+                subj_node_id,
+                **inverse_attrs
+            )
+
+        return {
+            "added": True,
+            "verification_used": verification_used,
+            "verification_result": verification_result,
+        }
+
     def _add_triples_to_graph(self, triples: List, chunk_id: str, entity_types: Dict, entity_descriptions: Dict = None, content: str = ""):
         """添加三元组到图（关系处理）"""
         if entity_descriptions is None:
             entity_descriptions = {}
-        
+
         for triple in triples:
-            if len(triple) != 3:
-                continue
-            
-            subj, pred, obj = triple
-            
-            # 查找或创建主体和客体节点
-            subj_node_id = self._find_or_create_entity(
-                subj, chunk_id, entity_types.get(subj), entity_descriptions.get(subj),
-                scope_chain=self._infer_scope_chain(subj, entity_types)
+            self._add_single_triple_to_graph(
+                triple,
+                chunk_id,
+                entity_types,
+                entity_descriptions=entity_descriptions,
+                content=content,
             )
-            obj_node_id = self._find_or_create_entity(
-                obj, chunk_id, entity_types.get(obj), entity_descriptions.get(obj),
-                scope_chain=self._infer_scope_chain(obj, entity_types)
-            )
-            
-            relation_normalized = normalize_relation(pred)
-            # 跳过SKIP（不应作为关系的词，如"具有"、"描述"等）
-            if relation_normalized == "SKIP":
-                continue
-
-            confidence = 0.85
-            extra_props: Dict[str, Any] = {}
-            refined_relation = False
-            if relation_normalized in {"RELATED_TO", "UNKNOWN", ""}:
-                relation_normalized, confidence, extra_props = self._refine_relation(
-                    subj,
-                    entity_types.get(subj),
-                    obj,
-                    entity_types.get(obj),
-                    pred,
-                    content
-                )
-                refined_relation = True
-
-            if self.drop_uncertain_relations and relation_normalized == "CO_OCCUR":
-                continue
-
-            if (
-                self.allowed_relation_types
-                and relation_normalized not in self.allowed_relation_types
-                and relation_normalized not in {"BELONGS_TO", "REQUIRED_BY"}
-            ):
-                print(
-                    f"[INFO] Skip relation '{pred}' -> '{relation_normalized}' (chunk={chunk_id})"
-                )
-                continue
-
-            # 端点类型约束校验（严格对位）
-            try:
-                subj_type = entity_types.get(subj)
-                obj_type = entity_types.get(obj)
-                if subj_type in self.type_synonyms:
-                    subj_type = self.type_synonyms[subj_type]
-                if obj_type in self.type_synonyms:
-                    obj_type = self.type_synonyms[obj_type]
-                allowed = self.relation_constraints.get(relation_normalized)
-                if allowed:
-                    subjects_allowed, objects_allowed = allowed
-                    mismatch = (subj_type not in subjects_allowed) or (obj_type not in objects_allowed)
-                    if mismatch:
-                        allow_mismatch = os.getenv("KG_RELATION_ALLOW_MISMATCH", "0").lower() in {"1", "true", "yes"}
-                        if self.relation_llm_fallback:
-                            is_reasonable = self._llm_verify_relation(
-                                subj, subj_type, relation_normalized, obj, obj_type, content
-                            )
-                            if not is_reasonable and not allow_mismatch:
-                                continue
-                            if not is_reasonable and allow_mismatch:
-                                print(
-                                    f"[WARN] Allowing mismatched endpoints (LLM unlikely): {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
-                                )
-                        else:
-                            if not allow_mismatch:
-                                print(
-                                    f"[INFO] Skip relation by endpoint types: {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
-                                )
-                                continue
-                            else:
-                                print(
-                                    f"[WARN] Allowing mismatched endpoints: {subj}({subj_type}) -[{relation_normalized}]-> {obj}({obj_type}); chunk={chunk_id}"
-                                )
-            except Exception:
-                pass
-
-            edge_attrs = {
-                "relation": relation_normalized,
-                "chunk_id": chunk_id,        # 单个chunk_id（向后兼容）
-                "chunk_ids": [chunk_id],     # 数组形式（支持多来源）
-                "original_relation": pred,
-                "confidence": confidence,
-            }
-            if refined_relation and extra_props:
-                edge_attrs.update(extra_props)
-
-            self.graph.add_edge(
-                subj_node_id,
-                obj_node_id,
-                **edge_attrs
-            )
-
-            # 自动生成反向关系
-            inverse_relation = get_inverse_relation(relation_normalized)
-            if (
-                inverse_relation
-                and (
-                    inverse_relation in self.allowed_relation_types
-                    or inverse_relation in {"BELONGS_TO", "REQUIRED_BY"}
-                )
-            ):
-                inverse_attrs = {
-                    "relation": inverse_relation,
-                    "chunk_id": chunk_id,        # 单个chunk_id（向后兼容）
-                    "chunk_ids": [chunk_id],     # 数组形式（支持多来源）
-                    "original_relation": f"inverse_of_{pred}",
-                    "confidence": confidence,
-                    "is_inverse": True,
-                }
-                if refined_relation and extra_props:
-                    inverse_attrs.update(extra_props)
-
-                self.graph.add_edge(
-                    obj_node_id,
-                    subj_node_id,
-                    **inverse_attrs
-                )
 
     def _find_or_create_image_asset(self, image: Dict[str, Any], chunk_id: str, source_document: str = "") -> str:
         """在图中创建/查找图片资源节点（作为通用实体，schema_type=ImageAsset）。"""
@@ -1992,7 +2585,250 @@ class MedicalKGBuilder:
             self._chunk_sequence_counter = 0
 
         return stats
-    
+
+    @staticmethod
+    def _normalized_name_key(name: Any) -> str:
+        return normalize_numbers(str(name or "").strip()).lower()
+
+    @staticmethod
+    def _merge_unique_list(existing: Any, incoming: Any) -> List[Any]:
+        merged: List[Any] = []
+        for values in (existing or [], incoming or []):
+            if isinstance(values, list):
+                candidates = values
+            else:
+                candidates = [values]
+            for item in candidates:
+                if item in (None, "", []):
+                    continue
+                if item not in merged:
+                    merged.append(item)
+        return merged
+
+    def _merge_entity_properties(
+        self,
+        target_props: Dict[str, Any],
+        source_props: Dict[str, Any],
+        canonical_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        merged = dict(target_props or {})
+        source_props = dict(source_props or {})
+        merge_unique_list = type(self)._merge_unique_list
+
+        for key in ("chunk_ids", "attributes", "doc_ids", "alias_names"):
+            combined = merge_unique_list(merged.get(key), source_props.get(key))
+            if combined:
+                merged[key] = combined
+
+        source_description = str(source_props.get("description", "") or "")
+        target_description = str(merged.get("description", "") or "")
+        if len(source_description) > len(target_description):
+            merged["description"] = source_description
+
+        source_credibility = source_props.get("credibility")
+        if source_credibility is not None:
+            target_credibility = merged.get("credibility")
+            if target_credibility is None or source_credibility > target_credibility:
+                merged["credibility"] = source_credibility
+
+        source_name = source_props.get("name") or source_props.get("title")
+        target_name = merged.get("name") or merged.get("title")
+        alias_names = merge_unique_list(merged.get("alias_names"), [])
+        for alias_name in (target_name, source_name):
+            if alias_name and alias_name != canonical_name and alias_name not in alias_names:
+                alias_names.append(alias_name)
+        if alias_names:
+            merged["alias_names"] = alias_names
+
+        for key, value in source_props.items():
+            if key in {"chunk_ids", "attributes", "doc_ids", "alias_names", "description", "credibility"}:
+                continue
+            if merged.get(key) in (None, "", [], {}) and value not in (None, "", [], {}):
+                merged[key] = value
+
+        if source_props.get("schema_type") and not merged.get("schema_type"):
+            merged["schema_type"] = source_props["schema_type"]
+
+        if canonical_name:
+            if "name" in merged or "name" in source_props or "title" not in merged:
+                merged["name"] = canonical_name
+                if "title" in merged and not target_props.get("title"):
+                    merged.pop("title", None)
+            else:
+                merged["title"] = canonical_name
+
+        return merged
+
+    def _merge_graph_nodes(
+        self,
+        source_node_id: str,
+        target_node_id: str,
+        canonical_name: Optional[str] = None,
+    ) -> str:
+        if not self.graph.has_node(source_node_id) or not self.graph.has_node(target_node_id):
+            return target_node_id
+
+        if source_node_id == target_node_id:
+            props = self.graph.nodes[target_node_id].get("properties", {})
+            self.graph.nodes[target_node_id]["properties"] = self._merge_entity_properties(
+                props,
+                {},
+                canonical_name=canonical_name,
+            )
+            return target_node_id
+
+        source_props = self.graph.nodes[source_node_id].get("properties", {})
+        target_props = self.graph.nodes[target_node_id].get("properties", {})
+        self.graph.nodes[target_node_id]["properties"] = self._merge_entity_properties(
+            target_props,
+            source_props,
+            canonical_name=canonical_name,
+        )
+        self.graph.nodes[target_node_id]["level"] = min(
+            self.graph.nodes[target_node_id].get("level", 2),
+            self.graph.nodes[source_node_id].get("level", 2),
+        )
+
+        for _, dst, _, data in list(
+            self.graph.out_edges(source_node_id, keys=True, data=True)
+        ):
+            new_dst = target_node_id if dst == source_node_id else dst
+            self.graph.add_edge(target_node_id, new_dst, **dict(data))
+
+        for src, _, _, data in list(
+            self.graph.in_edges(source_node_id, keys=True, data=True)
+        ):
+            if src == source_node_id:
+                continue
+            new_src = target_node_id if src == source_node_id else src
+            self.graph.add_edge(new_src, target_node_id, **dict(data))
+
+        entity_type = self.graph.nodes[target_node_id].get("properties", {}).get(
+            "schema_type", ""
+        )
+        self._rewrite_chunk_entity_index(source_node_id, target_node_id, entity_type)
+
+        self.graph.remove_node(source_node_id)
+        return target_node_id
+
+    def _rewrite_chunk_entity_index(
+        self,
+        source_node_id: str,
+        target_node_id: str,
+        entity_type: str = "",
+    ) -> None:
+        chunk_entity_index = getattr(self, "_chunk_entity_index", None)
+        if not isinstance(chunk_entity_index, dict):
+            return
+
+        for chunk_id, entities in list(chunk_entity_index.items()):
+            changed = False
+            rewritten: List[Tuple[str, str]] = []
+            seen: Set[Tuple[str, str]] = set()
+            for entity_id, entity_kind in entities:
+                current_id = target_node_id if entity_id == source_node_id else entity_id
+                current_type = entity_kind or entity_type
+                if entity_id == source_node_id:
+                    changed = True
+                key = (current_id, current_type)
+                if key in seen:
+                    continue
+                seen.add(key)
+                rewritten.append(key)
+            if changed:
+                chunk_entity_index[chunk_id] = rewritten
+
+    def _apply_synonym_mapping(self, synonym_map: Dict[str, str]) -> int:
+        if not synonym_map:
+            return 0
+
+        applied = 0
+        for source_node_id in list(self.graph.nodes()):
+            if not self.graph.has_node(source_node_id):
+                continue
+            props = self.graph.nodes[source_node_id].get("properties", {})
+            source_name = props.get("name") or props.get("title") or ""
+            source_type = props.get("schema_type") or ""
+            source_scope_key = props.get("scope_key") or ""
+            canonical_name = synonym_map.get(source_name)
+            if not canonical_name or not source_type:
+                continue
+
+            normalized_source = self._normalized_name_key(source_name)
+            normalized_canonical = self._normalized_name_key(canonical_name)
+            self.alias_map.setdefault(source_type, {})
+            self.alias_map[source_type][normalized_source] = normalized_canonical
+
+            target_node_id = None
+            for candidate_id, candidate_data in list(self.graph.nodes(data=True)):
+                if candidate_id == source_node_id:
+                    continue
+                candidate_props = candidate_data.get("properties", {})
+                candidate_name = candidate_props.get("name") or candidate_props.get("title") or ""
+                candidate_type = candidate_props.get("schema_type") or ""
+                candidate_scope_key = candidate_props.get("scope_key") or ""
+                if candidate_type != source_type:
+                    continue
+                if candidate_scope_key != source_scope_key:
+                    continue
+                if self._normalized_name_key(candidate_name) == normalized_canonical:
+                    target_node_id = candidate_id
+                    break
+
+            if target_node_id:
+                self._merge_graph_nodes(
+                    source_node_id,
+                    target_node_id,
+                    canonical_name=canonical_name,
+                )
+            else:
+                self.graph.nodes[source_node_id]["properties"] = self._merge_entity_properties(
+                    props,
+                    {},
+                    canonical_name=canonical_name,
+                )
+            applied += 1
+
+        return applied
+
+    def _optimize_triples_stage3(self) -> Dict[str, str]:
+        if not self.llm_client:
+            return {}
+        if os.getenv("KG_ENTITY_SYNONYM_LLM", "1").lower() not in {"1", "true", "yes"}:
+            return {}
+
+        name_to_type: Dict[str, str] = {}
+        ambiguous_names: Set[str] = set()
+        for _, data in self.graph.nodes(data=True):
+            props = data.get("properties", {})
+            entity_name = props.get("name") or props.get("title") or ""
+            entity_type = props.get("schema_type") or ""
+            if not entity_name or not entity_type or entity_type in {"资料来源", "ImageAsset"}:
+                continue
+            if canonicalize(entity_name, entity_type, self.alias_map) != self._normalized_name_key(entity_name):
+                continue
+            if entity_name in name_to_type and name_to_type[entity_name] != entity_type:
+                ambiguous_names.add(entity_name)
+                continue
+            name_to_type[entity_name] = entity_type
+
+        entity_names = [
+            name for name in name_to_type.keys() if name not in ambiguous_names
+        ]
+        if len(entity_names) < 2:
+            return {}
+
+        batch_size = max(2, int(os.getenv("KG_ENTITY_SYNONYM_BATCH_SIZE", "30")))
+        synonym_map = detect_synonyms_llm(
+            entity_names,
+            name_to_type,
+            self.llm_client,
+            batch_size=batch_size,
+        )
+        if synonym_map:
+            self._apply_synonym_mapping(synonym_map)
+        return synonym_map
+
     def write_to_databases(self) -> bool:
         """
         写入数据库（Neo4j + MongoDB 溯源）
@@ -2013,10 +2849,41 @@ class MedicalKGBuilder:
 
         print("[Phase] Writing to Neo4j...")
         try:
+            try:
+                synonym_map = self._optimize_triples_stage3()
+                if synonym_map:
+                    print(
+                        f"[INFO] Stage 3 LLM synonym normalization merged {len(synonym_map)} aliases."
+                    )
+            except Exception as exc:
+                print(f"[WARN] Stage 3 synonym normalization failed: {exc}")
+
+            if self.enable_semantic_fusion:
+                try:
+                    suggestions = self.suggest_entity_fusions(
+                        ratio=self.fusion_ratio, max_pairs=self.fusion_max_pairs
+                    )
+                    final_suggestions = suggestions
+                    if (
+                        suggestions
+                        and os.getenv("KG_FUSION_LLM_CONFIRM", "1").lower()
+                        in {"1", "true", "yes"}
+                    ):
+                        final_suggestions = self._llm_confirm_fusions(suggestions)
+                    if final_suggestions:
+                        merged_count = self._apply_confirmed_fusions(final_suggestions)
+                        print(
+                            f"[Entity Fusion] Applied {merged_count} confirmed merges before Neo4j write."
+                        )
+                    else:
+                        print("[Entity Fusion] No strong candidates found.")
+                except Exception as exc:
+                    print(f"[Entity Fusion] Failed to apply confirmed fusions: {exc}")
+
             if self.enable_cooccurrence_aug:
                 print("[INFO] Augmenting relations via co-occurrence...")
-                win_env = os.getenv("KG_COOCCUR_WINDOW")
-                sup_env = os.getenv("KG_COOCCUR_MIN_SUPPORT")
+                win_env = self.cooccur_window
+                sup_env = self.cooccur_min_support
                 if win_env is None and sup_env is None:
                     print("[INFO] Co-occurrence augmentation skipped (no KG_COOCCUR_* configuration).")
                 else:
@@ -2031,9 +2898,18 @@ class MedicalKGBuilder:
                     self.augment_relations_by_cooccurrence(window=win, min_support=sup)
 
             # 基于领域规则的补边（可通过环境变量关闭）
-            if os.getenv("KG_RULES_AUG", "1").lower() in {"1", "true", "yes"}:
+            if getattr(self, "enable_rules_aug", self._env_flag("KG_RULES_AUG", "1")):
                 print("[INFO] Augmenting relations via domain rules...")
                 self.augment_relations_by_rules()
+
+            # Stage 4b: LLM-based latent relation discovery
+            if getattr(self, "enable_latent_discovery", self._env_flag("KG_LATENT_DISCOVERY", "1")):
+                try:
+                    max_pairs = int(os.getenv("KG_LATENT_MAX_PAIRS", "50"))
+                    self.discover_latent_relations(max_pairs=max_pairs)
+                except Exception as exc:
+                    print(f"[Stage4b] Latent relation discovery failed: {exc}")
+
             self.write_to_neo4j()
             # 全局拓扑增强已移除（避免长时间阻塞构建）；如需启用，请改为离线脚本
             print(f"[OK] Graph written to Neo4j")
@@ -2075,25 +2951,6 @@ class MedicalKGBuilder:
         if neo_nodes is not None and neo_edges is not None:
             print(f"  - Neo4j nodes    : {neo_nodes}")
             print(f"  - Neo4j edges    : {neo_edges}")
-
-        # 可选：在成功提交后，生成语义合并候选（不改图，仅输出建议）
-        if self.enable_semantic_fusion:
-            try:
-                suggestions = self.suggest_entity_fusions(
-                    ratio=self.fusion_ratio, max_pairs=self.fusion_max_pairs
-                )
-                if suggestions:
-                    print("[Entity Fusion Suggestions]")
-                    for s in suggestions:
-                        print(f"  - {s['a']['name']} ({s['a']['type']})  ~~  {s['b']['name']} ({s['b']['type']})  | score={s['score']:.3f}  | context={s['context']}")
-                    # 可选：强匹配对写入别名边
-                    if self.auto_alias_links:
-                        written = self._write_alias_edges(suggestions)
-                        print(f"[Entity Fusion] Auto alias links written: {written}")
-                else:
-                    print("[Entity Fusion] No strong candidates found.")
-            except Exception as e:
-                print(f"[Entity Fusion] Failed to generate suggestions: {e}")
 
         return True
 
@@ -2140,6 +2997,93 @@ class MedicalKGBuilder:
         suggestions.sort(key=lambda x: x["score"], reverse=True)
         return suggestions
 
+    def _llm_confirm_fusions(
+        self,
+        candidates: List[Dict[str, Any]],
+        max_candidates: int = 30,
+    ) -> List[Dict[str, Any]]:
+        if not self.llm_client or not candidates:
+            return candidates
+
+        max_candidates = max(
+            1,
+            int(
+                os.getenv(
+                    "KG_FUSION_LLM_CONFIRM_MAX_CANDIDATES",
+                    str(max_candidates),
+                )
+            ),
+        )
+        batch_size = max(
+            1, int(os.getenv("KG_FUSION_LLM_CONFIRM_BATCH_SIZE", "10"))
+        )
+
+        confirmed: List[Dict[str, Any]] = []
+        to_check = candidates[:max_candidates]
+
+        for start in range(0, len(to_check), batch_size):
+            batch = to_check[start : start + batch_size]
+            pairs_text = "\n".join(
+                (
+                    f'{index + 1}. "{pair["a"]["name"]}" ({pair["a"]["type"]}) '
+                    f'vs "{pair["b"]["name"]}" ({pair["b"]["type"]})'
+                )
+                for index, pair in enumerate(batch)
+            )
+            prompt = (
+                "你是医疗建筑领域的知识图谱专家。以下实体对的名称高度相似，"
+                "请判断每对是否指代同一概念。如果是，请选择更规范的名称作为标准名。\n\n"
+                f"{pairs_text}\n\n"
+                "返回JSON数组，每个元素格式:\n"
+                '{"pair_index": 1, "same_concept": true, "canonical_name": "标准名", "reason": "简短理由"}\n'
+                "只返回JSON数组，不要其他文字。"
+            )
+
+            try:
+                response = self.llm_client.chat_json(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                )
+                if isinstance(response, list):
+                    results = response
+                elif isinstance(response, dict):
+                    results = response.get("results") or response.get("result")
+                    if results is None:
+                        raise ValueError("missing fusion confirmation results")
+                else:
+                    raise ValueError("invalid fusion confirmation response type")
+            except Exception as exc:
+                print(f"[WARN] LLM fusion confirmation failed: {exc}")
+                confirmed.extend(batch)
+                continue
+
+            batch_confirmed: List[Dict[str, Any]] = []
+            try:
+                for result in results:
+                    if not isinstance(result, dict):
+                        raise ValueError("fusion confirmation item must be an object")
+                    pair_index = int(result.get("pair_index", 0)) - 1
+                    if pair_index < 0 or pair_index >= len(batch):
+                        raise ValueError("fusion confirmation pair_index out of range")
+                    if not result.get("same_concept"):
+                        continue
+                    pair = dict(batch[pair_index])
+                    pair["canonical_name"] = (
+                        str(result.get("canonical_name") or pair["a"]["name"]).strip()
+                        or pair["a"]["name"]
+                    )
+                    pair["llm_reason"] = str(result.get("reason", "")).strip()
+                    pair["llm_confirmed"] = True
+                    batch_confirmed.append(pair)
+            except Exception as exc:
+                print(f"[WARN] LLM fusion confirmation parsing failed: {exc}")
+                confirmed.extend(batch)
+                continue
+
+            confirmed.extend(batch_confirmed)
+
+        return confirmed
+
     def _write_alias_edges(self, suggestions: List[Dict[str, Any]]) -> int:
         """将高分对写入 Neo4j 的 ALIAS_OF 关系（不做节点合并）。
         规则：score>=alias_min_score 且 context 中 rel_overlap>=alias_min_overlap。
@@ -2157,7 +3101,17 @@ class MedicalKGBuilder:
                 overlap = 0
             if overlap < self.alias_min_overlap:
                 continue
-            strong_pairs.append((s["a"]["id"], s["b"]["id"]))
+            alias_id = s["a"]["id"]
+            canonical_id = s["b"]["id"]
+            canonical_name = str(s.get("canonical_name", "")).strip()
+            if canonical_name:
+                if canonical_name == s["a"].get("name"):
+                    alias_id = s["b"]["id"]
+                    canonical_id = s["a"]["id"]
+                elif canonical_name == s["b"].get("name"):
+                    alias_id = s["a"]["id"]
+                    canonical_id = s["b"]["id"]
+            strong_pairs.append((alias_id, canonical_id))
             if len(strong_pairs) >= self.alias_max_edges:
                 break
 
@@ -2175,6 +3129,55 @@ class MedicalKGBuilder:
                 pairs=[{"a": a, "b": b} for a, b in strong_pairs]
             )
         return len(strong_pairs)
+
+    @staticmethod
+    def _resolve_fusion_node_id(node_id: str, redirects: Dict[str, str]) -> str:
+        current = node_id
+        while current in redirects:
+            current = redirects[current]
+        return current
+
+    def _apply_confirmed_fusions(
+        self,
+        suggestions: List[Dict[str, Any]],
+    ) -> int:
+        if not suggestions:
+            return 0
+
+        redirects: Dict[str, str] = {}
+        merged_count = 0
+
+        for suggestion in suggestions:
+            pair_a = suggestion.get("a") or {}
+            pair_b = suggestion.get("b") or {}
+            node_a = self._resolve_fusion_node_id(str(pair_a.get("id", "")), redirects)
+            node_b = self._resolve_fusion_node_id(str(pair_b.get("id", "")), redirects)
+
+            if not node_a or not node_b or node_a == node_b:
+                continue
+            if not self.graph.has_node(node_a) or not self.graph.has_node(node_b):
+                continue
+
+            canonical_name = str(suggestion.get("canonical_name", "")).strip()
+            name_a = str(pair_a.get("name", "")).strip()
+            name_b = str(pair_b.get("name", "")).strip()
+
+            if canonical_name and canonical_name == name_a:
+                target_node_id, source_node_id = node_a, node_b
+            elif canonical_name and canonical_name == name_b:
+                target_node_id, source_node_id = node_b, node_a
+            else:
+                target_node_id, source_node_id = node_b, node_a
+
+            merged_node_id = self._merge_graph_nodes(
+                source_node_id,
+                target_node_id,
+                canonical_name=canonical_name or None,
+            )
+            redirects[source_node_id] = merged_node_id
+            merged_count += 1
+
+        return merged_count
 
     def _auto_attach_orphan_entities(self):
         """
@@ -2351,14 +3354,41 @@ class MedicalKGBuilder:
                 dst_lbl = node_label_by_id.get(v)
                 if not src_lbl or not dst_lbl:
                     continue
-                rel_grouped[rel_type][(src_lbl, dst_lbl)].append({
-                    "source": u,
-                    "target": v,
-                    "chunk_id": data.get("chunk_id", ""),
-                    "original_relation": data.get("original_relation", ""),
-                    "confidence": data.get("confidence", 0.8),
-                    "is_inverse": data.get("is_inverse", False),
-                })
+                rel_row = dict(data or {})
+                rel_row["source"] = u
+                rel_row["target"] = v
+                if "chunk_ids" not in rel_row:
+                    chunk_id = rel_row.get("chunk_id", "")
+                    rel_row["chunk_ids"] = [chunk_id] if chunk_id else []
+                rel_grouped[rel_type][(src_lbl, dst_lbl)].append(rel_row)
+
+            # --- Stage 2 Evidence Aggregation ---
+            # Merge duplicate (source, target) edges within each relation group:
+            # max-pool confidence, union chunk_ids, union support_doc_ids, count support.
+            for rel_type, by_lbls in rel_grouped.items():
+                for lbl_key, rels in by_lbls.items():
+                    pair_map = {}  # (source, target) -> merged row
+                    for r in rels:
+                        pair_key = (r["source"], r["target"])
+                        if pair_key not in pair_map:
+                            merged = dict(r)
+                            merged.setdefault("support_doc_ids", [])
+                            merged.setdefault("support_count", 1)
+                            pair_map[pair_key] = merged
+                        else:
+                            existing = pair_map[pair_key]
+                            existing["confidence"] = max(
+                                existing.get("confidence", 0),
+                                r.get("confidence", 0),
+                            )
+                            old_cids = set(existing.get("chunk_ids") or [])
+                            new_cids = set(r.get("chunk_ids") or [])
+                            existing["chunk_ids"] = sorted(old_cids | new_cids)
+                            old_dids = set(existing.get("support_doc_ids") or [])
+                            new_dids = set(r.get("support_doc_ids") or [])
+                            existing["support_doc_ids"] = sorted(old_dids | new_dids)
+                            existing["support_count"] = existing.get("support_count", 1) + 1
+                    by_lbls[lbl_key] = list(pair_map.values())
 
             for rel_type, by_lbls in rel_grouped.items():
                 allowed_rel_prop_keys = self.allowed_rel_props_by_type.get(rel_type, set())
@@ -2366,11 +3396,17 @@ class MedicalKGBuilder:
                     # 预过滤关系属性，只保留 schema 允许的键
                     rows = []
                     for r in rels:
+                        chunk_ids = r.get("chunk_ids") or []
+                        if not isinstance(chunk_ids, list):
+                            chunk_ids = [chunk_ids] if chunk_ids else []
+                        chunk_ids = [x for x in chunk_ids if x]
                         props = {
-                            "chunk_ids": [r.get("chunk_id", "")] if r.get("chunk_id") else [],
+                            "chunk_ids": chunk_ids,
                             "original_relation": r.get("original_relation", ""),
                             "confidence": r.get("confidence", 0.8),
                             "is_inverse": r.get("is_inverse", False),
+                            "support_doc_ids": r.get("support_doc_ids", []),
+                            "support_count": r.get("support_count", 1),
                         }
                         system_prop_keys = {"inferred", "support", "window", "refined_by", "reason"}
                         for k in system_prop_keys:
@@ -2412,7 +3448,13 @@ class MedicalKGBuilder:
         self.neo4j_driver.close()
         print("[OK] All connections closed")
 
-    def _register_chunk_entities(self, chunk_id: str, entity_types: Dict[str, Any], chunk: Dict[str, Any]):
+    def _register_chunk_entities(
+        self,
+        chunk_id: str,
+        entity_types: Dict[str, Any],
+        chunk: Dict[str, Any],
+        entity_node_ids: Optional[Dict[str, str]] = None,
+    ):
         """记录chunk内的实体稳定ID，用于后续共现增强。"""
         doc_id = str(chunk.get("doc_id", ""))
         self.chunk_doc_map[chunk_id] = doc_id
@@ -2422,7 +3464,13 @@ class MedicalKGBuilder:
         entities: List[Tuple[str, str]] = []
         seen = set()
         for name, etype in (entity_types or {}).items():
-            stable_id = self._generate_stable_entity_id(name, etype or "")
+            stable_id = entity_node_ids.get(name) if entity_node_ids else None
+            if not stable_id:
+                stable_id = self._generate_stable_entity_id(
+                    name,
+                    etype or "",
+                    self._infer_scope_chain(name, entity_types),
+                )
             if stable_id in seen:
                 continue
             seen.add(stable_id)
@@ -2479,8 +3527,8 @@ class MedicalKGBuilder:
 
         options = [
             "MENTIONED_IN", "CONTAINS", "CONNECTED_TO", "ADJACENT_TO", "REQUIRES",
-            "GUIDES", "REFERENCES", "PROVIDES", "PERFORMED_IN", "USES", "SUPPORTS",
-            "CO_OCCUR"
+            "GUIDES", "REFERENCES", "REFERS_TO", "PROVIDES", "PERFORMED_IN",
+            "USES", "SUPPORTS", "IS_TYPE_OF", "RELATES_TO", "CO_OCCUR"
         ]
         prompt = (
             "你是医疗建筑领域的专家。请将以下关系归类为最合理的一种关系类型，"
@@ -2516,7 +3564,7 @@ class MedicalKGBuilder:
         relation, confidence, extra = self._refine_relation_rule(subj_type, obj_type, context)
         if relation != "CO_OCCUR":
             return relation, confidence, extra
-        if os.getenv("KG_RELATION_REFINE_LLM", "1").lower() in {"1", "true", "yes"}:
+        if getattr(self, "relation_refine_with_llm", self._env_flag("KG_RELATION_REFINE_LLM", "1")):
             relation, confidence, extra_llm = self._refine_relation_llm(subj, subj_type, obj, obj_type, context)
             extra = {**extra, **extra_llm}
         return relation, confidence, extra
@@ -2695,8 +3743,143 @@ class MedicalKGBuilder:
         except Exception as exc:
             print(f"[WARN] Rules augmentation failed: {exc}")
 
+    def discover_latent_relations(self, max_pairs: int = 50, batch_size: int = 10):
+        """Stage 4b: Discover latent relations between entity pairs sharing source documents.
+
+        For entity pairs that co-occur in the same document but have no direct relation,
+        submit them to LLM for relation classification using schema-defined types.
+        """
+        if not getattr(self, "llm_client", None):
+            print("[Stage4b] No LLM client, skipping latent relation discovery.")
+            return
+
+        # 1. Build doc -> entity mapping
+        # _chunk_entity_index stores List[Tuple[node_id, entity_type]], not a dict.
+        doc_entities = defaultdict(set)
+        for chunk_id, entity_list in self._chunk_entity_index.items():
+            doc_id = self.chunk_doc_map.get(chunk_id, "")
+            if not doc_id:
+                continue
+            if isinstance(entity_list, dict):
+                # Fallback: test fixtures may pass a dict {name: node_id}
+                items = [(nid, name) for name, nid in entity_list.items()]
+            else:
+                # Production format: List[Tuple[node_id, entity_type]]
+                items = list(entity_list) if entity_list else []
+            for item in items:
+                if not item or len(item) < 2:
+                    continue
+                node_id = item[0]
+                node_data = self.graph.nodes.get(node_id, {})
+                props = node_data.get("properties", {})
+                entity_name = props.get("name") or props.get("title") or node_id
+                etype = props.get("schema_type") or (item[1] if len(item) > 1 else "")
+                doc_entities[doc_id].add((node_id, entity_name, etype))
+
+        # 2. Find entity pairs sharing docs but lacking direct relations
+        candidates = {}
+        for doc_id, entities in doc_entities.items():
+            entity_list = list(entities)
+            for i in range(len(entity_list)):
+                for j in range(i + 1, len(entity_list)):
+                    a_id, a_name, a_type = entity_list[i]
+                    b_id, b_name, b_type = entity_list[j]
+                    if a_id == b_id:
+                        continue
+                    has_direct = any(
+                        v == b_id for _, v, _ in self.graph.edges(a_id, data=True)
+                    ) or any(
+                        v == a_id for _, v, _ in self.graph.edges(b_id, data=True)
+                    )
+                    if has_direct:
+                        continue
+                    pair_key = tuple(sorted([a_id, b_id]))
+                    if pair_key not in candidates:
+                        candidates[pair_key] = {
+                            "a_id": a_id, "a_name": a_name, "a_type": a_type,
+                            "b_id": b_id, "b_name": b_name, "b_type": b_type,
+                            "shared_docs": set(),
+                        }
+                    candidates[pair_key]["shared_docs"].add(doc_id)
+
+        valid = [v for v in candidates.values() if len(v["shared_docs"]) >= 1]
+        valid = valid[:max_pairs]
+
+        if not valid:
+            print("[Stage4b] No candidate pairs found.")
+            return
+
+        print(f"[Stage4b] Found {len(valid)} candidate pairs for latent relation discovery.")
+
+        schema_relations = list(self.allowed_relation_types) if self.allowed_relation_types else [
+            "CONTAINS", "ADJACENT_TO", "CONNECTED_TO", "REQUIRES",
+            "PROVIDES", "PERFORMED_IN", "USES", "SUPPORTS", "GUIDES",
+        ]
+
+        added = 0
+        for i in range(0, len(valid), batch_size):
+            batch = valid[i:i + batch_size]
+            pairs_text = "\n".join(
+                f'{idx+1}. "{p["a_name"]}" ({p["a_type"]}) -- "{p["b_name"]}" ({p["b_type"]}), shared docs: {len(p["shared_docs"])}'
+                for idx, p in enumerate(batch)
+            )
+            prompt = (
+                "You are a healthcare architecture knowledge graph expert.\n"
+                "The following entity pairs appear in the same source documents but have no direct relation.\n"
+                "For each pair, determine if a relation exists and classify it.\n\n"
+                f"Allowed relation types: {', '.join(schema_relations)}\n\n"
+                f"Entity pairs:\n{pairs_text}\n\n"
+                'Return a JSON array. Each element:\n'
+                '{"entity_a": "...", "entity_b": "...", "has_relation": true/false, '
+                '"relation": "RELATION_TYPE", "reason": "brief reason"}\n'
+                "Only return the JSON array."
+            )
+
+            try:
+                resp = self.llm_client.chat_json(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                )
+                results = resp if isinstance(resp, list) else []
+
+                for idx, result in enumerate(results):
+                    if idx >= len(batch):
+                        break
+                    if not result.get("has_relation"):
+                        continue
+                    rel = result.get("relation", "RELATED_TO")
+                    if rel not in schema_relations and rel != "RELATED_TO":
+                        rel = "RELATED_TO"
+                    pair = batch[idx]
+                    shared = sorted(pair["shared_docs"])
+                    self.graph.add_edge(
+                        pair["a_id"], pair["b_id"],
+                        relation=rel,
+                        chunk_id=f"latent:{','.join(shared)}",
+                        chunk_ids=[f"latent:{d}" for d in shared],
+                        original_relation=f"latent_{rel}",
+                        confidence=0.6,
+                        inferred=True,
+                        support_doc_ids=shared,
+                        support_count=len(shared),
+                        reason=result.get("reason", ""),
+                    )
+                    added += 1
+            except Exception as exc:
+                print(f"[Stage4b] LLM batch failed: {exc}")
+                continue
+
+        print(f"[Stage4b] Added {added} latent relations.")
+
     def _determine_build_strategy(self) -> str:
         """交互式决定构建策略：rebuild 或 incremental。"""
+        explicit_mode = getattr(self, "build_mode", None)
+        if explicit_mode in {"rebuild", "incremental"}:
+            print(f"[INFO] Build mode via parameter: {explicit_mode}")
+            if explicit_mode == "rebuild":
+                self._prepare_for_rebuild()
+            return explicit_mode
+
         default_mode = os.getenv("KG_BUILD_MODE", "prompt").lower()
         if default_mode in {"rebuild", "incremental"}:
             print(f"[INFO] Build mode via env KG_BUILD_MODE={default_mode}")

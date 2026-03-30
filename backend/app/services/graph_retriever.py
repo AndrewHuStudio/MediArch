@@ -6,7 +6,7 @@ import logging
 from typing import List, Dict, Any
 
 from neo4j import AsyncGraphDatabase, GraphDatabase
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 # 关系类型限制：
 # - 设置为具体列表时，仅沿这些关系扩展（例如: ["CONTAINS", "LOCATED_IN"]）

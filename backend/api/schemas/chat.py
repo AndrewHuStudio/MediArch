@@ -3,7 +3,7 @@
 对话聊天相关数据模型
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 from backend.api.schemas.common import Citation, DiagnosticInfo
@@ -39,6 +39,13 @@ class ChatRequest(BaseModel):
 
     # 深度检索模式（可选）
     deep_search: Optional[bool] = Field(default=False, description="是否启用深度检索模式")
+    # 思考模式（可选，预留）
+    thinking_mode: Optional[bool] = Field(default=False, description="是否启用思考模式")
+
+    # 检索模式（实验用）：R0=Milvus-only, R1=Neo4j+Milvus, R2=Full pipeline
+    retrieval_mode: Optional[Literal["R0", "R1", "R2"]] = Field(
+        default=None, description="检索模式: R0(Milvus-only), R1(Neo4j+Milvus), R2(完整管线). 默认None=R2"
+    )
 
 
 class AgentStatusUpdate(BaseModel):

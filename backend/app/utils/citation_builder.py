@@ -56,7 +56,9 @@ def _convert_to_relative_path(absolute_path: str) -> str:
 
         # 尝试相对于 documents 目录
         project_root = Path(__file__).resolve().parents[3]  # backend/app/utils -> project_root
-        documents_dir = project_root / "backend" / "databases" / "documents"
+        documents_dir = Path(
+            os.getenv("DATA_PROCESS_DOCUMENTS_DIR", str(project_root / "data_process" / "documents"))
+        )
 
         try:
             relative_path = path.relative_to(documents_dir)

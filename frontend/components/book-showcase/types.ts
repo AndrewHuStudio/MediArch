@@ -1,12 +1,10 @@
-import type * as THREE from "three"
-
 export interface MaterialProps {
   color: string
   metalness: number
   roughness: number
   emissive: string
   emissiveIntensity: number
-  texture: THREE.Texture | null
+  texture: any
   offsetX: number
   offsetY: number
 }
@@ -26,6 +24,8 @@ export interface BookData {
   author: string
   publishedYear: number
   pages: number
+  metaLine: string
+  countLabel: string
   description: string[]
   genres: string[]
   rating: number

@@ -31,7 +31,7 @@ from contextlib import contextmanager
 import re as _re
 import time
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 依赖：请确保下面模块路径与项目结构一致

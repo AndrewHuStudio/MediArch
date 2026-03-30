@@ -4,5 +4,5 @@
 
 export * from './types'
 export * from './config'
-export { api, chatApi, knowledgeBaseApi, healthApi, type StreamCallbacks } from './client'
+export { api, chatApi, knowledgeBaseApi, healthApi, translateText, type StreamCallbacks } from './client'
 export { default } from './client'

@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from rich.console import Console
 from rich.table import Table
 

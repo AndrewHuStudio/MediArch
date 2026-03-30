@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 import re
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase
 
 from backend.databases.graph.optimization.name_normalizer import (

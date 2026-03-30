@@ -1,14 +1,31 @@
 "use client"
 
-import { useId, useMemo, useRef } from "react"
+import { useCallback, useId, useMemo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { FileText, ImageIcon } from "lucide-react"
-import { useChatContext } from "@/contexts/ChatContext"
+import { useChatContext, type Message } from "@/contexts/ChatContext"
 import { ShiningText } from "@/components/ui/shining-text"
 import { MarkdownContent, MessageWithSources } from "@/components/chat/message-with-sources"
 import { buildHeadingIdPrefix, prepareMarkdownWithToc } from "@/lib/markdown-toc"
+import { translateText } from "@/lib/api"
+import {
+  getAssistantMessageDisplayContent,
+  getNextAssistantDisplayLanguage,
+  shouldRequestAssistantTranslation,
+} from "@/lib/chat/message-translation"
+import { useT } from "@/lib/i18n"
 
-function AssistantMessageContent({ content, images }: { content: string; images: string[] }) {
+const CONVERSATION_STORAGE_PREFIX = "mediarch-conversation-"
+
+function AssistantMessageContent({
+  content,
+  images,
+  headerActions,
+}: {
+  content: string
+  images: string[]
+  headerActions?: React.ReactNode
+}) {
   const tocRef = useRef<HTMLDivElement>(null)
   const tocId = useId()
   const headingIdPrefix = useMemo(() => buildHeadingIdPrefix(tocId, "toc"), [tocId])
@@ -16,6 +33,7 @@ function AssistantMessageContent({ content, images }: { content: string; images:
     () => prepareMarkdownWithToc(content, headingIdPrefix),
     [content, headingIdPrefix]
   )
+  const { t } = useT()
 
   const scrollToToc = () => {
     tocRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -36,15 +54,18 @@ function AssistantMessageContent({ content, images }: { content: string; images:
 
   return (
     <>
-      {tocItems.length > 0 && (
-        <div className="sticky top-2 z-10 flex justify-end mb-2">
-          <button
-            type="button"
-            onClick={scrollToToc}
-            className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
-          >
-            回到目录
-          </button>
+      {(tocItems.length > 0 || headerActions) && (
+        <div className="sticky top-2 z-10 mb-2 flex items-center justify-end gap-2">
+          {headerActions}
+          {tocItems.length > 0 && (
+            <button
+              type="button"
+              onClick={scrollToToc}
+              className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
+            >
+              {t('chat.backToToc')}
+            </button>
+          )}
         </div>
       )}
       {tocItems.length > 0 && (
@@ -53,7 +74,7 @@ function AssistantMessageContent({ content, images }: { content: string; images:
           id={`${headingIdPrefix}-toc`}
           className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
         >
-          <div className="text-sm font-semibold text-white mb-2">目录</div>
+          <div className="text-sm font-semibold text-white mb-2">{t('chat.toc')}</div>
           <ul className="space-y-1 text-sm text-gray-200">
             {tocItems.map((item) => (
               <li key={item.id} className={`flex items-start gap-2 ${getTocIndentClass(item.level)}`}>
@@ -80,8 +101,11 @@ function AssistantMessageContent({ content, images }: { content: string; images:
 
 // 主消息列表组件
 export function ChatMessages({ agents }: { agents: string[] }) {
+  const { t } = useT()
   const {
     messages,
+    setMessages,
+    currentConversationId,
     isLoading,
     streamingMessage,
     isThinking,
@@ -96,11 +120,137 @@ export function ChatMessages({ agents }: { agents: string[] }) {
     return Math.min(...Array.from(activeAgents))
   }, [activeAgentIndex, activeAgents])
 
+  const persistMessages = useCallback(
+    (nextMessages: Message[]) => {
+      if (!currentConversationId || typeof window === "undefined") return
+
+      try {
+        const key = `${CONVERSATION_STORAGE_PREFIX}${currentConversationId}`
+        const raw = window.localStorage.getItem(key)
+        if (!raw) return
+
+        const conversation = JSON.parse(raw)
+        window.localStorage.setItem(
+          key,
+          JSON.stringify({
+            ...conversation,
+            messages: nextMessages,
+            timestamp: new Date().toISOString(),
+          }),
+        )
+      } catch (error) {
+        console.warn("Failed to persist translated message:", error)
+      }
+    },
+    [currentConversationId],
+  )
+
+  const updateMessages = useCallback(
+    (updater: (prev: Message[]) => Message[]) => {
+      setMessages((prev) => {
+        const next = updater(prev)
+        persistMessages(next)
+        return next
+      })
+    },
+    [persistMessages, setMessages],
+  )
+
+  const handleToggleTranslation = useCallback(
+    async (messageId: string) => {
+      const targetMessage = messages.find((msg) => msg.id === messageId && msg.role === "assistant")
+      if (!targetMessage || targetMessage.isTranslating) return
+
+      const nextLanguage = getNextAssistantDisplayLanguage(targetMessage)
+      if (nextLanguage === "zh") {
+        updateMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, displayLanguage: "zh", isTranslating: false }
+              : msg,
+          ),
+        )
+        return
+      }
+
+      if (!shouldRequestAssistantTranslation(targetMessage)) {
+        updateMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, displayLanguage: "en", isTranslating: false }
+              : msg,
+          ),
+        )
+        return
+      }
+
+      updateMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, isTranslating: true }
+            : msg,
+        ),
+      )
+
+      try {
+        const translated = await translateText(targetMessage.content, "en")
+        updateMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? {
+                  ...msg,
+                  translatedContent: translated,
+                  displayLanguage: "en",
+                  isTranslating: false,
+                }
+              : msg,
+          ),
+        )
+      } catch (error) {
+        console.warn("Failed to translate assistant message:", error)
+        updateMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === messageId
+              ? { ...msg, isTranslating: false, displayLanguage: "zh" }
+              : msg,
+          ),
+        )
+      }
+    },
+    [messages, updateMessages],
+  )
+
+  const renderTranslationControls = useCallback(
+    (msg: Message) => (
+      <div className="flex items-center gap-2">
+        {msg.isTranslating && (
+          <span className="text-[11px] text-gray-400">{t("translate.translating")}</span>
+        )}
+        <button
+          type="button"
+          onClick={() => void handleToggleTranslation(msg.id)}
+          disabled={msg.isTranslating}
+          className="rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-xs text-gray-200 transition-colors hover:border-white/40 hover:text-white disabled:cursor-wait disabled:opacity-70"
+          title={msg.displayLanguage === "en" ? t("translate.toChinese") : t("translate.toEnglish")}
+        >
+          中 / EN
+        </button>
+      </div>
+    ),
+    [handleToggleTranslation, t],
+  )
+
   return (
     <div className="flex-1 overflow-y-auto px-2 space-y-6">
       {messages.map((msg, index) =>
         msg.role === "assistant" && (msg.sources || msg.images) ? (
-          <MessageWithSources key={msg.id} content={msg.content} sources={msg.sources} images={msg.images} />
+          <MessageWithSources
+            key={msg.id}
+            content={getAssistantMessageDisplayContent(msg)}
+            sources={msg.sources}
+            images={msg.images}
+            headerActions={renderTranslationControls(msg)}
+          />
         ) : (
           <motion.div
             key={msg.id}
@@ -117,7 +267,11 @@ export function ChatMessages({ agents }: { agents: string[] }) {
               }`}
             >
               {msg.role === "assistant" ? (
-                <AssistantMessageContent content={msg.content} images={msg.images || []} />
+                <AssistantMessageContent
+                  content={getAssistantMessageDisplayContent(msg)}
+                  images={msg.images || []}
+                  headerActions={renderTranslationControls(msg)}
+                />
               ) : (
                 <>
                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
@@ -155,10 +309,10 @@ export function ChatMessages({ agents }: { agents: string[] }) {
           >
             <div className="max-w-[75%] bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20 text-white">
               <div className="mb-2">
-                <ShiningText text={`${resolvedAgentIndex >= 0 ? agents[resolvedAgentIndex] : "系统"} 正在思考...`} />
+                <ShiningText text={`${resolvedAgentIndex >= 0 ? agents[resolvedAgentIndex] : t('chat.system')} ${t('chat.thinking')}`} />
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <span className="text-gray-400">[思路]</span>
+                <span className="text-gray-400">{t('chat.thought')}</span>
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={currentThought}

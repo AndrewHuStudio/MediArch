@@ -13,9 +13,10 @@ export function CameraController({ params }: { params: BookParams }) {
       prevParams.current.cameraPosition !== params.cameraPosition ||
       prevParams.current.cameraFov !== params.cameraFov
     ) {
-      camera.position.set(...params.cameraPosition)
-      camera.fov = params.cameraFov
-      camera.updateProjectionMatrix()
+      const perspectiveCamera = camera as any
+      perspectiveCamera.position.set(...params.cameraPosition)
+      perspectiveCamera.fov = params.cameraFov
+      perspectiveCamera.updateProjectionMatrix()
       prevParams.current = params
     }
   })

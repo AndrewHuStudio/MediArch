@@ -9,7 +9,7 @@ from datetime import timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from pymongo import MongoClient
 
 # Add project root to path

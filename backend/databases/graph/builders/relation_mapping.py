@@ -12,6 +12,7 @@ import json
 import os
 import re
 from difflib import get_close_matches
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict
 
@@ -32,6 +33,12 @@ RELATION_MAPPING: Dict[str, str] = {
     "设置": "CONTAINS",  # 新增
     "分为": "CONTAINS",  # 新增：分为XX部分
     "contains": "CONTAINS",
+    "has feature": "CONTAINS",
+    "has_feature": "CONTAINS",
+    "has features": "CONTAINS",
+    "has_features": "CONTAINS",
+    "has part": "CONTAINS",
+    "has_part": "CONTAINS",
 
     "邻近": "ADJACENT_TO",
     "相邻": "ADJACENT_TO",
@@ -79,6 +86,8 @@ RELATION_MAPPING: Dict[str, str] = {
     "应设": "REQUIRES",  # 新增
     "require": "REQUIRES",
     "requires": "REQUIRES",
+    "depends on": "REQUIRES",
+    "depends_on": "REQUIRES",
 
     "提供": "PROVIDES",
     "提供服务": "PROVIDES",
@@ -87,6 +96,10 @@ RELATION_MAPPING: Dict[str, str] = {
     "在": "PERFORMED_IN",
     "位于": "PERFORMED_IN",
     "实施于": "PERFORMED_IN",
+    "located in": "PERFORMED_IN",
+    "located_in": "PERFORMED_IN",
+    "used in": "PERFORMED_IN",
+    "used_in": "PERFORMED_IN",
     "可进行": "PROVIDES",
     "设置": "PROVIDES",
 
@@ -98,6 +111,8 @@ RELATION_MAPPING: Dict[str, str] = {
     "用于": "SUPPORTS",
     "适用于": "SUPPORTS",
     "满足": "SUPPORTS",
+    "used for": "SUPPORTS",
+    "used_for": "SUPPORTS",
 
     "指导": "GUIDES",
     "指导着": "GUIDES",
@@ -123,6 +138,26 @@ RELATION_MAPPING: Dict[str, str] = {
     "涉及": "RELATED_TO",  # 新增
     "related": "RELATED_TO",
     "related_to": "RELATED_TO",
+
+    # 新增：schema 定义但之前缺失的关系类型
+    "is type of": "IS_TYPE_OF",
+    "is a type of": "IS_TYPE_OF",
+    "type of": "IS_TYPE_OF",
+    "属于类型": "IS_TYPE_OF",
+    "类型": "IS_TYPE_OF",
+    "is_type_of": "IS_TYPE_OF",
+
+    "relates to": "RELATES_TO",
+    "related with": "RELATES_TO",
+    "relates_to": "RELATES_TO",
+
+    "refers to": "REFERS_TO",
+    "refer to": "REFERS_TO",
+    "cross-references": "REFERS_TO",
+    "refers_to": "REFERS_TO",
+    "参见": "REFERS_TO",
+    "详见": "REFERS_TO",
+    "见": "REFERS_TO",
     
     # 过滤掉不应该作为关系的词（映射为SKIP，后续跳过）
     "具有": "SKIP",  # 这应该是属性，不是关系
@@ -136,6 +171,22 @@ RELATION_MAPPING: Dict[str, str] = {
     "转变为": "SKIP",  # 太模糊
     "建立": "SKIP",    # 太模糊
     "应对": "SKIP",    # 太模糊
+    "has attribute": "SKIP",
+    "has_attribute": "SKIP",
+    "has specification": "SKIP",
+    "has_specification": "SKIP",
+    "has quantity": "SKIP",
+    "has_quantity": "SKIP",
+    "has value": "SKIP",
+    "has_value": "SKIP",
+    "has size": "SKIP",
+    "has_size": "SKIP",
+    "has area": "SKIP",
+    "has_area": "SKIP",
+    "has code": "SKIP",
+    "has_code": "SKIP",
+    "has room code": "SKIP",
+    "has_room_code": "SKIP",
 }
 
 # 反向关系映射（自动生成）
@@ -156,11 +207,14 @@ STANDARD_RELATIONS = [
     "REQUIRED_BY",
     "GUIDES",
     "REFERENCES",
+    "REFERS_TO",
     "PROVIDES",
     "PERFORMED_IN",
     "USES",
     "SUPPORTS",
-    "RELATED_TO"
+    "IS_TYPE_OF",
+    "RELATES_TO",
+    "RELATED_TO",
 ]
 
 RELATION_ALIAS_PATH = os.getenv("KG_RELATION_ALIASES_PATH")
@@ -171,6 +225,7 @@ UNKNOWN_RELATION_LOG = os.getenv(
 )
 LLM_FALLBACK_ENABLED = os.getenv("KG_RELATION_LLM_FALLBACK", "0").lower() in {"1", "true", "yes"}
 LLM_FALLBACK_MODEL = os.getenv("KG_RELATION_LLM_MODEL", "gpt-4o-mini")
+LLM_FALLBACK_TIMEOUT = float(os.getenv("KG_RELATION_LLM_TIMEOUT", "20"))
 _QUANTITATIVE_PATTERNS = [
     re.compile(r"\d+\.?\d*\s*[㎡m²mM平方米立方米]"),
     re.compile(r"\d+\.?\d*\s*[床位张台]"),
@@ -245,10 +300,15 @@ def _llm_classify_relation(name: str) -> str:
             "当前关系词：\"" + name.strip() + "\"\n"
             "若不确定，回答 UNKNOWN。"
         )
+        timeout = LLM_FALLBACK_TIMEOUT
+        client_timeout = getattr(_llm_client, "request_timeout", None)
+        if client_timeout is not None:
+            timeout = min(float(client_timeout), float(LLM_FALLBACK_TIMEOUT))
         resp = _llm_client.client.chat.completions.create(
             model=_llm_client.model,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
+            timeout=timeout,
         )
         answer = (resp.choices[0].message.content or "").strip().upper()
         return answer if answer in STANDARD_RELATIONS else ""
@@ -260,7 +320,8 @@ def _llm_classify_relation(name: str) -> str:
 _load_dynamic_aliases()
 
 
-def normalize_relation(relation_name: str) -> str:
+@lru_cache(maxsize=1024)
+def _normalize_relation_cached(relation_name: str) -> str:
     if not relation_name:
         return "RELATED_TO"
 
@@ -295,6 +356,10 @@ def normalize_relation(relation_name: str) -> str:
     print(f"[WARN] Unknown relation '{relation_name}', mapping to RELATED_TO")
     _log_unknown_relation(relation_name)
     return "RELATED_TO"
+
+
+def normalize_relation(relation_name: str) -> str:
+    return _normalize_relation_cached(str(relation_name or ""))
 
 
 def get_inverse_relation(relation: str) -> str:

@@ -33,7 +33,7 @@ class AgentRequest(BaseModel):
     filters: Dict[str, Any] = Field(default_factory=dict)
     top_k: int = Field(default=20, ge=1, le=100)  # [FIX 2026-01-14] 从8增加到20
     lang: str = Field(default="zh")
-    timeout_ms: int = Field(default=1500, ge=100, le=120000)
+    timeout_ms: int = Field(default=1500, ge=0, le=120000)
     trace_id: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     context: List[str] = Field(default_factory=list)
@@ -416,7 +416,7 @@ class AgentConfig(BaseModel):
     display_name: str
     agent_type: str
 
-    timeout_ms: int = Field(default=1500, ge=100, le=120_000)
+    timeout_ms: int = Field(default=1500, ge=0, le=120_000)
     retry: int = Field(default=1, ge=0, le=5)
     retry_delay_ms: int = Field(default=200, ge=0, le=10_000)
     concurrency_limit: int = Field(default=4, ge=1, le=32)
@@ -553,11 +553,14 @@ class BaseAgent(ABC):
             try:
                 self.status = AgentStatus.BUSY
 
-                # 执行核心逻辑
-                response = await asyncio.wait_for(
-                    self._run(request),
-                    timeout=self.config.timeout_ms / 1000.0
-                )
+                # timeout_ms <= 0 means unlimited wait for long-running retrieval/model calls.
+                if self.config.timeout_ms <= 0:
+                    response = await self._run(request)
+                else:
+                    response = await asyncio.wait_for(
+                        self._run(request),
+                        timeout=self.config.timeout_ms / 1000.0
+                    )
 
                 # 记录成功
                 latency_ms = (time.time() - start_time) * 1000
@@ -699,6 +702,12 @@ def create_worker_adapter(worker_name: str, worker_graph: Any) -> Callable:
             "request": state.get("request"),
             "query": state.get("query"),
         }
+        # 补充传递 filters 和 original_query，避免 Worker 内部直接读 state 时拿到 None
+        request = state.get("request")
+        if request and hasattr(request, "filters"):
+            worker_input["filters"] = request.filters
+        if state.get("original_query"):
+            worker_input["original_query"] = state.get("original_query")
 
         try:
             # 调用 Worker 子图

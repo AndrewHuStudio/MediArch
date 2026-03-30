@@ -41,7 +41,7 @@ from datetime import datetime
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
 from rich.panel import Panel

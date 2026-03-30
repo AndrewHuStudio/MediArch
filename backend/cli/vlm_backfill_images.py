@@ -33,7 +33,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table

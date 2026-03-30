@@ -17,7 +17,7 @@ import math
 import os
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from pymilvus import Collection, connections, utility
 
 from backend.databases.ingestion.indexing.embedding import EmbeddingGenerator

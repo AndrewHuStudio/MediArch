@@ -23,6 +23,8 @@ from typing import List, Dict, Set, Optional, Tuple
 from collections import defaultdict
 import logging
 
+logger = logging.getLogger(__name__)
+
 # [FIX 2025-12-04] 抑制 pkg_resources 弃用警告（jieba 依赖）
 warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
 
@@ -62,12 +64,20 @@ try:
             pass
 
     JIEBA_AVAILABLE = True
-    logging.info("[QueryExpansion] jieba已导入，已强制禁用缓存写入")
-except ImportError:
+    JIEBA_IMPORT_ERROR = None
+    logger.info("[QueryExpansion] jieba已导入，已强制禁用缓存写入")
+except ImportError as exc:
     JIEBA_AVAILABLE = False
-    logging.warning("[QueryExpansion] jieba未安装，将使用基础分词")
+    JIEBA_IMPORT_ERROR = str(exc)
 
-logger = logging.getLogger(__name__)
+
+def get_query_expansion_runtime_status() -> Dict[str, Optional[str] | bool]:
+    return {
+        "jieba_available": JIEBA_AVAILABLE,
+        "tokenizer_backend": "jieba" if JIEBA_AVAILABLE else "regex",
+        "fallback_reason": None if JIEBA_AVAILABLE else "missing_jieba",
+        "import_error": JIEBA_IMPORT_ERROR,
+    }
 
 
 # ============================================================================
@@ -183,7 +193,7 @@ class QueryExpansion:
         if self.use_jieba:
             logger.info("[QueryExpansion] 使用jieba分词")
         else:
-            logger.info("[QueryExpansion] 使用正则分词")
+            logger.info("[QueryExpansion] 使用正则分词（jieba 不可用）")
 
     def tokenize(self, query: str) -> List[str]:
         """

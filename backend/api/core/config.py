@@ -11,6 +11,8 @@ from typing import List, Literal
 
 from pydantic_settings import BaseSettings
 
+from backend.app.agents.postgres_deployment_policy import get_shared_postgres_uri
+
 
 class Settings(BaseSettings):
     """应用配置"""
@@ -27,17 +29,17 @@ class Settings(BaseSettings):
     # API 服务器配置
     # ====================
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = 8010
     API_PREFIX: str = "/api/v1"
 
     # ====================
     # CORS 配置
     # ====================
     CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",  # Next.js 开发服务器
-        "http://localhost:7860",  # Gradio (已废弃)
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:7860",
+        "http://localhost:3010",  # Next.js 开发服务器
+        "http://localhost:3011",  # 数据处理前端
+        "http://127.0.0.1:3010",
+        "http://127.0.0.1:3011",
     ]
 
     # ====================
@@ -72,8 +74,28 @@ class Settings(BaseSettings):
     # PostgreSQL Checkpoint (来自 mediarch_graph)
     POSTGRES_CHECKPOINT_URI: str = os.getenv(
         "POSTGRES_CHECKPOINT_URI",
-        "postgresql://postgres:postgres@localhost:5432/mediarch_checkpoints?sslmode=disable"
+        get_shared_postgres_uri(),
     )
+    PERSISTENCE_POSTGRES_URI: str = os.getenv(
+        "PERSISTENCE_POSTGRES_URI",
+        get_shared_postgres_uri(),
+    )
+    SESSION_STORE_BACKEND: str = os.getenv(
+        "SESSION_STORE_BACKEND",
+        os.getenv("STORE_BACKEND", os.getenv("CHECKPOINT_BACKEND", "sqlite")),
+    )
+    SQLITE_SESSION_STORE_PATH: str = os.getenv(
+        "SQLITE_SESSION_STORE_PATH",
+        os.getenv("SQLITE_STORE_PATH", ".langgraph_api/store.db"),
+    )
+    POSTGRES_SESSION_STORE_URI: str = os.getenv(
+        "POSTGRES_SESSION_STORE_URI",
+        os.getenv("POSTGRES_STORE_URI", os.getenv("POSTGRES_CHECKPOINT_URI", get_shared_postgres_uri())),
+    )
+    REQUIRE_POSTGRES_PERSISTENCE: bool = os.getenv(
+        "REQUIRE_POSTGRES_PERSISTENCE",
+        "false",
+    ).strip().lower() in {"1", "true", "yes", "on"}
 
     # Redis (可选，用于缓存)
     REDIS_HOST: str = "localhost"

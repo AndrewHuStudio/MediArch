@@ -47,6 +47,15 @@ import zipfile
 import io
 from glob import glob
 
+try:
+    from backend.env_loader import load_dotenv
+    # 兼容直接运行 data_process API：优先加载项目根目录 .env
+    _ROOT_ENV = Path(__file__).resolve().parents[4] / ".env"
+    load_dotenv(_ROOT_ENV)
+    load_dotenv()
+except Exception:
+    pass
+
 
 class MineruClient:
     def __init__(
@@ -64,8 +73,13 @@ class MineruClient:
         env_cuda = os.getenv("MINERU_USE_CUDA", "0").lower()
         self.use_cuda = bool(use_cuda) if use_cuda is not None else (env_cuda in {"1", "true", "yes"})
         # 远程 API（可选）
-        self.api_url = os.getenv("MINERU_API_URL") or None
+        self.api_url = self._resolve_api_url(
+            os.getenv("MINERU_API_URL"),
+            os.getenv("MINERU_BASE_URL"),
+        )
         self.api_key = os.getenv("MINERU_API_KEY") or None
+        # 官方 v4 常用值：vlm / pipeline
+        self.model_version = (os.getenv("MINERU_MODEL_VERSION") or "").strip().lower() or None
         self.api_mode = (os.getenv("MINERU_API_MODE") or "auto").strip().lower()  # auto|batch|task|direct
 
     # 与 TextInClient 对齐的接口
@@ -115,8 +129,8 @@ class MineruClient:
                     except Exception:
                         label = None
                 label = label or "full"
-                # 使用稳定子目录名，统一归并到资料目录根，不再保留按页段的子目录
-                out_dir_p = base
+                # 使用稳定子目录名，避免分段 OCR 产物互相覆盖。
+                out_dir_p = base / label
                 try:
                     out_dir_p.mkdir(parents=True, exist_ok=True)
                 except Exception:
@@ -243,6 +257,19 @@ class MineruClient:
             sess.proxies = {}
         return sess
 
+    @staticmethod
+    def _resolve_api_url(api_url: Optional[str], base_url: Optional[str]) -> Optional[str]:
+        """兼容 MINERU_API_URL 与 MINERU_BASE_URL 两种配置。"""
+        if api_url and str(api_url).strip():
+            return str(api_url).strip().rstrip("/")
+        if not base_url or not str(base_url).strip():
+            return None
+        base = str(base_url).strip().rstrip("/")
+        lower = base.lower()
+        if lower.endswith("/file-urls/batch") or lower.endswith("/extract/task"):
+            return base
+        return f"{base}/file-urls/batch"
+
     def _parse_pdf_via_api_task(self, pdf_path: str, page_range: Optional[Tuple[int, int]], artifacts_dir: Optional[str]) -> Dict[str, Any]:
         """基于 URL 的任务创建与结果轮询。注意：该模式要求可公网访问的文件 URL。
 
@@ -326,8 +353,14 @@ class MineruClient:
             try:
                 base = Path(artifacts_dir).resolve()
                 base.mkdir(parents=True, exist_ok=True)
-                # 统一落地到根目录（覆盖）
-                saved_dir = base
+                label = "full"
+                if page_range and isinstance(page_range, tuple):
+                    try:
+                        s, e = int(page_range[0]), int(page_range[1])
+                        label = f"p{s}-{e}"
+                    except Exception:
+                        label = "full"
+                saved_dir = base / label
                 saved_dir.mkdir(parents=True, exist_ok=True)
                 for item in attachments:
                     if not isinstance(item, dict):
@@ -385,7 +418,7 @@ class MineruClient:
                 pr_str = f"{s}-{e}"
             except Exception:
                 pr_str = None
-        model_version = "vlm" if (str(self.backend).lower().startswith("vlm")) else "pipeline"
+        model_version = self.model_version or ("vlm" if (str(self.backend).lower().startswith("vlm")) else "pipeline")
         body = {
             "enable_formula": True,
             "language": "ch",
@@ -487,8 +520,14 @@ class MineruClient:
         if artifacts_dir:
             base = Path(artifacts_dir).resolve()
             base.mkdir(parents=True, exist_ok=True)
-            # 统一落地到根目录（覆盖）
-            saved_dir = base
+            label = "full"
+            if page_range and isinstance(page_range, tuple):
+                try:
+                    s, e = int(page_range[0]), int(page_range[1])
+                    label = f"p{s}-{e}"
+                except Exception:
+                    label = "full"
+            saved_dir = base / label
             saved_dir.mkdir(parents=True, exist_ok=True)
         # 下载
         zr = sess.get(full_zip_url, timeout=600)
@@ -948,5 +987,3 @@ class MineruClient:
             return bool(getattr(torch, "cuda", None) and torch.cuda.is_available())
         except Exception:
             return False
-
-

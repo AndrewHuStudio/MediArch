@@ -24,8 +24,21 @@ import os
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from neo4j import GraphDatabase
+
+
+SEED_DATA_ENV_VAR = "KG_SEED_DATA_PATH"
+
+
+def resolve_seed_data_path() -> Path:
+    seed_path = (os.getenv(SEED_DATA_ENV_VAR) or "").strip()
+    if not seed_path:
+        raise RuntimeError(f"{SEED_DATA_ENV_VAR} environment variable is required.")
+    json_path = Path(seed_path).expanduser().resolve()
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_path}")
+    return json_path
 
 
 class OntologySeederV2:
@@ -33,12 +46,11 @@ class OntologySeederV2:
 
     def __init__(
         self,
-        json_path: Path,
         dry_run: bool = False,
         clear_existing: bool = False
     ) -> None:
         load_dotenv()
-        self.json_path = json_path
+        self.json_path = resolve_seed_data_path()
         self.dry_run = dry_run
         self.clear_existing = clear_existing
 
@@ -47,7 +59,7 @@ class OntologySeederV2:
             self.data = json.load(f)
 
         self.version = self.data.get("_version", "2.0")
-        self.source = self.data.get("_source", str(json_path))
+        self.source = self.data.get("_source", str(self.json_path))
 
         # 连接Neo4j
         self.database = os.getenv("NEO4J_DATABASE", "neo4j")
@@ -356,6 +368,7 @@ class OntologySeederV2:
                     MERGE (c:DesignMethodCategory {id: $id})
                     ON CREATE SET
                         c.name = $name,
+                        c.problem_domain = $problem_domain,
                         c.is_concept = true,
                         c.seed_version = $seed_version,
                         c.seed_source = $seed_source,
@@ -364,10 +377,12 @@ class OntologySeederV2:
                         c.created_at = datetime($created_at)
                     ON MATCH SET
                         c.seed_version = $seed_version,
+                        c.problem_domain = $problem_domain,
                         c.updated_at = datetime($created_at)
                 """,
                     id=node_id,
                     name=name,
+                    problem_domain=category.get("problem_domain", ""),
                     seed_version=category.get("seed_version", self.version),
                     seed_source=category.get("seed_source", self.source),
                     description=category.get("description", ""),
@@ -508,11 +523,6 @@ class OntologySeederV2:
 def main():
     parser = argparse.ArgumentParser(description="Seed ontology skeleton v2.0 into Neo4j")
     parser.add_argument(
-        "--json",
-        default="backend/databases/graph/schemas/ontology_seed_data.json",
-        help="JSON数据文件路径（默认：ontology_seed_data.json）",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="仅解析但不写入Neo4j",
@@ -524,12 +534,7 @@ def main():
     )
     args = parser.parse_args()
 
-    json_path = Path(args.json)
-    if not json_path.exists():
-        raise FileNotFoundError(f"JSON file not found: {json_path}")
-
     seeder = OntologySeederV2(
-        json_path=json_path,
         dry_run=args.dry_run,
         clear_existing=args.clear
     )

@@ -1,9 +1,7 @@
 {
   "_comment": "医疗建筑标准空间骨架 - 预注入数据",
-  "_version": "2.1",
-  "_source": "基于 医院功能分区图.md 和 GB 51039-2014",
   "_description": "这是知识图谱的骨架，所有从文档中提取的实体都应该挂载到这些概念节点上",
-  "_update_log": "v2.1 优化设计方法分类体系，对齐问题域框架(动/位/净/感/时)，增加AGV物流、医疗街采光、屋顶花园、模块化设计等种子方法",
+  "_update_log": "优化设计方法分类体系，对齐问题域框架(动/位/净/感/时)",
 
   "hospital": {
     "name": "综合医院",
@@ -22,8 +20,7 @@
       "label": "DesignMethodCategory",
       "is_concept": true,
       "description": "解决'动'的问题：人流、物流、洁污流线组织优化，包括走廊设计、AGV物流路径、电梯配置等",
-      "problem_domain": "动",
-      "seed_version": "2.1",
+      "problem_domain": "flow",
       "seed_source": "ontology_seed_data_v2"
     },
     {
@@ -31,8 +28,7 @@
       "label": "DesignMethodCategory",
       "is_concept": true,
       "description": "解决'位'的问题：功能分区、空间组织、平面布置，包括单元式护理、中心辐射式布局等",
-      "problem_domain": "位",
-      "seed_version": "2.1",
+      "problem_domain": "position",
       "seed_source": "ontology_seed_data_v2"
     },
     {
@@ -40,8 +36,7 @@
       "label": "DesignMethodCategory",
       "is_concept": true,
       "description": "解决'净'的问题：洁净区划分、污染控制、消毒灭菌，包括三区划分法、负压隔离技术等",
-      "problem_domain": "净",
-      "seed_version": "2.1",
+      "problem_domain": "cleanliness",
       "seed_source": "ontology_seed_data_v2"
     },
     {
@@ -49,8 +44,7 @@
       "label": "DesignMethodCategory",
       "is_concept": true,
       "description": "解决'感'的问题：空气质量、声光环境、景观介入，包括医疗街采光、屋顶花园、自然通风等",
-      "problem_domain": "感",
-      "seed_version": "2.1",
+      "problem_domain": "sensation",
       "seed_source": "ontology_seed_data_v2"
     },
     {
@@ -58,8 +52,7 @@
       "label": "DesignMethodCategory",
       "is_concept": true,
       "description": "解决'时'的问题：空间利用率、流程优化、运营效率提升，包括模块化设计、标准化诊室等",
-      "problem_domain": "时",
-      "seed_version": "2.1",
+      "problem_domain": "time",
       "seed_source": "ontology_seed_data_v2"
     }
   ],
@@ -76,7 +69,6 @@
       "applicable_spaces": ["手术部", "产房", "重症监护室"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "医院建筑设计规范"
     },
     {
@@ -90,7 +82,6 @@
       "applicable_spaces": ["住院部", "手术部", "消毒供应室", "药房"],
       "applicability": "可选",
       "design_phase": "初步设计",
-      "seed_version": "2.1",
       "seed_source": "智慧医院建设技术导则"
     },
     {
@@ -104,7 +95,6 @@
       "applicable_spaces": ["住院部", "护理单元"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "医院建筑设计指南"
     },
     {
@@ -118,7 +108,6 @@
       "applicable_spaces": ["门诊部", "住院部", "急诊部"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "医院建筑设计优化研究"
     },
     {
@@ -132,7 +121,6 @@
       "applicable_spaces": ["手术部", "消毒供应室", "ICU", "传染病房"],
       "applicability": "强制",
       "design_phase": "全阶段",
-      "seed_version": "2.1",
       "seed_source": "GB 51039-2014"
     },
     {
@@ -146,7 +134,6 @@
       "applicable_spaces": ["传染病房", "负压隔离病房", "ICU"],
       "applicability": "强制",
       "design_phase": "初步设计",
-      "seed_version": "2.1",
       "seed_source": "传染病医院建筑设计规范"
     },
     {
@@ -160,7 +147,6 @@
       "applicable_spaces": ["门诊部", "住院部", "医技部"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "医院建筑设计创新实践"
     },
     {
@@ -174,7 +160,6 @@
       "applicable_spaces": ["住院部", "康复区", "精神病区"],
       "applicability": "可选",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "疗愈性医疗建筑设计研究"
     },
     {
@@ -188,7 +173,6 @@
       "applicable_spaces": ["门诊部", "住院部", "医技部"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "装配式医疗建筑技术导则"
     },
     {
@@ -202,7 +186,6 @@
       "applicable_spaces": ["门诊部", "体检中心"],
       "applicability": "推荐",
       "design_phase": "方案设计",
-      "seed_version": "2.1",
       "seed_source": "门诊建筑设计优化研究"
     }
   ],

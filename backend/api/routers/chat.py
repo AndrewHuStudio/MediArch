@@ -14,6 +14,7 @@
 import asyncio
 import json
 import logging
+import re
 import time
 import uuid
 from typing import AsyncGenerator, Dict, Any, List, Optional
@@ -23,6 +24,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
+from langchain.chat_models import init_chat_model
 
 from backend.api.schemas.chat import (
     ChatRequest,
@@ -34,65 +36,52 @@ from backend.api.schemas.chat import (
 )
 from backend.api.schemas.common import Citation
 from backend.api.core.config import settings
+from backend.api.session_store import (
+    build_session_store_repository,
+    resolve_session_store_runtime_status,
+)
 
 # 导入 LangGraph MediArch Graph
 from backend.app.agents.mediarch_graph import graph as mediarch_graph
-from backend.app.agents.base_agent import AgentRequest, AgentResponse
+from backend.app.agents.base_agent import AgentRequest, AgentResponse, get_llm_manager
+from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 logger = logging.getLogger("mediarch_api")
 
 router = APIRouter()
 
-# ============================================================================
-# 会话管理（简单内存存储，生产环境应使用 Redis/PostgreSQL）
-# ============================================================================
+SESSION_REPOSITORY_RUNTIME_STATUS = resolve_session_store_runtime_status(
+    backend=settings.SESSION_STORE_BACKEND,
+)
+SESSION_REPOSITORY = build_session_store_repository(
+    max_history=settings.MAX_HISTORY_LENGTH,
+    backend=settings.SESSION_STORE_BACKEND,
+    sqlite_path=settings.SQLITE_SESSION_STORE_PATH,
+    postgres_uri=settings.POSTGRES_SESSION_STORE_URI,
+)
 
-# 临时会话存储（进程重启后会丢失）
-SESSION_STORE: Dict[str, Dict[str, Any]] = {}
+
+def _describe_chat_stream_error(exc: BaseException) -> str:
+    """生成适合返回给前端的流式错误信息。"""
+    if isinstance(exc, asyncio.TimeoutError):
+        timeout_ms = settings.SUPERVISOR_TIMEOUT_MS
+        return f"处理超时，请稍后重试（>{timeout_ms}ms）"
+
+    message = str(exc).strip()
+    if message:
+        return message
+
+    return f"{exc.__class__.__name__}: 未提供详细错误信息"
 
 
 def _get_or_create_session(session_id: str | None = None) -> str:
     """获取或创建会话"""
-    if session_id and session_id in SESSION_STORE:
-        # 更新最后活跃时间
-        SESSION_STORE[session_id]["last_active"] = time.time()
-        return session_id
-
-    # 创建新会话
-    new_session_id = session_id or f"session-{uuid.uuid4().hex[:16]}"
-    SESSION_STORE[new_session_id] = {
-        "session_id": new_session_id,
-        "created_at": time.time(),
-        "last_active": time.time(),
-        "messages": [],
-        "title": "New Chat",
-        "is_pinned": False,
-    }
-    return new_session_id
+    return SESSION_REPOSITORY.get_or_create_session(session_id)
 
 
 def _add_message_to_session(session_id: str, role: str, content: str, citations=None, images=None):
     """添加消息到会话历史"""
-    if session_id not in SESSION_STORE:
-        return
-
-    message = {
-        "role": role,
-        "content": content,
-        "timestamp": time.time(),
-        "citations": citations or [],
-        "images": images or [],
-    }
-    SESSION_STORE[session_id]["messages"].append(message)
-
-    # 自动生成标题（第一条用户消息）
-    if role == "user" and SESSION_STORE[session_id]["title"] == "New Chat":
-        SESSION_STORE[session_id]["title"] = content[:50] + ("..." if len(content) > 50 else "")
-
-    # 限制历史长度
-    max_history = settings.MAX_HISTORY_LENGTH
-    if len(SESSION_STORE[session_id]["messages"]) > max_history:
-        SESSION_STORE[session_id]["messages"] = SESSION_STORE[session_id]["messages"][-max_history:]
+    SESSION_REPOSITORY.add_message(session_id, role, content, citations=citations, images=images)
 
 
 def _extract_citations_from_items(
@@ -456,7 +445,11 @@ def _order_image_refs_for_injection(image_refs: List[Dict[str, Any]]) -> List[Di
     return sorted(image_refs, key=_key)
 
 
-def _extract_image_refs(citations: List[Dict[str, Any]], api_base: str, max_images: int = 5) -> List[Dict[str, Any]]:
+def _extract_image_refs(
+    citations: List[Dict[str, Any]],
+    api_base: str,
+    max_images: Optional[int] = None,
+) -> List[Dict[str, Any]]:
     """Build browser-accessible image URLs + captions from citations."""
     api_base = (api_base or "").rstrip("/")
     api_root = f"{api_base}{settings.API_PREFIX}".rstrip("/")
@@ -495,7 +488,7 @@ def _extract_image_refs(citations: List[Dict[str, Any]], api_base: str, max_imag
                 "page_number": cite.get("page_number"),
             }
         )
-        if len(out) >= max_images:
+        if max_images is not None and len(out) >= max_images:
             break
 
     return out
@@ -519,17 +512,25 @@ def _build_image_relation_summary(image_refs: List[Dict[str, Any]]) -> str:
 
 
 def _image_placeholder_block(image_refs: List[Dict[str, Any]]) -> str:
-    if not image_refs:
+    return _image_placeholder_block_for_entries(list(enumerate(image_refs)))
+
+
+def _image_placeholder_block_for_entries(
+    entries: List[tuple[int, Dict[str, Any]]],
+    *,
+    start_number: int = 1,
+) -> str:
+    if not entries:
         return ""
 
     lines: List[str] = []
-    relation = _build_image_relation_summary(image_refs)
+    relation = _build_image_relation_summary([ref for _, ref in entries])
     if relation:
         lines.append("\n\n【图示关系】" + relation)
 
-    for i, ref in enumerate(image_refs):
+    for display_index, (image_index, ref) in enumerate(entries, start=start_number):
         caption = str(ref.get("caption") or "").strip() or "相关配图"
-        lines.append(f"\n\n（图{i+1}：{caption}）\n[image:{i}]")
+        lines.append(f"\n\n（图{display_index}：{caption}）\n[image:{image_index}]")
 
     return "".join(lines)
 
@@ -537,9 +538,100 @@ def _image_placeholder_block(image_refs: List[Dict[str, Any]]) -> str:
 def _append_image_placeholders(answer: str, image_refs: List[Dict[str, Any]]) -> str:
     if not image_refs:
         return answer
-    if "[image:" in (answer or ""):
-        return answer
-    return (answer or "").rstrip() + _image_placeholder_block(image_refs)
+
+    text = answer or ""
+    existing_indices = {
+        int(match.group(1))
+        for match in _IMAGE_TOKEN_RE.finditer(text)
+    }
+    missing_entries = [
+        (index, ref)
+        for index, ref in enumerate(image_refs)
+        if index not in existing_indices
+    ]
+
+    if not missing_entries:
+        return text
+
+    return text.rstrip() + _image_placeholder_block_for_entries(
+        missing_entries,
+        start_number=len(existing_indices) + 1,
+    )
+
+
+_IMAGE_TOKEN_LINE_RE = re.compile(r"^\s*\[image:(\d+)\]\s*$")
+_IMAGE_TOKEN_RE = re.compile(r"\[image:(\d+)\]")
+_IMAGE_CAPTION_LINE_RE = re.compile(r"^\s*(?:\*+)?[（(]?\s*图\s*\d+\s*[：:].*$")
+
+
+def _renumber_image_caption_line(line: str, number: int) -> str:
+    return re.sub(r"(图\s*)\d+(\s*[：:])", rf"\g<1>{number}\g<2>", line, count=1)
+
+
+def _align_answer_images(answer: str, image_refs: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
+    """Align inline `[image:n]` placeholders with the actual image refs returned to the frontend.
+
+    This prevents orphaned "图7/图8" captions when the model emitted more image placeholders
+    than the backend eventually resolved into browser-accessible image URLs.
+    """
+    text = (answer or "").strip()
+    if not text:
+        return answer, image_refs
+
+    lines = text.splitlines()
+    token_entries: List[tuple[int, int]] = []
+    used_indices: List[int] = []
+
+    for line_index, line in enumerate(lines):
+        match = _IMAGE_TOKEN_LINE_RE.match(line)
+        if not match:
+            continue
+        image_index = int(match.group(1))
+        token_entries.append((line_index, image_index))
+        if 0 <= image_index < len(image_refs) and image_index not in used_indices:
+            used_indices.append(image_index)
+
+    if not token_entries:
+        return answer, image_refs
+
+    index_map = {original: new for new, original in enumerate(used_indices)}
+    updated_lines = list(lines)
+    drop_lines: set[int] = set()
+
+    for line_index, image_index in token_entries:
+        remapped_index = index_map.get(image_index)
+        if remapped_index is None:
+            drop_lines.add(line_index)
+
+            previous_content_index = line_index - 1
+            while previous_content_index >= 0 and not lines[previous_content_index].strip():
+                previous_content_index -= 1
+
+            if previous_content_index >= 0 and _IMAGE_CAPTION_LINE_RE.match(lines[previous_content_index]):
+                drop_lines.add(previous_content_index)
+                for blank_index in range(previous_content_index + 1, line_index):
+                    if not lines[blank_index].strip():
+                        drop_lines.add(blank_index)
+            continue
+
+        updated_lines[line_index] = f"[image:{remapped_index}]"
+
+        previous_content_index = line_index - 1
+        while previous_content_index >= 0 and not lines[previous_content_index].strip():
+            previous_content_index -= 1
+
+        if previous_content_index >= 0 and _IMAGE_CAPTION_LINE_RE.match(lines[previous_content_index]):
+            updated_lines[previous_content_index] = _renumber_image_caption_line(
+                updated_lines[previous_content_index],
+                remapped_index + 1,
+            )
+
+    aligned_answer = "\n".join(
+        updated_lines[idx] for idx in range(len(updated_lines)) if idx not in drop_lines
+    )
+    aligned_answer = re.sub(r"\n{3,}", "\n\n", aligned_answer).strip()
+    aligned_refs = [image_refs[idx] for idx in used_indices]
+    return aligned_answer, aligned_refs
 
 
 def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, Any]]) -> str:
@@ -773,19 +865,28 @@ async def chat(http_request: Request, request: ChatRequest):
             max_citations_setting = 15
         # 深度检索模式：增加 top_k 以获取更多候选结果
         effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
+        thinking_mode = bool(getattr(request, "thinking_mode", False) or request.deep_search)
+        metadata = {
+            "session_id": session_id,
+            "include_online_search": request.include_online_search,
+            "original_query": request.message,
+            "max_citations": max_citations_setting,
+            "include_citations": request.include_citations,
+            "deep_search": request.deep_search,
+            "thinking_mode": thinking_mode,
+            "retrieval_mode": (request.retrieval_mode or "R2").upper(),
+        }
+        if thinking_mode:
+            metadata.setdefault("neo4j_depth", 4)
+            metadata.setdefault("neo4j_k_edges", 400)
+            metadata.setdefault("neo4j_max_retries", 2)
+
         agent_request = AgentRequest(
             query=request.message,
             filters=request.filters or {},
             top_k=effective_top_k,
             timeout_ms=settings.SUPERVISOR_TIMEOUT_MS,
-            metadata={
-                "session_id": session_id,
-                "include_online_search": request.include_online_search,
-                "original_query": request.message,
-                "max_citations": max_citations_setting,
-                "include_citations": request.include_citations,
-                "deep_search": request.deep_search,
-            }
+            metadata=metadata,
         )
 
         # 调用 LangGraph MediArch Graph
@@ -821,6 +922,14 @@ async def chat(http_request: Request, request: ChatRequest):
                     ]
                 except Exception:
                     diagnostics_list["additional_info"]["agents_used"] = []
+                if isinstance(diagnostics_list.get("phase1_retrieval_mode"), dict):
+                    diagnostics_list["additional_info"]["phase1_retrieval_mode"] = diagnostics_list["phase1_retrieval_mode"]
+                if isinstance(diagnostics_list.get("checkpointer_runtime"), dict):
+                    diagnostics_list["additional_info"]["checkpointer_runtime"] = diagnostics_list["checkpointer_runtime"]
+                if isinstance(diagnostics_list.get("store_runtime"), dict):
+                    diagnostics_list["additional_info"]["store_runtime"] = diagnostics_list["store_runtime"]
+                if isinstance(diagnostics_list.get("query_expansion_runtime"), dict):
+                    diagnostics_list["additional_info"]["query_expansion_runtime"] = diagnostics_list["query_expansion_runtime"]
                 diagnostics_list["additional_info"]["strict_cross_doc"] = strict_cross_doc_mode
                 fc = result.get("final_citations")
                 diagnostics_list["additional_info"]["final_citations_count"] = len(fc) if isinstance(fc, list) else 0
@@ -867,23 +976,23 @@ async def chat(http_request: Request, request: ChatRequest):
         # Prefer Synthesizer-provided image order (aligns with answer's [image:i] indices).
         image_references = result.get("image_references")
         if isinstance(image_references, list) and image_references:
-            max_images = 8 if getattr(request, "deep_search", False) else 5
-            image_refs = _extract_image_refs(image_references, api_base, max_images=max_images)
+            image_refs = _extract_image_refs(image_references, api_base)
         else:
-            max_images = 8 if getattr(request, "deep_search", False) else 5
-            image_refs = _extract_image_refs(citations_full, api_base, max_images=max_images)
+            image_refs = _extract_image_refs(citations_full, api_base)
 
+        final_answer, image_refs = _align_answer_images(final_answer, image_refs)
         answer_has_image_tokens = "[image:" in (final_answer or "")
         if image_refs and (not answer_has_image_tokens):
             image_refs = _order_image_refs_for_injection(image_refs)
-
-        images = [ref.get("url") for ref in image_refs if ref.get("url")]
 
         # 让前端能渲染图片：优先尝试将图片插入正文附近；必要时再回退到末尾占位符。
         # 严格交叉验证模式下，为避免破坏格式，不做任何占位符注入。
         if not strict_cross_doc_mode and wants_images:
             final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
             final_answer = _append_image_placeholders(final_answer, image_refs)
+            final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+
+        images = [ref.get("url") for ref in image_refs if ref.get("url")]
 
         # [FIX 2026-01-14] API 层最终对齐：避免“参考资料只有 N 条但正文出现 [N+1]”
         final_answer, citations_full = _postprocess_answer_and_align_citations(
@@ -975,19 +1084,28 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                 max_citations_setting = 15
             # 深度检索模式：增加 top_k 以获取更多候选结果
             effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
+            thinking_mode = bool(getattr(request, "thinking_mode", False) or request.deep_search)
+            metadata = {
+                "session_id": session_id,
+                "include_online_search": request.include_online_search,
+                "original_query": request.message,
+                "max_citations": max_citations_setting,
+                "include_citations": request.include_citations,
+                "deep_search": request.deep_search,
+                "thinking_mode": thinking_mode,
+                "retrieval_mode": (request.retrieval_mode or "R2").upper(),
+            }
+            if thinking_mode:
+                metadata.setdefault("neo4j_depth", 4)
+                metadata.setdefault("neo4j_k_edges", 400)
+                metadata.setdefault("neo4j_max_retries", 2)
+
             agent_request = AgentRequest(
                 query=request.message,
                 filters=request.filters or {},
                 top_k=effective_top_k,
                 timeout_ms=settings.SUPERVISOR_TIMEOUT_MS,
-                metadata={
-                    "session_id": session_id,
-                    "include_online_search": request.include_online_search,
-                    "original_query": request.message,
-                    "max_citations": max_citations_setting,
-                    "include_citations": request.include_citations,
-                    "deep_search": request.deep_search,
-                }
+                metadata=metadata,
             )
 
             # 调用 LangGraph MediArch Graph（使用 astream 获取中间状态）
@@ -1016,168 +1134,156 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             }
             last_node_labels: Dict[str, str] = {}
 
-            async for event in mediarch_graph.astream(
-                {"request": agent_request, "original_query": request.message},
-                config=config,
-                stream_mode="updates",
-                subgraphs=True,
-            ):
-                for namespace, payload in _normalize_stream_event(event):
-                    if not payload:
-                        continue
-                    event_items = list(payload.items())
+            async def _consume_stream_events() -> AsyncGenerator[str, None]:
+                nonlocal final_answer
+                nonlocal kg_data
+                nonlocal recommended_questions
+                nonlocal image_references
+                nonlocal worker_responses
+                nonlocal final_citations_override
+                nonlocal neo4j_graph_sent
+                nonlocal strict_cross_doc_mode
 
-                    # 节点级状态（用于前端思考过程）
-                    for node_name, _ in event_items:
-                        agent_key = _extract_agent_key(namespace, node_name)
-                        if not agent_key:
+                async for event in mediarch_graph.astream(
+                    {"request": agent_request, "original_query": request.message},
+                    config=config,
+                    stream_mode="updates",
+                    subgraphs=True,
+                ):
+                    for namespace, payload in _normalize_stream_event(event):
+                        if not payload:
                             continue
-                        label = AGENT_NODE_LABELS.get(agent_key, {}).get(node_name)
-                        if not label:
+                        event_items = list(payload.items())
+
+                        for node_name, _ in event_items:
+                            agent_key = _extract_agent_key(namespace, node_name)
+                            if not agent_key:
+                                continue
+                            label = AGENT_NODE_LABELS.get(agent_key, {}).get(node_name)
+                            if not label:
+                                continue
+                            last_node_labels[agent_key] = label
+                            display_name = AGENT_DISPLAY_NAMES.get(agent_key, agent_key)
+                            yield _create_agent_status_chunk(display_name, "running", label)
+
+                        if namespace:
                             continue
-                        last_node_labels[agent_key] = label
-                        display_name = AGENT_DISPLAY_NAMES.get(agent_key, agent_key)
-                        yield _create_agent_status_chunk(display_name, "running", label)
 
-                    # 只处理顶层节点的聚合逻辑
-                    if namespace:
-                        continue
+                        for node_name, node_output in event_items:
+                            thought = None
 
-                    # LangGraph astream 返回的 event 格式: {node_name: node_output}
-                    # 例如: {"orchestrator_agent": {...}}, {"neo4j_agent": {...}}
-                    for node_name, node_output in event_items:
-                        thought = None
+                            if isinstance(node_output, dict):
+                                diag = node_output.get("diagnostics", {})
+                                if isinstance(diag, dict):
+                                    thought = diag.get("reasoning") or diag.get("thought") or diag.get("analysis_reasoning")
 
-                        # 从节点输出中提取思考信息
-                        if isinstance(node_output, dict):
-                            # 尝试从 diagnostics 中提取信息
-                            diag = node_output.get("diagnostics", {})
-                            if isinstance(diag, dict):
-                                thought = diag.get("reasoning") or diag.get("thought") or diag.get("analysis_reasoning")
+                                if "worker_responses" in node_output:
+                                    for wr in node_output["worker_responses"]:
+                                        if isinstance(wr, dict):
+                                            wr_diag = wr.get("diagnostics", {})
+                                            if isinstance(wr_diag, dict) and not thought:
+                                                thought = wr_diag.get("reasoning") or wr_diag.get("thought")
 
-                            # 从 worker_responses 中提取
-                            if "worker_responses" in node_output:
-                                for wr in node_output["worker_responses"]:
-                                    if isinstance(wr, dict):
-                                        wr_diag = wr.get("diagnostics", {})
-                                        if isinstance(wr_diag, dict) and not thought:
-                                            thought = wr_diag.get("reasoning") or wr_diag.get("thought")
+                            if node_name == "orchestrator_agent":
+                                if not agent_completed["Orchestrator"]:
+                                    thought_text = last_node_labels.get("orchestrator") or thought
+                                    yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
+                                    agent_completed["Orchestrator"] = True
 
-                        # 根据节点名称发送状态更新
-                        if node_name == "orchestrator_agent":
-                            if not agent_completed["Orchestrator"]:
-                                thought_text = last_node_labels.get("orchestrator") or thought
-                                yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
-                                agent_completed["Orchestrator"] = True
+                            elif node_name == "neo4j_agent":
+                                diagnostics = node_output.get("diagnostics", {}) if isinstance(node_output, dict) else {}
+                                if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
+                                    thought_text = last_node_labels.get("neo4j") or thought
+                                    yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
+                                    agent_completed["Neo4j"] = True
+                                    query_path = diagnostics.get("query_path")
+                                    if query_path and not neo4j_graph_sent:
+                                        kg_payload = _query_path_to_graph(query_path)
+                                        if kg_payload:
+                                            kg_data = kg_payload
+                                            chunk = StreamingChatChunk(
+                                                chunk_type="knowledge_graph",
+                                                knowledge_graph_path=kg_payload,
+                                                is_final=False
+                                            )
+                                            yield f"data: {chunk.model_dump_json()}\n\n"
+                                            neo4j_graph_sent = True
 
-                        elif node_name == "neo4j_agent":
-                            diagnostics = node_output.get("diagnostics", {}) if isinstance(node_output, dict) else {}
-                            # Neo4j 完成
-                            if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                thought_text = last_node_labels.get("neo4j") or thought
-                                yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
-                                agent_completed["Neo4j"] = True
-                                query_path = diagnostics.get("query_path")
-                                if query_path and not neo4j_graph_sent:
-                                    kg_payload = _query_path_to_graph(query_path)
-                                    if kg_payload:
-                                        kg_data = kg_payload
-                                        chunk = StreamingChatChunk(
-                                            chunk_type="knowledge_graph",
-                                            knowledge_graph_path=kg_payload,
-                                            is_final=False
-                                        )
-                                        yield f"data: {chunk.model_dump_json()}\n\n"
-                                        neo4j_graph_sent = True
+                            elif node_name == "milvus_agent":
+                                if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
+                                    thought_text = last_node_labels.get("milvus") or thought
+                                    yield _create_agent_status_chunk("Milvus", "completed", thought_text)
+                                    agent_completed["Milvus"] = True
 
-                        elif node_name == "milvus_agent":
-                            # Milvus 完成
-                            if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                thought_text = last_node_labels.get("milvus") or thought
-                                yield _create_agent_status_chunk("Milvus", "completed", thought_text)
-                                agent_completed["Milvus"] = True
+                            elif node_name == "mongodb_agent":
+                                if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
+                                    thought_text = last_node_labels.get("mongodb") or thought
+                                    yield _create_agent_status_chunk("MongoDB", "completed", thought_text)
+                                    agent_completed["MongoDB"] = True
 
-                        elif node_name == "mongodb_agent":
-                            # MongoDB 完成
-                            if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                thought_text = last_node_labels.get("mongodb") or thought
-                                yield _create_agent_status_chunk("MongoDB", "completed", thought_text)
-                                agent_completed["MongoDB"] = True
+                            elif node_name == "online_search_agent":
+                                if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
+                                    thought_text = last_node_labels.get("online_search") or thought
+                                    yield _create_agent_status_chunk("OnlineSearch", "completed", thought_text)
+                                    agent_completed["OnlineSearch"] = True
 
-                        elif node_name == "online_search_agent":
-                            if isinstance(node_output, dict) and ("items" in node_output or "diagnostics" in node_output):
-                                thought_text = last_node_labels.get("online_search") or thought
-                                yield _create_agent_status_chunk("OnlineSearch", "completed", thought_text)
-                                agent_completed["OnlineSearch"] = True
+                            elif node_name == "knowledge_fusion":
+                                if not agent_completed["Neo4j"]:
+                                    thought_text = last_node_labels.get("neo4j") or "实体匹配"
+                                    yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
+                                    agent_completed["Neo4j"] = True
+                                if not agent_completed["Milvus"]:
+                                    thought_text = last_node_labels.get("milvus") or "向量检索"
+                                    yield _create_agent_status_chunk("Milvus", "completed", thought_text)
+                                    agent_completed["Milvus"] = True
 
-                        elif node_name == "knowledge_fusion":
-                            # Knowledge Fusion 完成时，说明 Neo4j 和 Milvus 阶段1都已完成
-                            if not agent_completed["Neo4j"]:
-                                thought_text = last_node_labels.get("neo4j") or "实体匹配"
-                                yield _create_agent_status_chunk("Neo4j", "completed", thought_text)
-                                agent_completed["Neo4j"] = True
-                            if not agent_completed["Milvus"]:
-                                thought_text = last_node_labels.get("milvus") or "向量检索"
-                                yield _create_agent_status_chunk("Milvus", "completed", thought_text)
-                                agent_completed["Milvus"] = True
+                            elif node_name == "prepare_parallel_workers":
+                                if not agent_completed["Orchestrator"]:
+                                    thought_text = last_node_labels.get("orchestrator") or thought
+                                    yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
+                                    agent_completed["Orchestrator"] = True
 
-                        elif node_name == "prepare_parallel_workers":
-                            # 准备阶段完成，Orchestrator 已完成
-                            if not agent_completed["Orchestrator"]:
-                                thought_text = last_node_labels.get("orchestrator") or thought
-                                yield _create_agent_status_chunk("Orchestrator", "completed", thought_text)
-                                agent_completed["Orchestrator"] = True
-
-                    # 收集中间结果
-                    for node_name, node_output in event_items:
-                        if isinstance(node_output, dict):
-                            if "items" in node_output:
+                        for _, node_output in event_items:
+                            if isinstance(node_output, dict) and "items" in node_output:
                                 items_data = node_output["items"]
                                 if isinstance(items_data, list):
                                     all_items.extend(items_data)
 
-                    # 从各节点输出中收集worker_responses和final_answer
-                    for node_name, node_output in event_items:
-                        if isinstance(node_output, dict):
-                            # 收集 worker_responses
+                        for _, node_output in event_items:
+                            if not isinstance(node_output, dict):
+                                continue
+
                             if "worker_responses" in node_output:
                                 wr_list = node_output["worker_responses"]
                                 if isinstance(wr_list, list):
                                     worker_responses.extend(wr_list)
 
-                            # 检查 final_answer（通常来自 result_synthesizer_agent 或 push_answer_message）
                             if "final_answer" in node_output and node_output["final_answer"]:
                                 if not agent_completed["Synthesizer"]:
                                     thought_text = last_node_labels.get("synthesizer")
                                     yield _create_agent_status_chunk("Synthesizer", "completed", thought_text)
                                     agent_completed["Synthesizer"] = True
                                 final_answer = node_output["final_answer"]
-                                # image_references（用于 images[] 顺序对齐）
                                 if "image_references" in node_output and node_output["image_references"]:
                                     if isinstance(node_output["image_references"], list):
                                         image_references = node_output["image_references"]
 
-                            # 提取知识图谱
                             if "answer_graph_data" in node_output and node_output["answer_graph_data"]:
                                 kg_data = node_output["answer_graph_data"]
 
-                            # 提取推荐问题
                             if "recommended_questions" in node_output and node_output["recommended_questions"]:
                                 recommended_questions = node_output["recommended_questions"]
 
-                            # 提取 Synthesizer 最终 citations（用于严格交叉验证）
                             if "final_citations" in node_output and node_output["final_citations"]:
                                 fc = node_output["final_citations"]
                                 if isinstance(fc, list):
                                     final_citations_override = fc
-                            # 严格交叉验证模式标记
+
                             if "strict_cross_doc" in node_output:
                                 strict_cross_doc_mode = bool(node_output.get("strict_cross_doc"))
 
-                            # 提取 unified_hints 中的知识图谱数据
                             if "unified_hints" in node_output and node_output["unified_hints"]:
                                 unified_hints = node_output["unified_hints"]
-                                # unified_hints 也可以用于构建知识图谱
                                 if not kg_data and unified_hints.get("entity_names"):
                                     kg_data = {
                                         "nodes": [{"id": name, "label": name, "type": "entity"}
@@ -1185,6 +1291,15 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                                         "links": [],
                                         "unified_hints": unified_hints,
                                     }
+
+            if settings.SUPERVISOR_TIMEOUT_MS <= 0:
+                async for chunk_data in _consume_stream_events():
+                    yield chunk_data
+            else:
+                stream_timeout_s = max(settings.SUPERVISOR_TIMEOUT_MS / 1000, 1) + 5
+                async with asyncio.timeout(stream_timeout_s):
+                    async for chunk_data in _consume_stream_events():
+                        yield chunk_data
 
             # 提取引用信息（图片也依赖 citations 来构建 URL）
             # 深度检索模式：返回更多 citations（15-20个）
@@ -1206,23 +1321,23 @@ async def chat_stream(http_request: Request, request: ChatRequest):
 
             # 提取图片（构建浏览器可访问的 /api/v1/documents/image?... URL）
             if isinstance(image_references, list) and image_references:
-                max_images = 8 if getattr(request, "deep_search", False) else 5
-                image_refs = _extract_image_refs(image_references, api_base, max_images=max_images)
+                image_refs = _extract_image_refs(image_references, api_base)
             else:
-                max_images = 8 if getattr(request, "deep_search", False) else 5
-                image_refs = _extract_image_refs(all_citations_full, api_base, max_images=max_images)
+                image_refs = _extract_image_refs(all_citations_full, api_base)
 
+            final_answer, image_refs = _align_answer_images(final_answer, image_refs)
             answer_has_image_tokens = "[image:" in (final_answer or "")
             if image_refs and (not answer_has_image_tokens):
                 image_refs = _order_image_refs_for_injection(image_refs)
-
-            images = [ref.get("url") for ref in image_refs if ref.get("url")]
 
             # 让前端能渲染图片：优先尝试插入正文附近；必要时回退到末尾占位符块。
             # 严格交叉验证模式下，为避免破坏固定输出格式，不注入占位符。
             if image_refs and not strict_cross_doc_mode and wants_images:
                 final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
                 final_answer = _append_image_placeholders(final_answer, image_refs)
+                final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+
+            images = [ref.get("url") for ref in image_refs if ref.get("url")]
 
             # [FIX 2026-01-14] API 层最终对齐：避免流式返回时出现越界/乱引用
             final_answer, all_citations_full = _postprocess_answer_and_align_citations(
@@ -1312,7 +1427,7 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             logger.exception(f"[Chat Stream] 流式处理失败: {e}")
             error_chunk = StreamingChatChunk(
                 chunk_type="error",
-                content=f"处理失败: {str(e)}",
+                content=_describe_chat_stream_error(e),
                 is_final=True
             )
             yield f"data: {error_chunk.model_dump_json()}\n\n"
@@ -1332,20 +1447,7 @@ async def chat_stream(http_request: Request, request: ChatRequest):
 async def list_sessions():
     """获取所有会话列表"""
     try:
-        sessions = [
-            {
-                "session_id": session_data["session_id"],
-                "created_at": session_data["created_at"],
-                "last_active": session_data["last_active"],
-                "message_count": len(session_data["messages"]),
-                "title": session_data.get("title", "New Chat"),
-                "is_pinned": session_data.get("is_pinned", False),
-            }
-            for session_data in SESSION_STORE.values()
-        ]
-
-        # 排序：置顶在前，然后按最后活跃时间降序
-        sessions.sort(key=lambda x: (-int(x.get("is_pinned", False)), -x["last_active"]))
+        sessions = SESSION_REPOSITORY.list_sessions()
 
         return SessionListResponse(
             sessions=sessions,
@@ -1364,18 +1466,17 @@ async def list_sessions():
 async def get_session_history(session_id: str):
     """获取指定会话的对话历史"""
     try:
-        if session_id not in SESSION_STORE:
+        session_messages = SESSION_REPOSITORY.get_session_history(session_id)
+        if session_messages is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"会话 {session_id} 不存在"
             )
-
-        session_data = SESSION_STORE[session_id]
         # 兼容历史数据：对 citations 做一次规范化（字段命名/路径前缀等）
         from backend.app.utils.citation_builder import normalize_citations
 
         messages = []
-        for msg in session_data["messages"]:
+        for msg in session_messages:
             msg_copy = dict(msg) if isinstance(msg, dict) else {"role": "system", "content": str(msg)}
             if isinstance(msg_copy.get("citations"), list):
                 msg_copy["citations"] = normalize_citations(msg_copy["citations"])
@@ -1401,29 +1502,24 @@ async def get_session_history(session_id: str):
 async def update_session(session_id: str, update_data: SessionUpdateRequest):
     """更新会话信息（标题、置顶状态等）"""
     try:
-        if session_id not in SESSION_STORE:
+        updated = SESSION_REPOSITORY.update_session(
+            session_id,
+            title=update_data.title,
+            is_pinned=update_data.is_pinned,
+        )
+        if updated is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"会话 {session_id} 不存在"
             )
-
-        session = SESSION_STORE[session_id]
-
-        if update_data.title is not None:
-            session["title"] = update_data.title
-
-        if update_data.is_pinned is not None:
-            session["is_pinned"] = update_data.is_pinned
-
-        session["last_active"] = time.time()
 
         logger.info(f"[Session] 更新成功: {session_id}")
 
         return {
             "message": "会话已更新",
             "session_id": session_id,
-            "title": session.get("title"),
-            "is_pinned": session.get("is_pinned"),
+            "title": updated.get("title"),
+            "is_pinned": updated.get("is_pinned"),
         }
 
     except HTTPException:
@@ -1440,13 +1536,11 @@ async def update_session(session_id: str, update_data: SessionUpdateRequest):
 async def delete_session(session_id: str):
     """删除指定会话"""
     try:
-        if session_id not in SESSION_STORE:
+        if not SESSION_REPOSITORY.delete_session(session_id):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"会话 {session_id} 不存在"
             )
-
-        del SESSION_STORE[session_id]
         logger.info(f"[Session] 删除成功: {session_id}")
 
         return {"message": "会话已删除", "session_id": session_id}
@@ -1458,4 +1552,60 @@ async def delete_session(session_id: str):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="删除会话失败"
+        )
+
+
+# ---- 翻译接口 ----
+
+class TranslateRequest(BaseModel):
+    text: str = Field(..., description="待翻译文本")
+    target_lang: str = Field("en", description="目标语言: en / zh")
+
+
+class TranslateResponse(BaseModel):
+    translated: str
+
+
+def _init_translate_llm():
+    api_key = get_api_key()
+    if not api_key:
+        raise ValueError("缺少 MEDIARCH_API_KEY（chat_translate）")
+
+    base_url = get_llm_base_url() or "https://api.openai.com/v1"
+    model_provider = get_model_provider()
+    model = get_llm_model("gpt-4o-mini")
+
+    return init_chat_model(
+        model=model,
+        model_provider=model_provider,
+        api_key=api_key,
+        base_url=base_url,
+        temperature=0.0,
+        max_tokens=2000,
+        timeout=30,
+    )
+
+
+@router.post("/chat/translate", response_model=TranslateResponse, summary="文本翻译")
+async def translate_text(req: TranslateRequest):
+    """使用 LLM 将文本翻译为目标语言"""
+
+    lang_name = "English" if req.target_lang == "en" else "Chinese"
+    prompt = (
+        f"Translate the following text to {lang_name}. "
+        "Output ONLY the translated text, no explanation.\n\n"
+        f"{req.text}"
+    )
+
+    try:
+        manager = get_llm_manager()
+        llm = await manager.aget_or_create(name="chat_translate", init_func=_init_translate_llm)
+        result = await llm.ainvoke(prompt)
+        translated = result.content if hasattr(result, "content") else str(result)
+        return TranslateResponse(translated=translated.strip())
+    except Exception as e:
+        logger.exception(f"[Translate] failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Translation failed: {e}"
         )

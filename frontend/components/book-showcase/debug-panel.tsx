@@ -4,7 +4,6 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { Copy, RotateCcw } from "lucide-react"
-import type * as THREE from "three"
 import type { BookParams, MaterialProps } from "./types"
 import { generateUVForObject2 } from "./uv-debugger"
 import { handleImageUpload, clearTexture } from "./texture-manager"
@@ -14,7 +13,7 @@ interface DebugPanelProps {
   params: BookParams
   materialProps: MaterialProps
   defaultMaterialProps: MaterialProps
-  object2MeshRef: React.MutableRefObject<THREE.Mesh | null>
+  object2MeshRef: React.MutableRefObject<any>
   setParams: React.Dispatch<React.SetStateAction<BookParams>>
   setMaterialProps: React.Dispatch<React.SetStateAction<MaterialProps>>
   resetParams: () => void
@@ -43,7 +42,10 @@ export function DebugPanel({
   const updateParam = (param: keyof BookParams, index: number, value: any) => {
     setParams((prev) => ({
       ...prev,
-      [param]: prev[param].map((v, i) => (i === index ? value : v)) as any,
+      [param]:
+        param === "cameraPosition" || param === "position" || param === "rotation" || param === "scale"
+          ? (prev[param] as number[]).map((v, i) => (i === index ? value : v)) as any
+          : prev[param],
     }))
     console.log(`Updated param ${param} at index ${index} to ${value}`)
   }

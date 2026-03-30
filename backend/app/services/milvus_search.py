@@ -15,10 +15,11 @@ Milvus 实体属性检索工具
 
 import os
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from langchain_core.tools import tool
 from pymilvus import Collection, connections
 from openai import OpenAI
+from backend.llm_env import get_api_key, get_kg_base_url, get_kg_embedding_model
 
 load_dotenv()
 
@@ -48,10 +49,10 @@ class MilvusAttributeRetriever:
         
         # 初始化 OpenAI 客户端（用于生成查询向量）
         self.openai_client = OpenAI(
-            api_key=os.getenv("KG_OPENAI_API_KEY"),
-            base_url=os.getenv("KG_OPENAI_BASE_URL")
+            api_key=get_api_key(),
+            base_url=get_kg_base_url()
         )
-        self.embedding_model = os.getenv("KG_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+        self.embedding_model = get_kg_embedding_model("text-embedding-3-small")
         # 动态读取向量维度（支持 text-embedding-3-large 的 3072 维）
         self.embedding_dim = int(os.getenv("KG_EMBEDDING_DIM", "1536"))
     

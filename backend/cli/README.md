@@ -147,22 +147,24 @@ python -m backend.cli.build_kg
 set SKIP_DISK_CHECK=1
 python -m backend.cli.build_kg
 
-# 使用自定义 Schema
-set KG_SCHEMA_PATH=custom_schema.json
+# 配置 Schema 和种子数据路径
+set KG_SCHEMA_PATH=backend/databases/graph/schemas/medical_architecture.json
+set KG_SEED_DATA_PATH=backend/databases/graph/schemas/ontology_seed_data.json
 python -m backend.cli.build_kg
 ```
 
 **环境变量配置**:
 ```bash
 # 必需环境变量（在 .env 文件中配置）
-KG_OPENAI_API_KEY=your_deepseek_api_key
-KG_OPENAI_BASE_URL=https://api.deepseek.com/v1
-KG_OPENAI_MODEL=deepseek-v3
+MEDIARCH_API_KEY=your_deepseek_api_key
+MEDIARCH_KG_BASE_URL=https://api.deepseek.com/v1
+MEDIARCH_KG_MODEL=deepseek-v3
 MONGODB_URI=mongodb://admin:mediarch2024@localhost:27017/mediarch?authSource=admin
 NEO4J_URI=bolt://localhost:7687
+KG_SCHEMA_PATH=backend/databases/graph/schemas/medical_architecture.json
+KG_SEED_DATA_PATH=backend/databases/graph/schemas/ontology_seed_data.json
 
 # 可选配置
-KG_SCHEMA_PATH=backend/databases/graph/schemas/medical_architecture.json
 SKIP_DISK_CHECK=0                     # 是否跳过磁盘检查
 
 # 成本估算参数（如有变化可调整）
@@ -290,12 +292,8 @@ mongosh "mongodb://admin:mediarch2024@localhost:27017/mediarch?authSource=admin"
 http://localhost:7474
 MATCH (n) RETURN count(n);
 
-# 5. 启动 API 服务器
-cd backend
-uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-
-# 或者：在项目根目录启动
-# uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
+# 5. 启动 API 服务器（在项目根目录执行）
+python -m backend.api
 
 # 6. 启动前端
 cd frontend
@@ -323,8 +321,8 @@ CHUNK_MIN=100
 CHUNK_OVERLAP=100
 
 # 向量化配置
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_BASE_URL=https://api.openai.com/v1
+MEDIARCH_API_KEY=your_openai_api_key
+MEDIARCH_LLM_BASE_URL=https://api.openai.com/v1
 EMBEDDING_MODEL=text-embedding-3-large
 
 # MongoDB
@@ -341,9 +339,9 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=mediarch2024
 
 # 知识图谱构建
-KG_OPENAI_API_KEY=your_deepseek_api_key
-KG_OPENAI_BASE_URL=https://api.deepseek.com/v1
-KG_OPENAI_MODEL=deepseek-v3
+MEDIARCH_API_KEY=your_deepseek_api_key
+MEDIARCH_KG_BASE_URL=https://api.deepseek.com/v1
+MEDIARCH_KG_MODEL=deepseek-v3
 
 # 强制重新索引（可选）
 FORCE_REINGEST=0

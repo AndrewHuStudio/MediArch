@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 
 
 ROMAN_TO_ARABIC = {
@@ -85,6 +85,77 @@ def load_alias_map(path: str) -> Dict[str, Dict[str, str]]:
             return out
     except Exception:
         return {}
+
+
+def detect_synonyms_llm(
+    entity_names: List[str],
+    entity_types: Dict[str, str],
+    llm_client: Any,
+    batch_size: int = 30,
+) -> Dict[str, str]:
+    """使用 LLM 识别同类型实体名中的语义同义词。
+
+    返回值格式：{alias_name: canonical_name}
+    """
+    if not entity_names or not llm_client:
+        return {}
+
+    grouped_names: Dict[str, List[str]] = {}
+    for name in entity_names:
+        entity_type = entity_types.get(name, "").strip()
+        if not name or not entity_type:
+            continue
+        grouped_names.setdefault(entity_type, [])
+        if name not in grouped_names[entity_type]:
+            grouped_names[entity_type].append(name)
+
+    merge_map: Dict[str, str] = {}
+
+    for entity_type, names in grouped_names.items():
+        if len(names) < 2:
+            continue
+        for start in range(0, len(names), max(2, batch_size)):
+            batch = names[start : start + max(2, batch_size)]
+            if len(batch) < 2:
+                continue
+
+            names_text = "\n".join(f"- {name}" for name in batch)
+            prompt = (
+                f"以下是同一类型（{entity_type}）的实体名称列表。"
+                "请识别其中指代相同概念的同义词组，并为每组选择最规范的名称作为标准名。\n"
+                "只输出存在同义关系的组，不要输出独立实体。\n"
+                f"实体列表:\n{names_text}\n\n"
+                '返回JSON数组: [{"standard": "标准名", "synonyms": ["同义词1", "同义词2"]}]'
+            )
+
+            try:
+                response = llm_client.chat_json(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0,
+                )
+            except Exception:
+                continue
+
+            if isinstance(response, list):
+                groups = response
+            elif isinstance(response, dict):
+                groups = response.get("groups") or response.get("result") or []
+            else:
+                groups = []
+
+            for group in groups:
+                if not isinstance(group, dict):
+                    continue
+                standard = str(group.get("standard", "")).strip()
+                synonyms = group.get("synonyms") or []
+                if not standard:
+                    continue
+                for synonym in synonyms:
+                    synonym_name = str(synonym).strip()
+                    if synonym_name and synonym_name != standard:
+                        merge_map[synonym_name] = standard
+
+    return merge_map
 
 
 def compose_scope_key(scope_names: List[str]) -> str:

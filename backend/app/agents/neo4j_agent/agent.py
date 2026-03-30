@@ -34,10 +34,11 @@ from backend.app.agents.base_agent import (
 )
 from backend.app.services.query_expansion import expand_query, MEDICAL_ARCHITECTURE_SYNONYMS
 from backend.app.services.graph_retriever import AsyncGraphRetriever
+from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ANALYSIS_MODEL = os.getenv("NEO4J_AGENT_MODEL") or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+DEFAULT_ANALYSIS_MODEL = os.getenv("NEO4J_AGENT_MODEL") or get_llm_model("gpt-4o-mini")
 
 try:
     from openai import RateLimitError as OpenAIRateLimitError
@@ -159,12 +160,12 @@ async def get_retriever() -> AsyncGraphRetriever:
 
 def _init_analysis_llm():
     """初始化查询分析 LLM（同步版本）"""
-    api_key = os.getenv("MEDIARCH_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         raise ValueError("缺少 MEDIARCH_API_KEY（neo4j_agent）")
 
-    base_url = (os.getenv("OPENAI_BASE_URL") or "").rstrip("/") or None
-    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+    base_url = get_llm_base_url()
+    model_provider = get_model_provider()
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
     base_model = init_chat_model(
@@ -771,7 +772,8 @@ async def node_entity_match(state: Neo4jState) -> Dict[str, Any]:
         source_coverage[doc].append(item)
 
     # 如果有资料源结果数量超过其他的3倍以上，进行平衡
-    max_per_source = max(len(items) // 2, 10) if len(source_coverage) > 1 else 100
+    total_items = len(deduped_results)
+    max_per_source = max(total_items // 2, 10) if len(source_coverage) > 1 else 100
     balanced_results = []
     for doc, items in source_coverage.items():
         if len(items) > max_per_source:

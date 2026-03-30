@@ -111,7 +111,7 @@ class GraphStatistics(BaseModel):
 def get_neo4j_driver():
     """获取 Neo4j driver"""
     import os
-    from dotenv import load_dotenv
+    from backend.env_loader import load_dotenv
     load_dotenv()
 
     driver = GraphDatabase.driver(
@@ -130,7 +130,7 @@ def get_neo4j_driver():
 def get_neo4j_database():
     """获取 Neo4j 数据库名称"""
     import os
-    from dotenv import load_dotenv
+    from backend.env_loader import load_dotenv
     load_dotenv()
     return os.getenv("NEO4J_DATABASE", "neo4j")
 

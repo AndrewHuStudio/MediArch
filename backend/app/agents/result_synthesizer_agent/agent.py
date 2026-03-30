@@ -24,6 +24,7 @@ from backend.app.agents.base_agent import (
     WorkerResponsesAnnotated,  # ✅ 使用标准类型
     get_llm_manager,  # ✅ 使用 LLM 管理器
 )
+from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 try:
     from openai import RateLimitError as OpenAIRateLimitError
@@ -31,6 +32,15 @@ except Exception:
     OpenAIRateLimitError = Exception
 
 logger = logging.getLogger("result_synthesizer_agent")
+
+
+def _resolve_optional_timeout_seconds(env_name: str, default: int) -> Optional[int]:
+    raw = os.getenv(env_name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = default
+    return None if value <= 0 else value
 
 
 # ============================================================================
@@ -41,15 +51,17 @@ def _init_synthesizer_llm():
     """
         初始化 Synthesizer LLM
     """
-    api_key = os.getenv("MEDIARCH_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         raise ValueError("缺少 MEDIARCH_API_KEY（result_synthesizer_agent）")
 
-    base_url = (os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    base_url = get_llm_base_url() or "https://api.openai.com/v1"
+    model_provider = get_model_provider()
+    model = get_llm_model("gpt-4o-mini")
 
     # 强制使用 OpenAI 兼容模式（支持第三方 API Gateway）
+    timeout_s = _resolve_optional_timeout_seconds("RESULT_SYNTHESIZER_TIMEOUT", 180)
+
     return init_chat_model(
         model=model,
         model_provider=model_provider,
@@ -57,19 +69,21 @@ def _init_synthesizer_llm():
         base_url=base_url,
         temperature=0.3,
         max_tokens=8000,
-        timeout=120,       # [FIX 2025-12-04] 增加超时时间到120秒（原30秒太短）
+        timeout=timeout_s,
     )
 
 
 def _init_evaluator_llm():
     """初始化评估 LLM（可以使用不同的模型）"""
-    api_key = os.getenv("MEDIARCH_API_KEY")
+    api_key = get_api_key()
     if not api_key:
         raise ValueError("缺少 MEDIARCH_API_KEY（result_synthesizer_evaluator）")
 
-    base_url = (os.getenv("OPENAI_BASE_URL") or "https://api.openai.com/v1").rstrip("/")
-    model_provider = os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
-    model = os.getenv("EVALUATOR_MODEL", os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+    base_url = get_llm_base_url() or "https://api.openai.com/v1"
+    model_provider = get_model_provider()
+    model = os.getenv("EVALUATOR_MODEL", get_llm_model("gpt-4o-mini"))
+
+    timeout_s = _resolve_optional_timeout_seconds("RESULT_EVALUATOR_TIMEOUT", 30)
 
     return init_chat_model(
         model=model,
@@ -78,10 +92,11 @@ def _init_evaluator_llm():
         base_url=base_url,
         temperature=0.0,  # 评估需要确定性
         max_tokens=200,
-        timeout=30,       # 添加30秒超时，避免长时间等待
+        timeout=timeout_s,
     )
 
-SYNTHESIZER_TIMEOUT = int(os.getenv("RESULT_SYNTHESIZER_TIMEOUT", "180"))
+SYNTHESIZER_TIMEOUT = _resolve_optional_timeout_seconds("RESULT_SYNTHESIZER_TIMEOUT", 180)
+EVALUATOR_TIMEOUT = _resolve_optional_timeout_seconds("RESULT_EVALUATOR_TIMEOUT", 30)
 
 
 async def _call_llm_with_retry(
@@ -108,14 +123,14 @@ async def _call_llm_with_retry(
     """
     import asyncio
 
-    # ✅ 使用 LLMManager 获取 LLM
+    # ✅ 使用 LLMManager 获取 LLM（async-safe）
     manager = get_llm_manager()
 
-    # 根据 llm_name 选择初始化函数，使用异步版本避免阻塞调用
+    # 根据 llm_name 选择初始化函数（使用 async 版本避免竞态）
     if llm_name == "synthesizer":
-        llm = await asyncio.to_thread(lambda: manager.get_or_create(name=llm_name, init_func=_init_synthesizer_llm))
+        llm = await manager.aget_or_create(name=llm_name, init_func=_init_synthesizer_llm)
     elif llm_name == "evaluator":
-        llm = await asyncio.to_thread(lambda: manager.get_or_create(name=llm_name, init_func=_init_evaluator_llm))
+        llm = await manager.aget_or_create(name=llm_name, init_func=_init_evaluator_llm)
     else:
         raise ValueError(f"Unknown LLM name: {llm_name}")
 
@@ -124,7 +139,10 @@ async def _call_llm_with_retry(
 
     for attempt in range(1, max_attempts + 1):
         try:
-            return await asyncio.wait_for(llm.ainvoke(messages), timeout=SYNTHESIZER_TIMEOUT)
+            llm_timeout = SYNTHESIZER_TIMEOUT if llm_name == "synthesizer" else EVALUATOR_TIMEOUT
+            if llm_timeout is None:
+                return await llm.ainvoke(messages)
+            return await asyncio.wait_for(llm.ainvoke(messages), timeout=llm_timeout)
         except OpenAIRateLimitError as err:
             last_error = err
             logger.warning(
@@ -342,6 +360,11 @@ def _build_document_views(items: List[AgentItem]) -> List[Dict[str, Any]]:
                         "location": location,
                         "page_number": page,
                         "source": citation.get("source") or doc_name,
+                        "file_path": citation.get("file_path") or metadata.get("file_path"),
+                        "document_path": citation.get("document_path"),
+                        "pdf_url": citation.get("pdf_url"),
+                        "content_type": citation.get("content_type") or "image",
+                        "chunk_id": citation.get("chunk_id"),
                     }
                 )
 
@@ -357,6 +380,10 @@ def _build_document_views(items: List[AgentItem]) -> List[Dict[str, Any]]:
                     "location": attrs.get("location"),
                     "page_number": None,
                     "source": doc_name,
+                    "file_path": attrs.get("file_path"),
+                    "document_path": attrs.get("document_path"),
+                    "pdf_url": attrs.get("pdf_url"),
+                    "content_type": attrs.get("content_type") or "image",
                 }
             )
 
@@ -590,16 +617,12 @@ def _build_rule_based_answer(
     # [FIX 2025-12-04] 提取图片引用
     image_references = []
     if documents_view:
-        for doc in documents_view[:6]:
-            for image in doc.get("images", [])[:2]:
+        for doc in documents_view:
+            for image in doc.get("images", []):
                 image_references.append({
                     **image,
                     "doc_name": doc.get("doc_name"),
                 })
-                if len(image_references) >= 10:
-                    break
-            if len(image_references) >= 10:
-                break
 
     return {
         "final_answer": final_answer,
@@ -1489,10 +1512,22 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     notes = state.get("notes", [])
     retry_count = state.get("retry_count", 0)
     feedback_message = state.get("feedback_message", "")
+    request = state.get("request")
     wants_images = _wants_images(query)
     text_items = _filter_text_items(aggregated_items, query)
     image_items_count = sum(1 for item in aggregated_items if _is_image_item(item))
     document_views = _build_document_views(text_items)
+
+    # ✅ [2025-11-25] 从 state 获取 Knowledge Fusion 输出
+    answer_graph_data = state.get("answer_graph_data", {})
+    unified_hints = state.get("unified_hints", {})
+
+    # ✅ [2025-11-25] 从 request.metadata 获取 answer_graph_data（兼容旧版）
+    if not answer_graph_data and request and request.metadata:
+        answer_graph_data = request.metadata.get("answer_graph_data", {})
+        unified_hints = request.metadata.get("unified_hints", {})
+
+    strict_cross_doc = _is_strict_cross_doc_request(query, request)
 
     logger.info(
         "[Synthesizer→Synthesize] 合成答案，共 %d 条结果（文本=%d，图片=%d，retry=%d）",
@@ -1512,6 +1547,11 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         fallback = _build_rule_based_answer(query, text_items, notes, document_views)
         if not wants_images:
             fallback["image_references"] = []
+        fallback.setdefault("final_citations", [])
+        fallback.setdefault("answer_graph_data", answer_graph_data)
+        fallback.setdefault("unified_hints", unified_hints)
+        fallback.setdefault("strict_cross_doc", strict_cross_doc)
+        fallback.setdefault("strict_citations_candidate_count", 0)
         return fallback
 
     # ============================================================================
@@ -1577,6 +1617,19 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                                     "location": location,
                                     "source": citation.get("source", ""),
                                     "snippet": citation.get("snippet", "")[:100],
+                                    "positions": citation.get("positions", []),
+                                    "pdf_url": citation.get("pdf_url"),
+                                    "file_path": citation.get("file_path"),
+                                    "document_path": citation.get("document_path"),
+                                    "page_number": citation.get("page_number"),
+                                    "page_range": citation.get("page_range"),
+                                    "chapter": citation.get("chapter"),
+                                    "chapter_title": citation.get("chapter_title"),
+                                    "sub_section": citation.get("sub_section"),
+                                    "content_type": citation.get("content_type", "image"),
+                                    "chunk_id": citation.get("chunk_id"),
+                                    "doc_id": citation.get("doc_id"),
+                                    "highlight_text": citation.get("highlight_text", ""),
                                 })
 
         # Milvus: 提取属性引用
@@ -1613,15 +1666,11 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     top_documents = documents_payload[:4]  # 保证后续使用时已定义，避免未赋值错误
 
     document_images: List[Dict[str, Any]] = []
-    for doc in top_documents:
+    for doc in document_views:
         for image in doc.get("images", []):
             annotated = dict(image)
             annotated["doc_name"] = doc.get("doc_name")
             document_images.append(annotated)
-            if len(document_images) >= 10:
-                break
-        if len(document_images) >= 10:
-            break
 
     if wants_images:
         if document_images:
@@ -1633,8 +1682,6 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                     continue
                 seen_urls.add(url)
                 merged_images.append(img)
-                if len(merged_images) >= 12:
-                    break
             image_citations = merged_images
     else:
         image_citations = []
@@ -1660,16 +1707,6 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     # ============================================================================
     doc_distribution = {doc.get("doc_name"): doc.get("item_count", 0) for doc in top_documents if doc.get("doc_name")}
 
-    # ✅ [2025-11-25] 从 state 获取 Knowledge Fusion 输出
-    answer_graph_data = state.get("answer_graph_data", {})
-    unified_hints = state.get("unified_hints", {})
-
-    # ✅ [2025-11-25] 从 request.metadata 获取 answer_graph_data（兼容旧版）
-    request = state.get("request")
-    if not answer_graph_data and request and request.metadata:
-        answer_graph_data = request.metadata.get("answer_graph_data", {})
-        unified_hints = request.metadata.get("unified_hints", {})
-
     # ============================================================================
     # [FIX 2026-01-14] 构建"最终 citations"（用于：LLM 严格对齐 [n] + API/前端点击一致）
     # - 仅保留文本 citations（图片通过 [image:i] 机制单独处理）
@@ -1685,96 +1722,105 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 
     from backend.app.utils.citation_builder import normalize_citations
 
-    def _cite_score(c: Dict[str, Any]) -> int:
-        """
-        [FIX 2026-01-13] 优化引用评分权重，确保跨文档关联质量
+    strict_citations_candidate_count = 0
+    if strict_cross_doc:
+        final_citations = _build_balanced_citations_for_strict_cross_doc(
+            aggregated_items,
+            request,
+            max_citations=max_citations,
+        )
+        strict_citations_candidate_count = len(final_citations)
+    else:
+        def _cite_score(c: Dict[str, Any]) -> int:
+            """
+            [FIX 2026-01-13] 优化引用评分权重，确保跨文档关联质量
 
-        评分策略：
-        - PDF 可预览性（1000分）：优先展示有 PDF 的引用
-        - 精确定位能力（100分）：positions 字段支持黄色高亮
-        - 文本类型（10分）：文本优于图片（图片通过 [image:i] 单独处理）
-        """
-        content_type = str(c.get("content_type") or "").lower()
-        is_image = bool(c.get("image_url")) or content_type == "image"
-        is_text = not is_image
-        has_positions = bool(c.get("positions"))
-        has_pdf = bool(c.get("pdf_url")) or bool(c.get("document_path")) or bool(c.get("file_path"))
+            评分策略：
+            - PDF 可预览性（1000分）：优先展示有 PDF 的引用
+            - 精确定位能力（100分）：positions 字段支持黄色高亮
+            - 文本类型（10分）：文本优于图片（图片通过 [image:i] 单独处理）
+            """
+            content_type = str(c.get("content_type") or "").lower()
+            is_image = bool(c.get("image_url")) or content_type == "image"
+            is_text = not is_image
+            has_positions = bool(c.get("positions"))
+            has_pdf = bool(c.get("pdf_url")) or bool(c.get("document_path")) or bool(c.get("file_path"))
 
-        # 新权重：PDF(1000) > positions(100) > text(10)
-        return (1000 if has_pdf else 0) + (100 if has_positions else 0) + (10 if is_text else 0)
+            # 新权重：PDF(1000) > positions(100) > text(10)
+            return (1000 if has_pdf else 0) + (100 if has_positions else 0) + (10 if is_text else 0)
 
-    # [FIX 2026-01-14] 优化去重逻辑：更宽松的去重策略
-    # 关键改进：
-    # 1. 如果 chunk_id 为空，使用 (doc_id, page_num) 作为key（允许同一页的不同chunk）
-    # 2. 优先保留有 PDF URL 和 positions 的引用
-    # 3. 记录去重统计，便于调试
-    # 4. 目标：保留10+条有效引用
-    citation_best: Dict[tuple, Dict[str, Any]] = {}
-    citation_order: List[tuple] = []
+        # [FIX 2026-01-14] 优化去重逻辑：更宽松的去重策略
+        # 关键改进：
+        # 1. 如果 chunk_id 为空，使用 (doc_id, page_num) 作为key（允许同一页的不同chunk）
+        # 2. 优先保留有 PDF URL 和 positions 的引用
+        # 3. 记录去重统计，便于调试
+        # 4. 目标：保留10+条有效引用
+        citation_best: Dict[tuple, Dict[str, Any]] = {}
+        citation_order: List[tuple] = []
 
-    # 统计：有多少个item有citations
-    items_with_citations = 0
-    total_citations_found = 0
-    skipped_no_source = 0
-    skipped_image = 0
+        # 统计：有多少个item有citations
+        items_with_citations = 0
+        total_citations_found = 0
+        skipped_no_source = 0
+        skipped_image = 0
 
-    for item in aggregated_items:
-        if item.citations and len(item.citations) > 0:
-            items_with_citations += 1
-            total_citations_found += len(item.citations)
+        for item in aggregated_items:
+            if item.citations and len(item.citations) > 0:
+                items_with_citations += 1
+                total_citations_found += len(item.citations)
 
-        for cite in (item.citations or []):
-            data = _citation_to_dict(cite)
-            if not data or not data.get("source"):
-                skipped_no_source += 1
-                continue
-            # 跳过图片（图片通过 [image:i] 机制单独处理）
-            if data.get("image_url") or str(data.get("content_type") or "").lower() == "image":
-                skipped_image += 1
-                continue
+            for cite in (item.citations or []):
+                data = _citation_to_dict(cite)
+                if not data or not data.get("source"):
+                    skipped_no_source += 1
+                    continue
+                # 跳过图片（图片通过 [image:i] 机制单独处理）
+                if data.get("image_url") or str(data.get("content_type") or "").lower() == "image":
+                    skipped_image += 1
+                    continue
 
-            # Composite key: 优化策略
-            doc_id = str(data.get("doc_id") or data.get("source") or "").strip()
-            page_num = data.get("page_number")
-            chunk_id = str(data.get("chunk_id") or "").strip()
+                # Composite key: 优化策略
+                doc_id = str(data.get("doc_id") or data.get("source") or "").strip()
+                page_num = data.get("page_number")
+                chunk_id = str(data.get("chunk_id") or "").strip()
 
-            if not doc_id:
-                skipped_no_source += 1
-                continue
+                if not doc_id:
+                    skipped_no_source += 1
+                    continue
 
-            # [FIX 2026-01-14] 更宽松的去重策略：
-            # - 如果有 chunk_id，使用 (doc_id, page_num, chunk_id)
-            # - 如果没有 chunk_id，使用 (doc_id, page_num, content_type, snippet_hash)
-            #   这样同一页的不同内容可以有多个引用
-            # - 特别处理：图片和文字即使在同一页也应该分开显示
-            content_type = str(data.get("content_type") or "text").lower()
-            if chunk_id:
-                cite_key = (doc_id, page_num, chunk_id)
-            else:
-                # 使用 content_type + snippet 的前50个字符作为区分
-                snippet_hash = str(data.get("snippet", ""))[:50]
-                cite_key = (doc_id, page_num, content_type, snippet_hash)
+                # [FIX 2026-01-14] 更宽松的去重策略：
+                # - 如果有 chunk_id，使用 (doc_id, page_num, chunk_id)
+                # - 如果没有 chunk_id，使用 (doc_id, page_num, content_type, snippet_hash)
+                #   这样同一页的不同内容可以有多个引用
+                # - 特别处理：图片和文字即使在同一页也应该分开显示
+                content_type = str(data.get("content_type") or "text").lower()
+                if chunk_id:
+                    cite_key = (doc_id, page_num, chunk_id)
+                else:
+                    # 使用 content_type + snippet 的前50个字符作为区分
+                    snippet_hash = str(data.get("snippet", ""))[:50]
+                    cite_key = (doc_id, page_num, content_type, snippet_hash)
 
-            if cite_key not in citation_best:
-                citation_order.append(cite_key)
-                citation_best[cite_key] = data
-                continue
+                if cite_key not in citation_best:
+                    citation_order.append(cite_key)
+                    citation_best[cite_key] = data
+                    continue
 
-            # 如果重复，保留分数更高的
-            if _cite_score(data) > _cite_score(citation_best[cite_key]):
-                citation_best[cite_key] = data
+                # 如果重复，保留分数更高的
+                if _cite_score(data) > _cite_score(citation_best[cite_key]):
+                    citation_best[cite_key] = data
 
-    # [FIX 2026-01-14] 调试日志：追踪citations的来源
-    logger.info(
-        f"[Synthesizer→Citations] 统计：{len(aggregated_items)} 个items，"
-        f"{items_with_citations} 个有citations，"
-        f"共 {total_citations_found} 条原始citations，"
-        f"跳过 {skipped_no_source} 条（无source），"
-        f"跳过 {skipped_image} 条（图片），"
-        f"去重后 {len(citation_best)} 条"
-    )
+        # [FIX 2026-01-14] 调试日志：追踪citations的来源
+        logger.info(
+            f"[Synthesizer→Citations] 统计：{len(aggregated_items)} 个items，"
+            f"{items_with_citations} 个有citations，"
+            f"共 {total_citations_found} 条原始citations，"
+            f"跳过 {skipped_no_source} 条（无source），"
+            f"跳过 {skipped_image} 条（图片），"
+            f"去重后 {len(citation_best)} 条"
+        )
 
-    final_citations = normalize_citations([citation_best[k] for k in citation_order][:max_citations])
+        final_citations = normalize_citations([citation_best[k] for k in citation_order][:max_citations])
 
     # [FIX 2026-01-14] 验证final_citations的PDF URL完整性
     citations_with_pdf = sum(1 for c in final_citations if c.get("pdf_url") or c.get("file_path") or c.get("document_path"))
@@ -1836,7 +1882,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "source_document": source_doc or "unknown",
             "score": float(item.score) if item.score else 0.0,
             "snippet": (item.snippet or "")[:220],
-            "citations": item.citations or [],
+            "citations_count": len(item.citations or []),
         })
 
     # 生成关键洞察，方便 LLM 快速理解要点
@@ -1854,7 +1900,9 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     # [NEW] ??????PDF???2025-01-17 ???
     # ============================================================================
     project_root = Path(__file__).resolve().parents[3]
-    documents_dir = (project_root / "backend" / "databases" / "documents").resolve()
+    documents_dir = Path(
+        os.getenv("DATA_PROCESS_DOCUMENTS_DIR", str(project_root / "data_process" / "documents"))
+    ).resolve()
 
     def _attach_pdf_metadata(citation: Dict[str, Any]) -> None:
         file_path = citation.get("file_path")
@@ -1883,7 +1931,10 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             try:
                 rel_path = abs_path.relative_to(documents_dir).as_posix()
             except ValueError:
-                rel_path = rel_path or None
+                normalized = str(file_path or "").replace("\\", "/")
+                marker = "documents/"
+                idx = normalized.lower().find(marker)
+                rel_path = normalized[idx + len(marker) :].lstrip("/") if idx >= 0 else (rel_path or None)
 
         if rel_path:
             citation["document_path"] = rel_path
@@ -1904,6 +1955,12 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         _attach_pdf_metadata(citation)
         citation["link_placeholder"] = True
 
+    for citation in image_citations:
+        _attach_pdf_metadata(citation)
+
+    for image in document_images:
+        _attach_pdf_metadata(image)
+
     # [FIX 2026-01-14] 关键修复：确保 final_citations 也有 PDF metadata
     for citation in final_citations:
         _attach_pdf_metadata(citation)
@@ -1919,7 +1976,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 2. 结构清晰：必须提供“目录”，并使用 Markdown 分级标题与分点
 3. 标题与正文分行：标题单独成行，正文另起一行
 4. 核心数据表格化：涉及尺寸、间距、配比、流程指标等信息时必须用 Markdown 表格呈现
-5. 图文并茂：若 `related_images` 充足（>=5），至少嵌入 5 张图片（`[image:i]`）；若不足 5 张，则全部嵌入，放在相关段落下方并配斜体说明
+5. 图文并茂：若存在 `related_images`，应尽可能全部嵌入（`[image:i]`），放在相关段落下方并配斜体说明
 6. 引用精准投放：引用标记紧跟被支持的具体句子之后
 
 ## 输出结构（灵活但有目录）
@@ -1945,7 +2002,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 - 只输出学术化、严谨、可直接用于文档的正文内容
 
 ## 图片使用规范
-- 默认图文并茂，优先满足至少 5 张（若资源不足则全部展示）
+- 默认图文并茂：如有图片则全部展示
 - 图片索引来自 `related_images`（从 0 开始），不要虚构
 - 图片标记 `[image:i]` 单独一行
 - 图片说明使用斜体 `*图1：...*`，不超过40字
@@ -1956,6 +2013,13 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 - 表格单元格内的引用
 - `| :--- | :--- |` 对齐语法（只用 `|---|---|`）
 """
+
+    if feedback_message:
+        system_prompt = (
+            system_prompt
+            + "\n\n## 改进要求\n"
+            + f"{feedback_message}\n"
+        )
 
     # ✅ [2025-12-03] 简化 user_prompt，移除冗余指令
     user_prompt = f"""用户问题：{query}
@@ -2149,8 +2213,10 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "notes": notes,
             "answer_graph_data": answer_graph_data,
             "unified_hints": unified_hints,
-            "image_references": image_citations[:10] if wants_images and image_citations else [],
+            "image_references": image_citations if wants_images and image_citations else [],
             "final_citations": final_citations,
+            "strict_cross_doc": strict_cross_doc,
+            "strict_citations_candidate_count": strict_citations_candidate_count,
             "document_citations": {
                 "mongodb": mongodb_citations[:10],
                 "milvus": milvus_citations[:10],
@@ -2163,6 +2229,8 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         fallback = _build_rule_based_answer(query, text_items, notes, document_views)
         fallback["notes"] = notes
         fallback["final_citations"] = final_citations
+        fallback["strict_cross_doc"] = strict_cross_doc
+        fallback["strict_citations_candidate_count"] = strict_citations_candidate_count
         if not wants_images:
             fallback["image_references"] = []
         return fallback
@@ -2185,28 +2253,21 @@ async def node_evaluate_quality(state: SynthesizerState) -> Dict[str, Any]:
     citation_count = sum(len(item.citations or []) for item in aggregated_items)
     sources = list({item.source for item in aggregated_items if item.source})
     
-    system_prompt = """你是医院建筑设计领域的质量评估专家。
-
-评估以下答案的质量：
-
-查询：{query}
-答案：{answer}
-引用数量：{citation_count}
-数据来源：{sources}
-结果条数：{item_count}
-
-评估标准：
-1. 信息完整性 - 是否完整回答了问题（权重 40%）
-2. 引用充分性 - 是否有足够的数据支持（权重 30%）
-3. 专业准确性 - 信息是否专业可靠（权重 30%）
-
-返回格式（必须是有效的 JSON）：
-{
-  "quality_score": 0.85,
-  "is_quality_good": true,
-  "feedback": "建议补充急诊部的具体面积要求"
-}
-"""
+    system_prompt = (
+        "你是医院建筑设计领域的质量评估专家。\n\n"
+        "评估以下答案的质量：\n\n"
+        f"查询：{query}\n"
+        f"答案：{final_answer[:1500]}\n"
+        f"引用数量：{citation_count}\n"
+        f"数据来源：{sources}\n"
+        f"结果条数：{len(aggregated_items)}\n\n"
+        "评估标准：\n"
+        "1. 信息完整性 - 是否完整回答了问题（权重 40%）\n"
+        "2. 引用充分性 - 是否有足够的数据支持（权重 30%）\n"
+        "3. 专业准确性 - 信息是否专业可靠（权重 30%）\n\n"
+        '返回格式（必须是有效的 JSON）：\n'
+        '{"quality_score": 0.85, "is_quality_good": true, "feedback": "建议补充急诊部的具体面积要求"}'
+    )
     
     user_payload = {
         "query": query,
@@ -2326,14 +2387,30 @@ def build_synthesizer_graph():
     """
     builder = StateGraph(SynthesizerState)
 
-    # 添加节点（简化版：只保留核心节点）
+    # 添加节点
     builder.add_node("aggregate", node_aggregate)
     builder.add_node("synthesize", node_synthesize)
+    builder.add_node("evaluate_quality", node_evaluate_quality)
+    builder.add_node("request_retry", node_request_retry)
+    builder.add_node("finalize", node_finalize)
+    builder.add_node("finalize_with_warning", node_finalize_with_warning)
 
-    # 设置流程（直接流程，无评估循环）
+    # 设置流程：聚合 → 合成 → 质量评估 → 最终化/重试
     builder.set_entry_point("aggregate")
     builder.add_edge("aggregate", "synthesize")
-    builder.add_edge("synthesize", END)
+    builder.add_edge("synthesize", "evaluate_quality")
+    builder.add_conditional_edges(
+        "evaluate_quality",
+        route_after_evaluation,
+        {
+            "finalize": "finalize",
+            "request_retry": "request_retry",
+            "finalize_with_warning": "finalize_with_warning",
+        },
+    )
+    builder.add_edge("request_retry", "synthesize")
+    builder.add_edge("finalize", END)
+    builder.add_edge("finalize_with_warning", END)
 
     logger.info("[Synthesizer] 图构建完成")
 

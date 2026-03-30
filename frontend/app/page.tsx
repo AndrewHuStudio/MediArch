@@ -5,22 +5,27 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Globe } from "lucide-react"
 import HeroSection from "@/app/sections/hero-section"
 import KnowledgeSection from "@/app/sections/knowledge-section"
 import KnowledgeGraphSection from "@/app/sections/knowledge-graph-section"
 import TeamSection from "@/app/sections/team-section"
 import { usePageTransition } from "@/components/page-transition"
+import { useT } from "@/lib/i18n"
+import { getLandingNavItems } from "@/lib/i18n/ui-copy"
 
 export default function MediArchLanding() {
   const { startTransition } = usePageTransition()
   const router = useRouter()
+  const { t, locale, setLocale } = useT()
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [currentSection, setCurrentSection] = useState(0)
-  const [activeNav, setActiveNav] = useState("首页")
+  const [activeNav, setActiveNav] = useState("home")
   const [headerVisible, setHeaderVisible] = useState(true)
 
   const isScrollingRef = useRef(false)
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const navItems = getLandingNavItems(t)
 
   useEffect(() => {
     let debounceTimeout: NodeJS.Timeout | null = null
@@ -105,9 +110,8 @@ export default function MediArchLanding() {
   }
 
   useEffect(() => {
-    const navItems = ["首页", "知识库", "知识图谱", "实验室"]
-    setActiveNav(navItems[currentSection] || "首页")
-  }, [currentSection])
+    setActiveNav(navItems[currentSection]?.key || "home")
+  }, [currentSection, navItems])
 
   const handleHomeLogoClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
@@ -158,26 +162,21 @@ export default function MediArchLanding() {
             <img src="/images/mediarch-logo.png" alt="MediArch" className="h-8" />
           </button>
           <nav className="flex items-center gap-8">
-            {[
-              { name: "首页", index: 0 },
-              { name: "知识库", index: 1 },
-              { name: "知识图谱", index: 2 },
-              { name: "实验室", index: 3 },
-            ].map((section) => (
+            {navItems.map((section) => (
               <button
-                key={section.name}
+                key={section.key}
                 onClick={(e) => {
                   e.stopPropagation()
                   scrollToSection(section.index)
                 }}
                 data-nav-button
                 className={`text-sm font-medium transition-colors ${
-                  activeNav === section.name
+                  activeNav === section.key
                     ? "text-white border-b border-white pb-1"
                     : "text-gray-400 hover:text-white"
                 }`}
               >
-                {section.name}
+                {section.label}
               </button>
             ))}
             <Link
@@ -186,11 +185,26 @@ export default function MediArchLanding() {
               onClick={handleChatNavigation}
               data-nav-button
               className={`text-sm font-medium transition-colors ${
-                activeNav === "智能问答" ? "text-white border-b border-white pb-1" : "text-gray-400 hover:text-white"
+                activeNav === "chat" ? "text-white border-b border-white pb-1" : "text-gray-400 hover:text-white"
               }`}
             >
-              智能问答
+              {t('nav.chat')}
             </Link>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setLocale(locale === "zh" ? "en" : "zh")
+              }}
+              data-nav-button
+              className="flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+              aria-label={locale === "zh" ? t('translate.toEnglish') : t('translate.toChinese')}
+            >
+              <Globe className="w-4 h-4" />
+              <span className={locale === "zh" ? "text-white" : ""}>{t('chatHeader.lang.zh')}</span>
+              <span className="text-gray-600">/</span>
+              <span className={locale === "en" ? "text-white" : ""}>{t('chatHeader.lang.en')}</span>
+            </button>
           </nav>
         </div>
       </header>

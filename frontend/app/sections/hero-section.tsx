@@ -7,6 +7,7 @@ import { Share2, Bot, Layers, ChevronDown } from "lucide-react"
 import { useState } from "react"
 import { Waves } from "@/components/ui/wave-background"
 import { usePageTransition } from "@/components/page-transition"
+import { useT } from "@/lib/i18n"
 
 interface HeroSectionProps {
   onNavigate: (sectionIndex: number) => void
@@ -15,13 +16,14 @@ interface HeroSectionProps {
 export default function HeroSection({ onNavigate }: HeroSectionProps) {
   const [inputValue, setInputValue] = useState("")
   const { startTransition, isTransitioning } = usePageTransition()
+  const { t } = useT()
 
   const placeholders = [
-    "医院手术室的设计标准是什么？",
-    "如何规划病房的空间布局？",
-    "医疗设备的配置要求有哪些？",
-    "感染控制设计的关键要点？",
-    "无障碍设计在医院中的应用？",
+    t('hero.placeholder.1'),
+    t('hero.placeholder.2'),
+    t('hero.placeholder.3'),
+    t('hero.placeholder.4'),
+    t('hero.placeholder.5'),
   ]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,7 +61,7 @@ export default function HeroSection({ onNavigate }: HeroSectionProps) {
             MediArch
           </h1>
 
-          <p className="text-xl text-white mb-12 max-w-2xl">综合医院设计问答助手 - 专业的医疗建筑设计咨询服务</p>
+          <p className="text-xl text-white mb-12 max-w-2xl">{t('hero.subtitle')}</p>
 
           <div className="mb-8 max-w-2xl w-full">
             <div className="relative p-[2px] rounded-full overflow-hidden">
@@ -93,10 +95,10 @@ export default function HeroSection({ onNavigate }: HeroSectionProps) {
                 <Share2 className="w-4 h-4 text-white" />
               </div>
               <GradientButton width="160px" height="36px" onClick={() => onNavigate(2)}>
-                <span className="text-white font-medium text-sm">图谱知识网络</span>
+                <span className="text-white font-medium text-sm">{t('hero.btn.graph')}</span>
               </GradientButton>
               <p className="text-white text-xs leading-relaxed opacity-80 max-w-48">
-                8800+医疗建筑实体，21000+关联，全景知识图谱可视洞察
+                {t('hero.desc.graph')}
               </p>
             </div>
 
@@ -105,10 +107,10 @@ export default function HeroSection({ onNavigate }: HeroSectionProps) {
                 <Bot className="w-4 h-4 text-white" />
               </div>
               <GradientButton width="140px" height="36px" onClick={handleChatClick}>
-                <span className="text-white font-medium text-sm">智能设计助手</span>
+                <span className="text-white font-medium text-sm">{t('hero.btn.chat')}</span>
               </GradientButton>
               <p className="text-white text-xs leading-relaxed opacity-80 max-w-48">
-                多智能体协同分析，即时响应复杂设计咨询与方案建议
+                {t('hero.desc.chat')}
               </p>
             </div>
 
@@ -117,10 +119,10 @@ export default function HeroSection({ onNavigate }: HeroSectionProps) {
                 <Layers className="w-4 h-4 text-white" />
               </div>
               <GradientButton width="160px" height="36px" onClick={() => onNavigate(1)}>
-                <span className="text-white font-medium text-sm">多源知识检索</span>
+                <span className="text-white font-medium text-sm">{t('hero.btn.search')}</span>
               </GradientButton>
               <p className="text-white text-xs leading-relaxed opacity-80 max-w-48">
-                标准规范、学术论文、案例、政策文件一体化智能检索
+                {t('hero.desc.search')}
               </p>
             </div>
           </div>

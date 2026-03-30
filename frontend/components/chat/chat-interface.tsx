@@ -17,9 +17,15 @@ import { ChatProvider, useChatContext } from "@/contexts/ChatContext"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { ChatInput } from "@/components/chat/chat-input"
 import { initializeDemoConversations } from "@/lib/init-demo-conversations"
+import { convertKnowledgeGraphData } from "@/lib/chat/knowledge-graph-normalization"
+import { runChatWithFallback, type ChatExecutionResult } from "@/lib/chat/chat-execution"
+import { useT } from "@/lib/i18n"
+import { getChatAgentDefinitions } from "@/lib/i18n/ui-copy"
+import type { AssistantDisplayLanguage } from "@/lib/chat/message-translation"
 
 // API 客户端
 import { chatApi, type StreamCallbacks, getApiUrl } from "@/lib/api"
+import { mockChatStreamRequest } from "@/lib/api/mock-client"
 import type { Citation, KnowledgeGraphData, AgentStatusUpdate } from "@/lib/api/types"
 
 // 延迟加载非关键组件 - 性能优化
@@ -36,8 +42,6 @@ const KnowledgeGraphPanel = dynamic(() => import("@/components/chat/knowledge-gr
 // localStorage 相关常量
 const CONVERSATION_STORAGE_PREFIX = "mediarch-conversation-"
 const CURRENT_CONVERSATION_KEY = "mediarch-current-conversation-id"
-const DEFAULT_CONVERSATION_TITLE = "新的对话"
-const DEFAULT_CONVERSATION_SUMMARY = "大模型正在梳理对话意图..."
 
 // 是否使用后端 API（可以通过环境变量控制）
 const USE_BACKEND_API = process.env.NEXT_PUBLIC_USE_BACKEND_API !== "false"
@@ -51,6 +55,9 @@ interface StoredConversation {
     id: string
     role: "user" | "assistant"
     content: string
+    translatedContent?: string
+    displayLanguage?: AssistantDisplayLanguage
+    isTranslating?: boolean
     timestamp: Date
     files?: File[]
     sources?: PDFSource[]
@@ -76,6 +83,65 @@ const saveConversationToStorage = (conversation: StoredConversation) => {
   }
 }
 
+const buildImageUrl = (rawImagePath?: string) => {
+  if (!rawImagePath) return undefined
+
+  const normalized = rawImagePath.replace(/\\/g, "/")
+  if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith("data:")) {
+    return normalized
+  }
+  if (normalized.startsWith("/api/")) {
+    return getApiUrl(normalized.replace(/^\/api\/v1/, ""))
+  }
+  if (normalized.startsWith("/documents/image")) {
+    return getApiUrl(normalized)
+  }
+
+  const match = normalized.match(/documents_ocr\/(.+)$/i)
+  const relative = match ? match[1] : normalized.replace(/^\/+/, "")
+  return getApiUrl(`/documents/image?path=${encodeURIComponent(relative)}`)
+}
+
+const inferPdfRelativePath = (fallbackPath?: string, imagePath?: string, title?: string) => {
+  const normalizedFallback = String(fallbackPath || "").replace(/\\/g, "/").trim()
+  if (normalizedFallback) {
+    const match = normalizedFallback.match(/documents\/(.+)$/i)
+    return match ? match[1] : normalizedFallback.replace(/^\/+/, "")
+  }
+
+  const normalizedImage = String(imagePath || "").replace(/\\/g, "/").trim()
+  if (normalizedImage) {
+    const ocrMatch = normalizedImage.match(/documents_ocr\/([^/]+)\/([^/]+)\/(?:full\/)?images\//i)
+    if (ocrMatch) return `${ocrMatch[1]}/${ocrMatch[2]}.pdf`
+
+    const relMatch = normalizedImage.match(/^([^/]+)\/([^/]+)\/(?:full\/)?images\//i)
+    if (relMatch) return `${relMatch[1]}/${relMatch[2]}.pdf`
+  }
+
+  const normalizedTitle = String(title || "").trim().replace(/\.pdf$/i, "")
+  if (normalizedTitle) {
+    return `书籍报告/${normalizedTitle}.pdf`
+  }
+
+  return undefined
+}
+
+const normalizeStoredSource = (source: PDFSource): PDFSource => {
+  const pdfUrl = buildPdfUrl(source.pdfUrl, source.documentPath, source.filePath, source.imageUrl, source.title)
+  const imageUrl = buildImageUrl(source.imageUrl)
+  return {
+    ...source,
+    pdfUrl,
+    imageUrl,
+    thumbnail: source.thumbnail || imageUrl,
+  }
+}
+
+const normalizeStoredImages = (images?: string[]) => {
+  if (!Array.isArray(images) || images.length === 0) return images
+  return images.map((image) => buildImageUrl(image) || image)
+}
+
 const loadConversationFromStorage = (id: string): StoredConversation | null => {
   try {
     const key = `${CONVERSATION_STORAGE_PREFIX}${id}`
@@ -89,6 +155,8 @@ const loadConversationFromStorage = (id: string): StoredConversation | null => {
       messages: parsed.messages.map((msg: any) => ({
         ...msg,
         timestamp: new Date(msg.timestamp),
+        sources: Array.isArray(msg.sources) ? msg.sources.map(normalizeStoredSource) : msg.sources,
+        images: normalizeStoredImages(msg.images),
       })),
     }
   } catch (error) {
@@ -127,19 +195,25 @@ const getCurrentConversationIdStorage = (): string | null => {
   }
 }
 
-const createAutoConversationTitle = (raw: string, maxLength = 20) => {
+const createAutoConversationTitle = (raw: string, emptyTitle: string, maxLength = 20) => {
   const normalized = raw.replace(/\s+/g, " ").trim()
-  if (!normalized) return DEFAULT_CONVERSATION_TITLE
+  if (!normalized) return emptyTitle
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized
 }
 
-const createConversationSummary = (raw: string) => {
+const createConversationSummary = (raw: string, emptySummary: string) => {
   const normalized = raw.replace(/\s+/g, " ").trim()
-  if (!normalized) return DEFAULT_CONVERSATION_SUMMARY
+  if (!normalized) return emptySummary
   return normalized.length > 60 ? `${normalized.slice(0, 60)}...` : normalized
 }
 
-const buildPdfUrl = (rawPdfPath?: string, documentPath?: string, filePath?: string) => {
+const buildPdfUrl = (
+  rawPdfPath?: string,
+  documentPath?: string,
+  filePath?: string,
+  imagePath?: string,
+  title?: string,
+) => {
   const toApiUrl = (path: string) => getApiUrl(path.startsWith("/") ? path : `/${path}`)
 
   const normalizeRelativePath = (path: string) => {
@@ -163,12 +237,8 @@ const buildPdfUrl = (rawPdfPath?: string, documentPath?: string, filePath?: stri
   if (fromPdfUrl) return fromPdfUrl
 
   // 2) 其次用 document_path / file_path 组装
-  const fallbackPath = documentPath || filePath
-  if (fallbackPath) {
-    // 兼容绝对/相对路径，尽量取 documents 目录后的相对部分
-    const sanitized = fallbackPath.replace(/\\/g, "/")
-    const match = sanitized.match(/documents\/(.+)$/i)
-    const relative = match ? match[1] : sanitized
+  const relative = inferPdfRelativePath(documentPath || filePath, imagePath, title)
+  if (relative) {
     return toApiUrl(`/documents/pdf?path=${encodeURIComponent(relative)}`)
   }
 
@@ -183,7 +253,7 @@ const citationsToPDFSources = (citations: Citation[]): PDFSource[] => {
     const filePath = cite.file_path || (cite as any).filePath
     const imageUrl = (cite as any).imageUrl || cite.image_url
     const rawPdfPath = cite.pdf_url || (cite as any).pdfUrl
-    const pdfUrl = buildPdfUrl(rawPdfPath as string | undefined, documentPath, filePath)
+    const pdfUrl = buildPdfUrl(rawPdfPath as string | undefined, documentPath, filePath, imageUrl, cite.source)
     const normalizedPositions =
       Array.isArray(cite.positions) && cite.positions.length > 0
         ? cite.positions.map((pos: any) => {
@@ -220,74 +290,6 @@ const citationsToPDFSources = (citations: Citation[]): PDFSource[] => {
       contentType: ((cite.content_type as any) || (cite.image_url ? "image" : undefined)) as any,
     }
   })
-}
-
-// 转换知识图谱数据格式
-const convertKnowledgeGraphData = (data: any | null): GraphData => {
-  if (!data) return { nodes: [], links: [] }
-
-  // 处理可能的不同数据格式
-  const rawNodes = data.nodes || []
-  const rawLinks = data.links || data.edges || []
-
-  // 去重节点（后端可能返回重复节点）
-  const nodeMap = new Map<string, any>()
-  for (const node of rawNodes) {
-    const id = node.id || node.name || `node-${Math.random()}`
-    if (!nodeMap.has(id)) {
-      nodeMap.set(id, {
-        id,
-        label: node.label || node.name || node.id || "未知",
-        type: mapNodeType(node.type),
-      })
-    }
-  }
-
-  // 过滤无效的边（source 或 target 不存在于节点中）
-  const validLinks = rawLinks
-    .map((link: any) => ({
-      source: link.source,
-      target: link.target,
-      label: link.label || link.relation || "",
-    }))
-    .filter((link: any) => nodeMap.has(link.source) && nodeMap.has(link.target))
-
-  return {
-    nodes: Array.from(nodeMap.values()),
-    links: validLinks,
-  }
-}
-
-// 映射节点类型到前端支持的类型
-function mapNodeType(type: string | undefined): string {
-  if (!type) return "entity"
-
-  // 直接使用 schema 定义的节点类型
-  const schemaTypes = [
-    "Hospital", "DepartmentGroup", "FunctionalZone", "Space",
-    "DesignMethod", "DesignMethodCategory", "Case", "Source",
-    "MedicalService", "MedicalEquipment", "TreatmentMethod",
-    "KnowledgePoint"  // 新增：知识点类型
-  ]
-
-  if (schemaTypes.includes(type)) {
-    return type
-  }
-
-  // 兼容旧的类型名称
-  const typeLower = type.toLowerCase()
-
-  if (typeLower.includes("hospital")) return "Hospital"
-  if (typeLower.includes("department")) return "DepartmentGroup"
-  if (typeLower.includes("zone") || typeLower.includes("功能分区")) return "FunctionalZone"
-  if (typeLower.includes("space") || typeLower.includes("room")) return "Space"
-  if (typeLower.includes("design") && typeLower.includes("method")) return "DesignMethod"
-  if (typeLower.includes("case") || typeLower.includes("案例")) return "Case"
-  if (typeLower.includes("knowledge") || typeLower.includes("知识")) return "KnowledgePoint"
-  // 检查 document 或 doc 后缀（如 design_standard_doc, diagram_atlas_doc）
-  if (typeLower.includes("document") || typeLower.includes("source") || typeLower.includes("_doc")) return "Source"
-
-  return "entity"
 }
 
 // 快速操作按钮组件
@@ -332,6 +334,7 @@ function InitialChatState({
   deepSearch: boolean
   setDeepSearch: (deepSearch: boolean) => void
 }) {
+  const { t } = useT()
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -350,7 +353,7 @@ function InitialChatState({
           <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-br from-white via-gray-200 to-gray-400 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">
             MediArch AI
           </h1>
-          <p className="text-neutral-400 text-lg font-light tracking-wide">综合医院建筑设计问答助手</p>
+          <p className="text-neutral-400 text-lg font-light tracking-wide">{t('chat.initialSubtitle')}</p>
         </motion.div>
 
         <motion.div
@@ -366,7 +369,7 @@ function InitialChatState({
             setUploadedFiles={setUploadedFiles}
             onSend={handleSendMessage}
             variant="initial"
-            placeholder="输入您的问题..."
+            placeholder={t('chat.inputPlaceholder')}
             deepSearch={deepSearch}
             setDeepSearch={setDeepSearch}
           />
@@ -380,23 +383,23 @@ function InitialChatState({
         >
           <QuickActionComponent
             icon={<Stethoscope className="w-4 h-4" />}
-            label="医疗流程设计"
-            onClick={() => onQuickAction("请帮我设计一个高效的医疗流程")}
+            label={t('chat.quickAction.flow')}
+            onClick={() => onQuickAction(t('chat.quickAction.flowPrompt'))}
           />
           <QuickActionComponent
             icon={<Building2 className="w-4 h-4" />}
-            label="建筑规范查询"
-            onClick={() => onQuickAction("医疗建筑设计有哪些规范要求？")}
+            label={t('chat.quickAction.standard')}
+            onClick={() => onQuickAction(t('chat.quickAction.standardPrompt'))}
           />
           <QuickActionComponent
             icon={<FileSearch className="w-4 h-4" />}
-            label="案例分析"
-            onClick={() => onQuickAction("分析一个优秀的医疗建筑案例")}
+            label={t('chat.quickAction.case')}
+            onClick={() => onQuickAction(t('chat.quickAction.casePrompt'))}
           />
           <QuickActionComponent
             icon={<Lightbulb className="w-4 h-4" />}
-            label="创新方案"
-            onClick={() => onQuickAction("给我一些创新的医疗空间设计方案")}
+            label={t('chat.quickAction.innovation')}
+            onClick={() => onQuickAction(t('chat.quickAction.innovationPrompt'))}
           />
         </motion.div>
       </div>
@@ -406,6 +409,7 @@ function InitialChatState({
 
 // 主 ChatInterface 组件逻辑
 function ChatInterfaceContent() {
+  const { t } = useT()
   const router = useRouter()
   const searchParams = useSearchParams()
   const initialQuestion = searchParams.get("q")
@@ -454,7 +458,9 @@ function ChatInterfaceContent() {
   const [message, setMessage] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true)
-  const [displayedSummary, setDisplayedSummary] = useState(DEFAULT_CONVERSATION_SUMMARY)
+  const defaultConversationTitle = t('chat.defaultTitle')
+  const defaultConversationSummary = t('chat.defaultSummary')
+  const [displayedSummary, setDisplayedSummary] = useState(defaultConversationSummary)
   const [backendSessionId, setBackendSessionId] = useState<string | null>(null)
   const [apiError, setApiError] = useState<string | null>(null)
   const [recommendedQuestions, setRecommendedQuestions] = useState<string[]>([])
@@ -463,27 +469,20 @@ function ChatInterfaceContent() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasProcessedInitialQuestion = useRef(false)
 
-  // 使用 useMemo 避免每次渲染创建新数组引用
-  const agents = useMemo(() => [
-    "Orchestrator Agent",
-    "Neo4j Agent",
-    "Milvus Agent",
-    "MongoDB Agent",
-    "Online Search Agent",
-    "Result Synthesizer Agent",
-  ], [])
-
-  const agentThoughts = useMemo(() => ({
-    "Orchestrator Agent": ["分析问题结构...", "制定查询策略...", "分配任务给各智能体..."],
-    "Neo4j Agent": ["查询知识图谱...", "分析关系网络...", "提取关键节点..."],
-    "Milvus Agent": ["向量相似度搜索...", "语义匹配分析...", "排序相关内容..."],
-    "MongoDB Agent": ["检索文档数据...", "过滤相关记录...", "聚合结果集..."],
-    "Online Search Agent": ["在线资源检索...", "验证最新信息...", "补充外部数据..."],
-    "Result Synthesizer Agent": ["整合各方数据...", "生成综合答案...", "优化表达方式..."],
-  }), [])
+  const agentDefinitions = useMemo(() => getChatAgentDefinitions(t), [t])
+  const agents = useMemo(() => agentDefinitions.map((agent) => agent.label), [agentDefinitions])
+  const agentThoughts = useMemo(
+    () => Object.fromEntries(agentDefinitions.map((agent) => [agent.label, agent.thoughts])),
+    [agentDefinitions],
+  )
 
   // 默认建议问题（当后端没有返回时使用）
-  const defaultSuggestedQuestions = ["能详细解释一下吗？", "有什么实际案例？", "如何实现这个功能？", "还有其他建议吗？"]
+  const defaultSuggestedQuestions = [
+    t('chat.defaultSuggestion.1'),
+    t('chat.defaultSuggestion.2'),
+    t('chat.defaultSuggestion.3'),
+    t('chat.defaultSuggestion.4'),
+  ]
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -495,7 +494,7 @@ function ChatInterfaceContent() {
 
   // 对话摘要打字效果
   useEffect(() => {
-    const target = conversationSummary || DEFAULT_CONVERSATION_SUMMARY
+    const target = conversationSummary || defaultConversationSummary
     if (!target) return
 
     let index = 0
@@ -509,21 +508,21 @@ function ChatInterfaceContent() {
     }, 45)
 
     return () => clearInterval(interval)
-  }, [conversationSummary])
+  }, [conversationSummary, defaultConversationSummary])
 
   // 自动标题更新
   useEffect(() => {
     if (!isAutoTitleActive) return
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === "user") {
-        const newTitle = createAutoConversationTitle(messages[i].content)
+        const newTitle = createAutoConversationTitle(messages[i].content, defaultConversationTitle)
         setConversationTitle(newTitle)
         break
       }
     }
     // 注意：setConversationTitle 来自 Context，是稳定的引用，不需要加入依赖
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, isAutoTitleActive])
+  }, [messages, isAutoTitleActive, defaultConversationTitle])
 
   // 处理初始问题
   useEffect(() => {
@@ -548,8 +547,8 @@ function ChatInterfaceContent() {
       const newId = `conv-${Date.now()}`
       const newConversation: StoredConversation = {
         id: newId,
-        title: DEFAULT_CONVERSATION_TITLE,
-        summary: DEFAULT_CONVERSATION_SUMMARY,
+        title: defaultConversationTitle,
+        summary: defaultConversationSummary,
         messages: [],
         timestamp: new Date(),
         isPinned: false,
@@ -563,33 +562,13 @@ function ChatInterfaceContent() {
   const getStatusText = (status: AgentStatusUpdate) => status.thought || ""
 
   // 智能体名称映射
-  const agentNameMap: Record<string, number> = {
-    Orchestrator: 0,
-    orchestrator: 0,
-    orchestrator_agent: 0,
-    "Orchestrator Agent": 0,
-    Neo4j: 1,
-    neo4j: 1,
-    neo4j_agent: 1,
-    "Neo4j Agent": 1,
-    Milvus: 2,
-    milvus: 2,
-    milvus_agent: 2,
-    "Milvus Agent": 2,
-    MongoDB: 3,
-    mongodb: 3,
-    mongodb_agent: 3,
-    "MongoDB Agent": 3,
-    OnlineSearch: 4,
-    online_search: 4,
-    online_search_agent: 4,
-    "Online Search Agent": 4,
-    Synthesizer: 5,
-    synthesizer: 5,
-    result_synthesizer: 5,
-    result_synthesizer_agent: 5,
-    "Result Synthesizer Agent": 5,
-  }
+  const agentNameMap = useMemo(
+    () =>
+      Object.fromEntries(
+        agentDefinitions.flatMap((agent, index) => agent.backendNames.map((name) => [name, index])),
+      ) as Record<string, number>,
+    [agentDefinitions],
+  )
 
   // 处理智能体状态更新
   const handleAgentStatusUpdate = useCallback(
@@ -637,7 +616,7 @@ function ChatInterfaceContent() {
   )
 
   // 使用后端 API 发送消息（流式）
-  const sendMessageWithBackendStream = async (text: string): Promise<{ content: string; citations: Citation[]; images: string[]; success: boolean }> => {
+  const sendMessageWithBackendStream = async (text: string): Promise<ChatExecutionResult> => {
     setStreamingMessage("")
     setApiError(null)
     setIsThinking(true)
@@ -652,6 +631,7 @@ function ChatInterfaceContent() {
     let receivedCitations: Citation[] = []
     let receivedImages: string[] = []
     let hasError = false
+    let lastError: string | undefined
 
     const callbacks: StreamCallbacks = {
       onSession: (sessionId) => {
@@ -693,6 +673,7 @@ function ChatInterfaceContent() {
       },
       onError: (error) => {
         hasError = true
+        lastError = error || "后端流式响应失败"
         // 只在真正的错误时记录，忽略正常流结束
         if (error && !error.includes("Stream ended")) {
           console.warn("[API] Stream error:", error)
@@ -711,12 +692,14 @@ function ChatInterfaceContent() {
           include_online_search: false, // 测试阶段关闭
           include_citations: true,
           deep_search: deepSearch, // 深度检索模式
+          thinking_mode: deepSearch, // 思考模式（先与深度检索同步，便于后续独立开关）
         },
         callbacks
       )
     } catch (error) {
       console.warn("[API] Stream request failed:", error)
       hasError = true
+      lastError = error instanceof Error ? error.message : "后端请求失败"
       setIsThinking(false)
       setAgentStatus("idle")
     }
@@ -726,16 +709,72 @@ function ChatInterfaceContent() {
       citations: receivedCitations,
       images: receivedImages,
       success: !hasError && accumulatedContent.length > 0,
+      error: lastError,
+    }
+  }
+
+  const sendMessageWithBackendRequest = async (text: string): Promise<ChatExecutionResult> => {
+    setStreamingMessage("")
+    setApiError(null)
+    setIsThinking(true)
+    setAgentStatus("thinking")
+
+    try {
+      const response = await chatApi.send({
+        message: text,
+        session_id: backendSessionId || undefined,
+        include_online_search: false,
+        include_citations: true,
+        deep_search: deepSearch,
+        thinking_mode: deepSearch,
+      })
+
+      if (response.session_id) {
+        setBackendSessionId(response.session_id)
+      }
+      if (response.knowledge_graph_path) {
+        setGraphData(convertKnowledgeGraphData(response.knowledge_graph_path as KnowledgeGraphData))
+      }
+      if (response.recommended_questions) {
+        setRecommendedQuestions(response.recommended_questions)
+      }
+
+      setIsThinking(false)
+      setAgentStatus("idle")
+      setActiveAgentIndex(-1)
+
+      return {
+        content: response.message || "",
+        citations: response.citations || [],
+        images: response.images || [],
+        success: Boolean(response.message && response.message.trim()),
+        error: response.message && response.message.trim() ? undefined : "后端非流式返回空响应",
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "后端非流式请求失败"
+      console.warn("[API] Non-stream request failed:", message)
+      setIsThinking(false)
+      setAgentStatus("idle")
+      setActiveAgentIndex(-1)
+
+      return {
+        content: "",
+        citations: [],
+        images: [],
+        success: false,
+        error: message,
+      }
     }
   }
 
   // 模拟流式响应（使用 Mock API 客户端）
-  const simulateStreamResponse = async (text: string) => {
+  const simulateStreamResponse = async (text: string): Promise<ChatExecutionResult> => {
     let accumulatedContent = ""
     let receivedCitations: Citation[] = []
     let receivedImages: string[] = []
     let receivedKnowledgeGraph: KnowledgeGraphData | undefined = undefined
     let hasError = false
+    let lastError: string | undefined
 
     const callbacks: StreamCallbacks = {
       onSession: (sessionId) => {
@@ -779,23 +818,26 @@ function ChatInterfaceContent() {
       onError: (error) => {
         console.error("[Mock] Error:", error)
         hasError = true
+        lastError = error || "模拟响应失败"
         setIsThinking(false)
         setAgentStatus("idle")
       },
     }
 
     try {
-      await chatApi.stream(
+      await mockChatStreamRequest(
         {
           message: text,
           include_citations: true,
           deep_search: deepSearch, // 深度检索模式
+          thinking_mode: deepSearch, // 思考模式（先与深度检索同步，便于后续独立开关）
         },
         callbacks
       )
     } catch (error) {
       console.warn("[Mock] Stream request failed:", error)
       hasError = true
+      lastError = error instanceof Error ? error.message : "模拟请求失败"
       setIsThinking(false)
       setAgentStatus("idle")
     }
@@ -805,16 +847,17 @@ function ChatInterfaceContent() {
       citations: receivedCitations,
       images: receivedImages,
       success: !hasError && accumulatedContent.length > 0,
+      error: lastError,
     }
   }
 
   const updateConversationSummaryFromText = (text: string) => {
     const normalized = text.replace(/\s+/g, " ").trim()
     if (!normalized) return
-    const summary = createConversationSummary(normalized)
+    const summary = createConversationSummary(normalized, defaultConversationSummary)
     setConversationSummary(summary)
     if (isAutoTitleActive) {
-      setConversationTitle(createAutoConversationTitle(normalized))
+      setConversationTitle(createAutoConversationTitle(normalized, defaultConversationTitle))
     }
   }
 
@@ -848,18 +891,25 @@ function ChatInterfaceContent() {
     updateConversationSummaryFromText(textToSend)
 
     // 调用后端 API 或降级到模拟
-    let result: { content: string; citations: Citation[]; images: string[] }
+    const result = await runChatWithFallback({
+      useBackend: USE_BACKEND_API,
+      runBackendStream: async () => {
+        const backendStreamResult = await sendMessageWithBackendStream(textToSend)
+        if (!backendStreamResult.success) {
+          console.warn("[API] Backend unavailable or returned empty, falling back to simulation")
+        }
+        return backendStreamResult
+      },
+      runBackendSend: async () => sendMessageWithBackendRequest(textToSend),
+      runMock: async () => simulateStreamResponse(textToSend),
+    })
 
-    if (USE_BACKEND_API) {
-      const backendResult = await sendMessageWithBackendStream(textToSend)
-      if (backendResult.success) {
-        result = backendResult
-      } else {
-        console.warn("[API] Backend unavailable or returned empty, falling back to simulation")
-        result = await simulateStreamResponse(textToSend)
-      }
-    } else {
-      result = await simulateStreamResponse(textToSend)
+    if (!result.success) {
+      setApiError(result.error || "当前问题处理失败，请稍后重试。")
+      setStreamingMessage("")
+      setIsLoading(false)
+      setShowSuggestedQuestions(false)
+      return
     }
 
     // 转换引用为 PDFSource 格式
@@ -925,11 +975,11 @@ function ChatInterfaceContent() {
   }
 
   const resetConversationMeta = () => {
-    setConversationTitle(DEFAULT_CONVERSATION_TITLE)
+    setConversationTitle(defaultConversationTitle)
     setIsConversationPinned(false)
     setIsAutoTitleActive(true)
-    setConversationSummary(DEFAULT_CONVERSATION_SUMMARY)
-    setDisplayedSummary(DEFAULT_CONVERSATION_SUMMARY)
+    setConversationSummary(defaultConversationSummary)
+    setDisplayedSummary(defaultConversationSummary)
     setBackendSessionId(null)
     setRecommendedQuestions([])
     setApiError(null)
@@ -940,8 +990,8 @@ function ChatInterfaceContent() {
 
     const newConversation: StoredConversation = {
       id: newConversationId,
-      title: DEFAULT_CONVERSATION_TITLE,
-      summary: DEFAULT_CONVERSATION_SUMMARY,
+      title: defaultConversationTitle,
+      summary: defaultConversationSummary,
       messages: [],
       timestamp: new Date(),
       isPinned: false,
@@ -966,7 +1016,7 @@ function ChatInterfaceContent() {
 
   const handleDeleteConversation = () => {
     const shouldDelete =
-      typeof window === "undefined" ? true : window.confirm("确定删除当前对话吗？\n删除后内容将无法恢复。")
+      typeof window === "undefined" ? true : window.confirm(t('chat.deleteCurrentConfirm'))
     if (!shouldDelete) return
 
     if (currentConversationId) {
@@ -992,8 +1042,8 @@ function ChatInterfaceContent() {
     setCurrentConversationId(id)
     setMessages(conversation.messages)
     setConversationTitle(conversation.title)
-    setConversationSummary(conversation.summary || DEFAULT_CONVERSATION_SUMMARY)
-    setDisplayedSummary(conversation.summary || DEFAULT_CONVERSATION_SUMMARY)
+    setConversationSummary(conversation.summary || defaultConversationSummary)
+    setDisplayedSummary(conversation.summary || defaultConversationSummary)
     setIsConversationPinned(conversation.isPinned)
     setIsInitialState(conversation.messages.length === 0)
     setMessage("")
@@ -1087,7 +1137,7 @@ function ChatInterfaceContent() {
                       size="icon"
                       onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
                       className="text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-300"
-                      aria-label={isSidebarCollapsed ? "显示侧边栏" : "隐藏侧边栏"}
+                      aria-label={isSidebarCollapsed ? t('chat.aria.showSidebar') : t('chat.aria.hideSidebar')}
                     >
                       {isSidebarCollapsed ? (
                         <PanelRightOpen className="h-5 w-5" />
@@ -1150,7 +1200,7 @@ function ChatInterfaceContent() {
                           setUploadedFiles={setUploadedFiles}
                           onSend={() => handleSendMessageWithText()}
                           disabled={isLoading}
-                          placeholder="继续对话..."
+                          placeholder={t('chat.continueChat')}
                           variant="conversation"
                           deepSearch={deepSearch}
                           setDeepSearch={setDeepSearch}

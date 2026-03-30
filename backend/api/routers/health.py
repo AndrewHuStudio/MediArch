@@ -74,7 +74,7 @@ async def _check_database_status(db_name: str, db_type: str) -> DatabaseStatus:
         # 根据数据库类型执行检查
         if db_type == "neo4j":
             import os
-            from dotenv import load_dotenv
+            from backend.env_loader import load_dotenv
             load_dotenv()
             from backend.app.services.graph_retriever import get_neo4j_driver
             driver = get_neo4j_driver()

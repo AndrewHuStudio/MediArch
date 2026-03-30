@@ -10,6 +10,7 @@ import { PDFViewerModal } from "./pdf-viewer-modal"
 import { ImageLightbox } from "@/components/ui/image-lightbox"
 import { buildHeadingIdPrefix, prepareMarkdownWithToc } from "@/lib/markdown-toc"
 import { getPdfThumbnail } from "@/lib/pdf-thumbnails"
+import { useT } from "@/lib/i18n"
 
 interface MarkdownContentProps {
   content: string
@@ -18,6 +19,7 @@ interface MarkdownContentProps {
   onCitationPositions?: (positions: Array<{ number: number; top: number }>) => void
   onCitationClick?: (citationNumber: number) => void
   positionAnchorRef?: React.RefObject<HTMLElement>
+  headerActions?: React.ReactNode
 }
 
 const citationClassName =
@@ -411,7 +413,13 @@ export function MarkdownContent({ content, images, sources, onCitationPositions,
   )
 }
 
-export function MessageWithSources({ content, sources, images }: MarkdownContentProps & { sources?: PDFSource[] }) {
+export function MessageWithSources({
+  content,
+  sources,
+  images,
+  headerActions,
+}: MarkdownContentProps & { sources?: PDFSource[] }) {
+  const { t } = useT()
   const [selectedPDF, setSelectedPDF] = useState<PDFSource | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [citationPositions, setCitationPositions] = useState<Array<{ number: number; top: number }>>([])
@@ -653,15 +661,18 @@ export function MessageWithSources({ content, sources, images }: MarkdownContent
       >
         <div ref={messageRef} className="relative flex-1 max-w-[90%]">
           <div className="bg-black/60 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20 text-white" >
-            {tocItems.length > 0 && (
-              <div className="sticky top-2 z-10 flex justify-end mb-2">
-                <button
-                  type="button"
-                  onClick={scrollToToc}
-                  className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
-                >
-                  回到目录
-                </button>
+            {(tocItems.length > 0 || headerActions) && (
+              <div className="sticky top-2 z-10 mb-2 flex items-center justify-end gap-2">
+                {headerActions}
+                {tocItems.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={scrollToToc}
+                    className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
+                  >
+                    {t('chat.backToToc')}
+                  </button>
+                )}
               </div>
             )}
             {tocItems.length > 0 && (
@@ -670,7 +681,7 @@ export function MessageWithSources({ content, sources, images }: MarkdownContent
                 id={`${headingIdPrefix}-toc`}
                 className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
               >
-                <div className="text-sm font-semibold text-white mb-2">目录</div>
+                <div className="text-sm font-semibold text-white mb-2">{t('chat.toc')}</div>
                 <ul className="space-y-1 text-sm text-gray-200">
                   {tocItems.map((item) => (
                     <li key={item.id} className={`flex items-start gap-2 ${getTocIndentClass(item.level)}`}>
@@ -696,7 +707,7 @@ export function MessageWithSources({ content, sources, images }: MarkdownContent
               sources={sourcesForRender}
               onCitationPositions={setCitationPositions}
               onCitationClick={handleCitationClick}
-              positionAnchorRef={messageRef}
+              positionAnchorRef={messageRef as React.RefObject<HTMLElement>}
             />
           </div>
 
@@ -738,7 +749,7 @@ export function MessageWithSources({ content, sources, images }: MarkdownContent
             <div className="bg-black/40 backdrop-blur-md rounded-xl px-5 py-4 border border-white/10">
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <span className="text-blue-400">📚</span>
-                参考资料
+                {t('source.references')}
               </h3>
               <div className="space-y-3.5">
                 {orderedSources.map(({ source, number }) => {
@@ -757,7 +768,7 @@ export function MessageWithSources({ content, sources, images }: MarkdownContent
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="font-medium text-white text-base">{source.title}</span>
                           <span className="text-xs text-gray-400 bg-white/5 px-2 py-0.5 rounded">
-                            第 {source.pageNumber} 页
+                            {t('pdf.page', { n: source.pageNumber })}
                           </span>
                           {source.section && (
                             <span className="text-xs text-gray-500">· {source.section}</span>

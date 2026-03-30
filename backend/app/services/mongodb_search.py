@@ -16,7 +16,7 @@ import os
 import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 from langchain_core.tools import tool
 from pymongo import MongoClient
 from bson import ObjectId
@@ -24,7 +24,9 @@ from bson import ObjectId
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DOCUMENTS_DIR = (PROJECT_ROOT / "backend" / "databases" / "documents").resolve()
+DOCUMENTS_DIR = Path(
+    os.getenv("DATA_PROCESS_DOCUMENTS_DIR", str(PROJECT_ROOT / "data_process" / "documents"))
+).resolve()
 
 
 class MongoDBChunkRetriever:
@@ -132,6 +134,45 @@ class MongoDBChunkRetriever:
 
         return doc_title, doc_info
 
+    def _infer_file_path(self, doc_title: Optional[str], doc_category: Optional[str]) -> Optional[str]:
+        """从文档标题和分类推断 PDF 相对路径。"""
+        title = str(doc_title or "").strip()
+        category = str(doc_category or "").strip()
+        if not title:
+            return None
+
+        candidate_names: List[str] = []
+        if title.lower().endswith(".pdf"):
+            candidate_names.append(title)
+        else:
+            candidate_names.append(f"{title}.pdf")
+
+        normalized_title = title.replace("《", "").replace("》", "").strip()
+        if normalized_title and normalized_title != title:
+            if normalized_title.lower().endswith(".pdf"):
+                candidate_names.append(normalized_title)
+            else:
+                candidate_names.append(f"{normalized_title}.pdf")
+
+        search_dirs: List[Path] = []
+        if category:
+            search_dirs.append(DOCUMENTS_DIR / category)
+        search_dirs.append(DOCUMENTS_DIR)
+
+        seen: set[str] = set()
+        for base_dir in search_dirs:
+            if not base_dir.exists():
+                continue
+            for candidate_name in candidate_names:
+                candidate_path = (base_dir / candidate_name).resolve()
+                if str(candidate_path) in seen:
+                    continue
+                seen.add(str(candidate_path))
+                if candidate_path.is_file():
+                    return self._compute_relative_path(str(candidate_path))
+
+        return None
+
     def _compute_relative_path(self, file_path: Optional[str]) -> Optional[str]:
         if not file_path:
             return None
@@ -145,6 +186,13 @@ class MongoDBChunkRetriever:
         try:
             return abs_path.relative_to(DOCUMENTS_DIR).as_posix()
         except ValueError:
+            normalized = str(file_path).replace("\\", "/")
+            marker = "documents/"
+            lowered = normalized.lower()
+            idx = lowered.find(marker)
+            if idx >= 0:
+                rel = normalized[idx + len(marker) :].lstrip("/")
+                return rel or None
             return None
 
     @staticmethod
@@ -232,7 +280,8 @@ class MongoDBChunkRetriever:
     def _build_chunk_result(self, chunk_doc: Dict[str, Any]) -> Dict[str, Any]:
         """统一构建 chunk 返回结构"""
         doc_title, doc_info = self._resolve_source_document(chunk_doc)
-        file_path = doc_info.get("file_path")
+        doc_category = chunk_doc.get("doc_category") or doc_info.get("category")
+        file_path = doc_info.get("file_path") or self._infer_file_path(doc_title, doc_category)
         document_path = self._compute_relative_path(file_path)
         doc_id = chunk_doc.get("doc_id")
 
@@ -246,7 +295,7 @@ class MongoDBChunkRetriever:
             "image_url": chunk_doc.get("image_url"),
             "content_type": chunk_doc.get("content_type", "text"),
             "doc_title": doc_title,
-            "doc_category": chunk_doc.get("doc_category") or doc_info.get("category"),
+            "doc_category": doc_category,
             "positions": chunk_doc.get("positions", []),
             "file_path": file_path,
             "document_path": document_path,

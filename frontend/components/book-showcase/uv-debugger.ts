@@ -1,6 +1,6 @@
 import * as THREE from "three"
 
-export const debugUVMapping = (mesh: THREE.Mesh) => {
+export const debugUVMapping = (mesh: any) => {
   const uvAttr = mesh.geometry.attributes.uv
   if (!uvAttr) {
     console.log("No UV coordinates found on Object_2")
@@ -64,7 +64,7 @@ export const debugUVMapping = (mesh: THREE.Mesh) => {
   console.log("UV sample (first 20 coords):", uvAttr.array.slice(0, 20))
 }
 
-export const debugAllObjectsUV = (scene: THREE.Object3D) => {
+export const debugAllObjectsUV = (scene: any) => {
   console.log("=== UV Analysis for All Book Objects ===")
 
   if (!scene) {
@@ -92,7 +92,7 @@ export const debugAllObjectsUV = (scene: THREE.Object3D) => {
 
   console.log(
     "Children in Geode:",
-    geode.children.map((child) => child.name),
+    geode.children.map((child: any) => child.name),
   )
 
   objectNames.forEach((name) => {
@@ -106,12 +106,12 @@ export const debugAllObjectsUV = (scene: THREE.Object3D) => {
 
     console.log(`✅ Found ${name}`)
 
-    if (!(obj as THREE.Mesh).geometry) {
+    if (!(obj as any).geometry) {
       console.log(`❌ ${name} has no geometry`)
       return
     }
 
-    const mesh = obj as THREE.Mesh
+    const mesh = obj as any
     console.log(`--- ${name} UV Analysis ---`)
     console.log("Object name:", mesh.name)
     console.log("Material type:", mesh.material.constructor.name)
@@ -152,7 +152,7 @@ export const debugAllObjectsUV = (scene: THREE.Object3D) => {
   })
 }
 
-export const generateUVForObject2 = (mesh: THREE.Mesh | null) => {
+export const generateUVForObject2 = (mesh: any | null) => {
   if (!mesh) {
     console.log("Object_2 not found, cannot generate UV coordinates")
     return
@@ -222,9 +222,10 @@ export const generateUVForObject2 = (mesh: THREE.Mesh | null) => {
 }
 
 function splitCoverEdgeSeam(geometry: THREE.BufferGeometry, coverMask: Uint8Array) {
-  const pos = geometry.attributes.position
-  const uvOld = geometry.attributes.uv!
-  const index = geometry.index!
+  const typedGeometry = geometry as any
+  const pos = typedGeometry.attributes.position
+  const uvOld = typedGeometry.attributes.uv!
+  const index = typedGeometry.index!
 
   const posArr = []
   const uvArr = []
@@ -283,7 +284,7 @@ function splitCoverEdgeSeam(geometry: THREE.BufferGeometry, coverMask: Uint8Arra
   return g2
 }
 
-export const generateUVForBothCovers = (mesh: THREE.Mesh | null) => {
+export const generateUVForBothCovers = (mesh: any | null) => {
   if (!mesh) {
     console.log("Object_2 not found, cannot generate UV coordinates")
     return

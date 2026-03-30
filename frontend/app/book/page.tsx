@@ -43,14 +43,14 @@ export default function BooksPage() {
                   {book.title}
                 </h3>
                 <p className="text-gray-600 text-sm mb-2">{book.subtitle}</p>
-                <p className="text-gray-500 text-sm">by {book.author}</p>
+                <p className="text-gray-500 text-sm">{book.metaLine}</p>
 
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center gap-1">
                     <span className="text-yellow-500">★</span>
                     <span className="text-sm font-medium">{book.rating}</span>
                   </div>
-                  <span className="text-sm text-gray-500">{book.pages} pages</span>
+                  <span className="text-sm text-gray-500">{book.countLabel}</span>
                 </div>
               </div>
             </Link>

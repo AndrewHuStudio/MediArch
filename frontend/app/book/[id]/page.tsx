@@ -129,11 +129,7 @@ export default function BookProductPage({ params }: BookProductPageProps) {
 
             {/* Author and publication info */}
             <div className={`flex items-center gap-2 text-sm ${mutedTextClass}`}>
-              <span>by {book.author}</span>
-              <span>•</span>
-              <span>Published {book.publishedYear}</span>
-              <span>•</span>
-              <span>{book.pages} pages</span>
+              <span>{book.metaLine}</span>
             </div>
 
             {/* Description */}

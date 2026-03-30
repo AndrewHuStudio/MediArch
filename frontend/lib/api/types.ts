@@ -70,6 +70,7 @@ export interface ChatRequest {
   include_citations?: boolean
   include_diagnostics?: boolean
   deep_search?: boolean  // 深度检索模式
+  thinking_mode?: boolean  // 思考模式（预留）
 }
 
 export interface ChatResponse {

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import SystemMessage, HumanMessage
+from backend.llm_env import get_api_key, get_llm_base_url, get_model_provider
 
 logger = logging.getLogger(__name__)
 
@@ -61,13 +62,13 @@ async def get_expansion_llm():
             return _expansion_llm
 
         try:
-            api_key = os.getenv("MEDIARCH_API_KEY")
+            api_key = get_api_key()
             if not api_key:
                 raise ValueError("缺少 MEDIARCH_API_KEY（intelligent_expansion）")
 
-            base_url = (os.getenv("INTELLIGENT_EXPANSION_BASE_URL") or os.getenv("OPENAI_BASE_URL") or "").rstrip("/")
+            base_url = (os.getenv("INTELLIGENT_EXPANSION_BASE_URL") or get_llm_base_url() or "").rstrip("/")
             model_name = os.getenv("INTELLIGENT_EXPANSION_MODEL", "gpt-4o-mini")
-            model_provider = os.getenv("INTELLIGENT_EXPANSION_PROVIDER") or os.getenv("OPENAI_MODEL_PROVIDER") or "openai"
+            model_provider = os.getenv("INTELLIGENT_EXPANSION_PROVIDER") or get_model_provider()
 
             _expansion_llm = await asyncio.to_thread(
                 init_chat_model,

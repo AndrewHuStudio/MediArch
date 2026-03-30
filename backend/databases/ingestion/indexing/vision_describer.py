@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any
 import requests
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)

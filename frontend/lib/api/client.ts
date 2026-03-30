@@ -5,7 +5,7 @@
  * 支持 Mock 模式（无后端演示）
  */
 
-import { API_CONFIG, getApiUrl, API_ENDPOINTS } from './config'
+import { API_CONFIG, getApiBaseUrlCandidates, getApiUrl, API_ENDPOINTS } from './config'
 import {
   ChatRequest,
   ChatResponse,
@@ -31,6 +31,7 @@ import {
   mockGetSessions,
   mockGetSessionHistory,
 } from './mock-client'
+import { requestTranslationWithCandidates } from './translate-client'
 
 // 检查是否使用后端 API（可以通过环境变量控制）
 const USE_BACKEND_API = process.env.NEXT_PUBLIC_USE_BACKEND_API !== 'false'
@@ -39,35 +40,40 @@ const USE_BACKEND_API = process.env.NEXT_PUBLIC_USE_BACKEND_API !== 'false'
 const BACKEND_DETECT_TIMEOUT_MS = 1200
 const BACKEND_DETECT_TTL_MS = 8000
 
-let backendAvailabilityCache: { ok: boolean; checkedAt: number } | null = null
+let backendAvailabilityCache: { ok: boolean; checkedAt: number; baseUrl: string | null } | null = null
 
-async function isBackendAvailable(): Promise<boolean> {
-  if (!USE_BACKEND_API) return false
+async function resolveBackendBaseUrl(): Promise<string | null> {
+  if (!USE_BACKEND_API) return null
 
   const now = Date.now()
   if (backendAvailabilityCache && now - backendAvailabilityCache.checkedAt < BACKEND_DETECT_TTL_MS) {
-    return backendAvailabilityCache.ok
+    return backendAvailabilityCache.ok ? backendAvailabilityCache.baseUrl : null
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), BACKEND_DETECT_TIMEOUT_MS)
+  for (const baseUrl of getApiBaseUrlCandidates()) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), BACKEND_DETECT_TIMEOUT_MS)
 
-  try {
-    const response = await fetch(getApiUrl(API_ENDPOINTS.HEALTH), {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-    const ok = response.ok
-    backendAvailabilityCache = { ok, checkedAt: now }
-    return ok
-  } catch {
-    backendAvailabilityCache = { ok: false, checkedAt: now }
-    return false
-  } finally {
-    clearTimeout(timeoutId)
+    try {
+      const response = await fetch(getApiUrl(API_ENDPOINTS.HEALTH, baseUrl), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+        cache: 'no-store',
+      })
+      if (response.ok) {
+        backendAvailabilityCache = { ok: true, checkedAt: now, baseUrl }
+        return baseUrl
+      }
+    } catch {
+      // continue probing the next candidate
+    } finally {
+      clearTimeout(timeoutId)
+    }
   }
+
+  backendAvailabilityCache = { ok: false, checkedAt: now, baseUrl: null }
+  return null
 }
 
 // ============================================================================
@@ -78,6 +84,30 @@ interface RequestOptions extends RequestInit {
   timeout?: number
 }
 
+function isRetryableChatTransportError(error: unknown): boolean {
+  const message =
+    error instanceof APIException
+      ? String(error.message || "").toLowerCase()
+      : String(error instanceof Error ? error.message : error || "").toLowerCase()
+
+  if (!message) return false
+
+  return [
+    "failed to connect",
+    "backend not available",
+    "network error",
+    "fetch failed",
+    "econnrefused",
+    "ecconnrefused",
+    "connection refused",
+    "connection reset",
+    "socket hang up",
+    "aborterror",
+    "stream error:",
+    "request timeout",
+  ].some((marker) => message.includes(marker))
+}
+
 async function request<T>(
   url: string,
   options: RequestOptions = {}
@@ -85,7 +115,10 @@ async function request<T>(
   const { timeout = API_CONFIG.TIMEOUT, ...fetchOptions } = options
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
+  const timeoutId =
+    typeof timeout === 'number' && timeout > 0
+      ? setTimeout(() => controller.abort(), timeout)
+      : null
 
   try {
     const response = await fetch(url, {
@@ -97,7 +130,9 @@ async function request<T>(
       },
     })
 
-    clearTimeout(timeoutId)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
@@ -111,7 +146,9 @@ async function request<T>(
 
     return response.json()
   } catch (error) {
-    clearTimeout(timeoutId)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
     if (error instanceof APIException) {
       throw error
     }
@@ -311,16 +348,30 @@ export const chatApi = {
       return mockChatRequest(req)
     }
 
-    // 真实 API 调用
-    if (!(await isBackendAvailable())) {
-      console.log('[chatApi] Backend not available, using mock mode')
-      return mockChatRequest(req)
+    let lastError: unknown = null
+
+    for (const baseUrl of getApiBaseUrlCandidates()) {
+      try {
+        return await request<ChatResponse>(getApiUrl(API_ENDPOINTS.CHAT, baseUrl), {
+          method: 'POST',
+          body: JSON.stringify(req),
+          timeout: 0,
+        })
+      } catch (error) {
+        lastError = error
+        if (!isRetryableChatTransportError(error)) {
+          throw error
+        }
+      }
     }
 
-    return request<ChatResponse>(getApiUrl(API_ENDPOINTS.CHAT), {
-      method: 'POST',
-      body: JSON.stringify(req),
-    })
+    throw lastError instanceof Error
+      ? lastError
+      : new APIException({
+          code: 500,
+          message: 'Backend not available',
+          path: getApiUrl(API_ENDPOINTS.CHAT),
+        })
   },
 
   /**
@@ -333,14 +384,31 @@ export const chatApi = {
       return mockChatStreamRequest(req, callbacks)
     }
 
-    // 真实 API 调用
-    if (!(await isBackendAvailable())) {
-      console.log('[chatApi] Backend not available, using mock stream mode')
-      return mockChatStreamRequest(req, callbacks)
+    let lastError = 'Backend not available'
+
+    for (const baseUrl of getApiBaseUrlCandidates()) {
+      let attemptError: string | undefined
+      const attemptCallbacks: StreamCallbacks = {
+        ...callbacks,
+        onError: (error) => {
+          attemptError = error
+        },
+      }
+
+      await streamRequest(getApiUrl(API_ENDPOINTS.CHAT_STREAM, baseUrl), req, attemptCallbacks)
+
+      if (!attemptError) {
+        return
+      }
+
+      lastError = attemptError
+      if (!isRetryableChatTransportError(attemptError)) {
+        callbacks.onError?.(attemptError)
+        return
+      }
     }
 
-    const url = getApiUrl(API_ENDPOINTS.CHAT_STREAM)
-    return streamRequest(url, req, callbacks)
+    callbacks.onError?.(lastError)
   },
 
   /**
@@ -352,11 +420,12 @@ export const chatApi = {
       return mockGetSessions()
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       return mockGetSessions()
     }
 
-    return request<SessionListResponse>(getApiUrl(API_ENDPOINTS.SESSIONS))
+    return request<SessionListResponse>(getApiUrl(API_ENDPOINTS.SESSIONS, baseUrl))
   },
 
   /**
@@ -368,12 +437,13 @@ export const chatApi = {
       return mockGetSessionHistory(sessionId)
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       return mockGetSessionHistory(sessionId)
     }
 
     return request<SessionHistoryResponse>(
-      getApiUrl(API_ENDPOINTS.SESSION_HISTORY(sessionId))
+      getApiUrl(API_ENDPOINTS.SESSION_HISTORY(sessionId), baseUrl)
     )
   },
 
@@ -389,14 +459,15 @@ export const chatApi = {
       })
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       throw new APIException({
         code: 501,
         message: 'Not implemented in mock mode',
       })
     }
 
-    return request(getApiUrl(API_ENDPOINTS.SESSION_DELETE(sessionId)), {
+    return request(getApiUrl(API_ENDPOINTS.SESSION_DELETE(sessionId), baseUrl), {
       method: 'DELETE',
     })
   },
@@ -416,14 +487,15 @@ export const chatApi = {
       })
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       throw new APIException({
         code: 501,
         message: 'Not implemented in mock mode',
       })
     }
 
-    return request(getApiUrl(API_ENDPOINTS.SESSION_UPDATE(sessionId)), {
+    return request(getApiUrl(API_ENDPOINTS.SESSION_UPDATE(sessionId), baseUrl), {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
@@ -479,11 +551,12 @@ export const healthApi = {
       return mockHealthCheck()
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       return mockHealthCheck()
     }
 
-    return request(getApiUrl(API_ENDPOINTS.HEALTH))
+    return request(getApiUrl(API_ENDPOINTS.HEALTH, baseUrl))
   },
 
   /**
@@ -498,14 +571,15 @@ export const healthApi = {
       })
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       throw new APIException({
         code: 501,
         message: 'Not implemented in mock mode',
       })
     }
 
-    return request(getApiUrl(API_ENDPOINTS.HEALTH_DETAILED))
+    return request(getApiUrl(API_ENDPOINTS.HEALTH_DETAILED, baseUrl))
   },
 
   /**
@@ -520,15 +594,33 @@ export const healthApi = {
       })
     }
 
-    if (!(await isBackendAvailable())) {
+    const baseUrl = await resolveBackendBaseUrl()
+    if (!baseUrl) {
       throw new APIException({
         code: 501,
         message: 'Not implemented in mock mode',
       })
     }
 
-    return request(getApiUrl(API_ENDPOINTS.METRICS))
+    return request(getApiUrl(API_ENDPOINTS.METRICS, baseUrl))
   },
+}
+
+// ============================================================================
+// Translate API
+// ============================================================================
+
+export async function translateText(text: string, targetLang: 'en' | 'zh'): Promise<string> {
+  return requestTranslationWithCandidates({
+    text,
+    targetLang,
+    requestFn: async (url, body) =>
+      request<{ translated: string }>(url, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        timeout: 0,
+      }),
+  })
 }
 
 // ============================================================================

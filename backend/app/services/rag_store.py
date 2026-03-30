@@ -7,7 +7,8 @@ import shutil
 from typing import List, Tuple, Iterable, Dict, Any
 import json
 import requests
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
+from backend.llm_env import get_api_key, get_llm_base_url
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -107,8 +108,8 @@ def configure_rag(**kwargs) -> None:
 def _get_embedding():
     """优先使用 OpenAI Embeddings；失败或无 API_KEY 时回退 HuggingFace BGE-small-zh。"""
     model_name = os.getenv("RAG_EMBED_MODEL", EmbeddingModel.OPENAI_3_LARGE.value)
-    api_key = "sk-NbZ9AEWhhFOVPIeI46C9980859234dD88b3c01A14dAfAd12"
-    base_url = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE")
+    api_key = get_api_key()
+    base_url = get_llm_base_url()
 
     if api_key:
         try:
@@ -122,7 +123,7 @@ def _get_embedding():
         except Exception as e:
             print(f"⚠️ OpenAI Embedding 初始化失败，回退到 BGE-small-zh。原因: {e}")
 
-    print("⚠️ 未使用 OpenAI（缺少 OPENAI_API_KEY 或初始化失败），回退到 BGE-small-zh")
+    print("⚠️ 未使用远程 Embedding（缺少 MEDIARCH_API_KEY 或初始化失败），回退到 BGE-small-zh")
     return HuggingFaceEmbeddings(model_name=EmbeddingModel.BGE_SMALL_ZH.value)
 
 

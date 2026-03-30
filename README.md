@@ -103,17 +103,17 @@ The Orchestrator Agent is responsible for decomposing, interpreting, and enrichi
 在项目根目录下打开终端，执行：
 
 ```bash
-# 方式 1：直接运行 main.py
-python backend/api/main.py
+# 方式 1：使用项目模块入口（Windows 推荐）
+python -m backend.api
 
-# 方式 2：使用 uvicorn（更灵活）
-uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
+# 方式 2：直接运行 main.py
+python backend/api/main.py
 ```
 
-后端服务将在 `http://localhost:8000` 启动
+后端服务默认将在 `http://localhost:8010` 启动
 
-- API 文档：http://localhost:8000/api/docs
-- ReDoc 文档：http://localhost:8000/api/redoc
+- API 文档：http://localhost:8010/api/docs
+- ReDoc 文档：http://localhost:8010/api/redoc
 
 #### 2. 启动前端（Next.js）
 
@@ -141,3 +141,47 @@ cd frontend && npm run dev
 - Node.js 18+
 - pnpm 或 npm
 - 已安装依赖：`cd frontend && pnpm install`
+
+## 最小共享 Postgres 部署
+
+如果目标是“部署到网页上让大家简单访问”，当前仓库建议先走最小方案：
+
+- 使用根目录的 `docker-compose.yml`
+- 使用单个共享 PostgreSQL URI 统一 graph checkpointer、graph store 和 API session store
+- 打开 `REQUIRE_POSTGRES_PERSISTENCE=true`
+- 启动时如果实际后端不是 `postgres`，API 会直接失败，而不是静默回退到 SQLite
+
+### 1. 构建并启动服务
+
+```bash
+docker compose up -d --build postgres mongodb etcd minio milvus neo4j api
+```
+
+### 2. 关键持久化环境变量
+
+`docker-compose.yml` 中的 `api` 服务已经显式设置了：
+
+```env
+CHECKPOINT_BACKEND=postgres
+STORE_BACKEND=postgres
+SESSION_STORE_BACKEND=postgres
+REQUIRE_POSTGRES_PERSISTENCE=true
+PERSISTENCE_POSTGRES_URI=postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+POSTGRES_CHECKPOINT_URI=postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+POSTGRES_STORE_URI=postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+POSTGRES_SESSION_STORE_URI=postgresql://postgres:mediarch_password_2024@postgres:5432/postgres?sslmode=disable
+```
+
+这样可以保证：
+
+- 图执行 checkpoint 走共享 Postgres
+- 图级 memory store 走共享 Postgres
+- API session metadata / history 也走共享 Postgres
+
+### 3. 验证方式
+
+```bash
+docker compose logs -f api
+```
+
+如果依赖包未安装、连接字符串错误，或运行时仍然回退到 SQLite / memory，`api` 服务会在启动时直接报错退出。这是预期行为，因为最小共享 Postgres 模式不允许静默 fallback。

@@ -1,10 +1,11 @@
 "use client"
 
 import { useRef, useCallback, useEffect, useState } from "react"
-import { Paperclip, ArrowUpIcon, FileText, ImageIcon, Zap } from "lucide-react"
+import { Paperclip, ArrowUpIcon, FileText, ImageIcon, Brain } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 interface AutoResizeProps {
   minHeight: number
@@ -65,11 +66,13 @@ export function ChatInput({
   setUploadedFiles,
   onSend,
   disabled = false,
-  placeholder = "输入您的问题...",
+  placeholder = "",
   variant = "conversation",
   deepSearch = false,
   setDeepSearch,
 }: ChatInputProps) {
+  const { t } = useT()
+  const resolvedPlaceholder = placeholder || t('chat.inputPlaceholder')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: variant === "initial" ? 80 : 48,
@@ -104,7 +107,7 @@ export function ChatInput({
               adjustHeight()
             }}
             onKeyDown={handleKeyDown}
-            placeholder={placeholder}
+            placeholder={resolvedPlaceholder}
             className={cn(
               "w-full px-6 py-5 resize-none border-none",
               "bg-transparent text-white text-lg",
@@ -157,10 +160,10 @@ export function ChatInput({
                       ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
                       : "text-neutral-400 hover:text-white hover:bg-white/10"
                   )}
-                  title="深度检索模式：返回更多资料（15-20个），适合需要全面了解的场景"
+                  title={t('chat.deepSearchTitle')}
                 >
-                  <Zap className={cn("w-3.5 h-3.5", deepSearch && "text-blue-300")} />
-                  <span>深度检索</span>
+                  <Brain className={cn("w-3.5 h-3.5", deepSearch && "text-blue-300")} />
+                  <span>{t('chat.deepSearch')}</span>
                 </Button>
               )}
             </div>
@@ -175,7 +178,7 @@ export function ChatInput({
                   : "bg-white/10 text-neutral-500 cursor-not-allowed",
               )}
             >
-              <span className="text-sm font-medium">发送</span>
+              <span className="text-sm font-medium">{t('chat.send')}</span>
               <ArrowUpIcon className="w-4 h-4" />
             </Button>
           </div>
@@ -196,7 +199,7 @@ export function ChatInput({
             adjustHeight()
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           className={cn(
             "w-full px-4 py-3 resize-none border-none",
             "bg-transparent text-white text-sm",
@@ -250,10 +253,10 @@ export function ChatInput({
                     ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
                     : "text-neutral-400 hover:text-white hover:bg-neutral-700"
                 )}
-                title="深度检索模式：返回更多资料（15-20个），适合需要全面了解的场景"
+                title={t('chat.deepSearchTitle')}
               >
-                <Zap className={cn("w-3 h-3", deepSearch && "text-blue-300")} />
-                <span className="hidden sm:inline">深度</span>
+                <Brain className={cn("w-3 h-3", deepSearch && "text-blue-300")} />
+                <span className="hidden sm:inline">{t('chat.deepSearchShort')}</span>
               </Button>
             )}
           </div>
@@ -271,7 +274,7 @@ export function ChatInput({
         </div>
       </div>
 
-      <p className="text-center text-[11px] text-gray-400">MediArch 的回答未必正确无误,请注意核查</p>
+      <p className="text-center text-[11px] text-gray-400">{t('chat.disclaimer')}</p>
     </div>
   )
 }

@@ -418,5 +418,467 @@
     ],
     "last_ocr_at": "2025-12-19T10:40:19.622146",
     "engine": "mineru"
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-23\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-23\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T13:25:12.380431",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-24\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-24\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T13:35:48.866810",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-26\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-26\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T13:40:14.372039",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-27\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-27\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T13:44:23.063755",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-28\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-28\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T13:46:25.704986",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-29\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-29\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T14:00:40.524270",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-30\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-30\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T14:01:53.131561",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-33\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-33\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T14:38:27.061538",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-36\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-36\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-02-17T15:15:47.012135",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-93\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-93\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-04T23:34:27.324538",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-94\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-94\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-04T23:36:57.968145",
+    "engine": null
+  },
+  "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\参考论文\\结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf": {
+    "file_path": "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\参考论文\\结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf",
+    "file_name": "结合建筑空间设计的医院导向标识系统设计探讨_龙灏.pdf",
+    "category": "参考论文",
+    "total_pages": -1,
+    "scanned_pages": 4,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        4
+      ]
+    ],
+    "last_ocr_at": "2026-03-04T23:46:12.992083",
+    "engine": null
+  },
+  "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\书籍报告\\医院建筑设计指南.pdf": {
+    "file_path": "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\书籍报告\\医院建筑设计指南.pdf",
+    "file_name": "医院建筑设计指南.pdf",
+    "category": "书籍报告",
+    "total_pages": -1,
+    "scanned_pages": 277,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        277
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T00:35:30.337361",
+    "engine": null
+  },
+  "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\标准规范\\GB 51039-2014 综合医院建筑设计规范.pdf": {
+    "file_path": "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\标准规范\\GB 51039-2014 综合医院建筑设计规范.pdf",
+    "file_name": "GB 51039-2014 综合医院建筑设计规范.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 66,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        66
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T07:58:24.532849",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-96\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-96\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T20:04:21.186187",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-99\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-99\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T20:40:11.089651",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-101\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-101\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T20:41:24.849855",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-102\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-102\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T20:43:08.080969",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-108\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-108\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T21:46:21.515744",
+    "engine": null
+  },
+  "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-109\\test_ocr_module_namespaces_art0\\f.pdf": {
+    "file_path": "C:\\Users\\82064\\AppData\\Local\\Temp\\pytest-of-82064\\pytest-109\\test_ocr_module_namespaces_art0\\f.pdf",
+    "file_name": "f.pdf",
+    "category": "标准规范",
+    "total_pages": -1,
+    "scanned_pages": 2,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        2
+      ]
+    ],
+    "last_ocr_at": "2026-03-05T21:47:25.721659",
+    "engine": null
+  },
+  "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\书籍报告\\医疗功能房间详图集3.pdf": {
+    "file_path": "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\书籍报告\\医疗功能房间详图集3.pdf",
+    "file_name": "医疗功能房间详图集3.pdf",
+    "category": "书籍报告",
+    "total_pages": -1,
+    "scanned_pages": 234,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        234
+      ]
+    ],
+    "last_ocr_at": "2026-03-23T09:20:35.185646",
+    "engine": null
+  },
+  "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\政策文件\\医疗机构设置规划指导原则（2021-2025）.pdf": {
+    "file_path": "E:\\MyPrograms\\MediArch_System\\data_process\\documents\\政策文件\\医疗机构设置规划指导原则（2021-2025）.pdf",
+    "file_name": "医疗机构设置规划指导原则（2021-2025）.pdf",
+    "category": "政策文件",
+    "total_pages": -1,
+    "scanned_pages": 21,
+    "status": "partial",
+    "start_time": null,
+    "end_time": null,
+    "error_message": null,
+    "mongo_doc_id": null,
+    "total_chunks": 0,
+    "done_ranges": [
+      [
+        1,
+        21
+      ]
+    ],
+    "last_ocr_at": "2026-03-23T09:37:26.103306",
+    "engine": null
   }
 }

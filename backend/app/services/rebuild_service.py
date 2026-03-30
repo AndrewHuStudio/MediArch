@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from pymongo import MongoClient
 from pymilvus import connections, utility, Collection
 from neo4j import GraphDatabase
-from dotenv import load_dotenv
+from backend.env_loader import load_dotenv
 
 # 导入现有模块
 from backend.databases.ingestion.indexing.pipeline import DocumentIngestionPipeline

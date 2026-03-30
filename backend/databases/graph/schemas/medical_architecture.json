@@ -192,7 +192,7 @@
       "concept": "设计方法分类",
       "label": "DesignMethodCategory",
       "description": "设计方法的上层分类（如流线设计方法、空间布局方法、感染控制方法）",
-      "attributes": ["name", "description", "is_concept", "seed_version", "chunk_ids"],
+      "attributes": ["name", "description", "problem_domain", "is_concept", "seed_version", "chunk_ids"],
       "required": ["name"]
     },
     {
@@ -234,7 +234,7 @@
       "concept": "资料来源",
       "label": "Source",
       "description": "统一的知识来源节点（包括规范、论文、项目文件、图片等）",
-      "attributes": ["title", "source_type", "year", "code", "status", "url", "summary", "effective_date", "credibility"],
+      "attributes": ["title", "source_type", "year", "code", "url", "summary", "credibility"],
       "required": ["title", "source_type"]
     }
   ],

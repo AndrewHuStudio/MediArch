@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, ZoomIn, ZoomOut, Maximize2, Download } from 'lucide-react'
 import { cn } from "@/lib/utils"
+import { useT } from "@/lib/i18n"
 
 interface ImageLightboxProps {
   src: string
@@ -12,6 +13,7 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ src, alt, className }: ImageLightboxProps) {
+  const { t } = useT()
   const [isOpen, setIsOpen] = useState(false)
   const [scale, setScale] = useState(1)
   const [mounted, setMounted] = useState(false)
@@ -83,7 +85,7 @@ export function ImageLightbox({ src, alt, className }: ImageLightboxProps) {
         <button
           onClick={handleDownload}
           className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white backdrop-blur-sm"
-          title="下载图片"
+          title={t('image.download')}
         >
           <Download className="w-5 h-5" />
         </button>
@@ -93,7 +95,7 @@ export function ImageLightbox({ src, alt, className }: ImageLightboxProps) {
             handleZoomOut()
           }}
           className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white backdrop-blur-sm"
-          title="缩小"
+          title={t('viewer.zoomOut')}
         >
           <ZoomOut className="w-5 h-5" />
         </button>
@@ -103,14 +105,14 @@ export function ImageLightbox({ src, alt, className }: ImageLightboxProps) {
             handleZoomIn()
           }}
           className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white backdrop-blur-sm"
-          title="放大"
+          title={t('viewer.zoomIn')}
         >
           <ZoomIn className="w-5 h-5" />
         </button>
         <button
           onClick={handleClose}
           className="p-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white backdrop-blur-sm"
-          title="关闭"
+          title={t('image.close')}
         >
           <X className="w-5 h-5" />
         </button>
@@ -156,7 +158,7 @@ export function ImageLightbox({ src, alt, className }: ImageLightboxProps) {
           onClick={handleExpandClick}
           className="absolute bottom-2 right-2 p-1.5 rounded-md bg-black/70 hover:bg-black/90 transition-all duration-200 text-white shadow-lg border border-white/20 hover:scale-110 flex items-center justify-center"
           style={{ zIndex: 10 }}
-          title="全屏查看"
+          title={t('image.expand')}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>

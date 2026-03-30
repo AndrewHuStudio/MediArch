@@ -38,23 +38,6 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage,AIMessage,AnyMessage
 from langgraph.graph import END, StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.store.memory import InMemoryStore
-from langgraph.checkpoint.memory import MemorySaver
-
-# ============================================================================
-# [NEW] 2025-01-16: 完全异步Checkpointer支持（彻底修复阻塞调用问题）
-# ============================================================================
-try:
-    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-    ASYNC_SQLITE_AVAILABLE = True
-except ImportError:
-    ASYNC_SQLITE_AVAILABLE = False
-
-try:
-    from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-    ASYNC_POSTGRES_AVAILABLE = True
-except ImportError:
-    ASYNC_POSTGRES_AVAILABLE = False
 
 # ============================================================================
 # 导入 base_agent 的标准组件（避免重复定义）
@@ -75,6 +58,23 @@ from backend.app.agents.base_agent import (
     create_worker_adapter,
     # LLM 管理
     get_llm_manager,
+)
+from backend.app.agents.persistence import (
+    POSTGRES_CHECKPOINTER_AVAILABLE,
+    POSTGRES_STORE_AVAILABLE,
+    SQLITE_BACKEND_AVAILABLE,
+    create_checkpointer_from_runtime,
+    create_store_from_runtime,
+)
+from backend.app.agents.postgres_deployment_policy import get_shared_postgres_uri
+from backend.app.agents.routing_policy import select_workers_for_execution
+from backend.app.agents.runtime_policy import (
+    build_checkpointer_runtime_diagnostics,
+    build_phase1_runtime_diagnostics,
+    build_store_runtime_diagnostics,
+    resolve_checkpointer_runtime_status,
+    resolve_phase1_runtime_mode,
+    resolve_store_runtime_status,
 )
 
 # 导入 Orchestrator
@@ -103,9 +103,17 @@ DEFAULT_WORKER_PRIORITY: List[str] = [
     "online_search_agent",
 ]
 # Phase1 retrieval strategy:
-# - "parallel" (default): Neo4j + Milvus run concurrently, then Knowledge Fusion.
-# - "neo4j_first": run Neo4j first, extract graph expansion, then run Milvus (so Milvus can reuse Neo4j expansion).
-PHASE1_RETRIEVAL_MODE = (os.getenv("PHASE1_RETRIEVAL_MODE", "parallel") or "parallel").strip().lower()
+# - configured mode comes from env for observability;
+# - effective mode is currently pinned to `parallel` so experiments and paper claims stay aligned.
+PHASE1_RUNTIME_MODE = resolve_phase1_runtime_mode(os.getenv("PHASE1_RETRIEVAL_MODE"))
+PHASE1_RETRIEVAL_MODE = PHASE1_RUNTIME_MODE["effective_mode"]
+
+if PHASE1_RUNTIME_MODE["is_forced"]:
+    logger.info(
+        "[MediArchGraph] PHASE1_RETRIEVAL_MODE=%s, but effective experiment mode is fixed to %s",
+        PHASE1_RUNTIME_MODE["configured_mode"],
+        PHASE1_RUNTIME_MODE["effective_mode"],
+    )
 
 # ============================================================================
 # [NEW] 2025-01-16: Checkpointer配置
@@ -114,22 +122,52 @@ CHECKPOINT_BACKEND = os.getenv("CHECKPOINT_BACKEND", "sqlite")  # "sqlite", "pos
 SQLITE_CHECKPOINT_PATH = os.getenv("SQLITE_CHECKPOINT_PATH", ".langgraph_api/checkpoints.db")
 POSTGRES_CHECKPOINT_URI = os.getenv(
     "POSTGRES_CHECKPOINT_URI",
-    "postgresql://postgres:mediarch_password_2024@localhost:5432/mediarch_checkpoints?sslmode=disable"
+    get_shared_postgres_uri(),
+)
+STORE_BACKEND = os.getenv("STORE_BACKEND", CHECKPOINT_BACKEND)
+SQLITE_STORE_PATH = os.getenv("SQLITE_STORE_PATH", ".langgraph_api/store.db")
+POSTGRES_STORE_URI = os.getenv("POSTGRES_STORE_URI", get_shared_postgres_uri())
+
+_IS_LANGGRAPH_API = (
+    os.getenv("LANGGRAPH_API_VERSION") is not None or
+    os.getenv("LANGGRAPH_RUNTIME") == "api"
+)
+CHECKPOINTER_RUNTIME_STATUS = resolve_checkpointer_runtime_status(
+    CHECKPOINT_BACKEND,
+    is_langgraph_api=_IS_LANGGRAPH_API,
+    sqlite_available=SQLITE_BACKEND_AVAILABLE,
+    postgres_available=POSTGRES_CHECKPOINTER_AVAILABLE,
+)
+STORE_RUNTIME_STATUS = resolve_store_runtime_status(
+    STORE_BACKEND,
+    is_langgraph_api=_IS_LANGGRAPH_API,
+    sqlite_available=SQLITE_BACKEND_AVAILABLE,
+    postgres_available=POSTGRES_STORE_AVAILABLE,
 )
 
 
 # ============================================================================
 # 长期记忆 Store（全局实例，线程安全）
 # ============================================================================
-_memory_store: Optional[InMemoryStore] = None
+_memory_store: Optional[Any] = None
 
 
-def get_memory_store() -> InMemoryStore:
+def get_memory_store():
     """获取全局记忆 store（线程安全）"""
     global _memory_store
     if _memory_store is None:
-        _memory_store = InMemoryStore()
-        logger.info("[Memory] InMemoryStore 已初始化")
+        _memory_store = create_store_from_runtime(
+            STORE_RUNTIME_STATUS,
+            sqlite_path=SQLITE_STORE_PATH,
+            postgres_uri=POSTGRES_STORE_URI,
+        )
+        logger.info(
+            "[Memory] %s 已初始化（configured=%s, effective=%s, fallback_reason=%s）",
+            type(_memory_store).__name__,
+            STORE_RUNTIME_STATUS["configured_backend"],
+            STORE_RUNTIME_STATUS["effective_backend"],
+            STORE_RUNTIME_STATUS["fallback_reason"],
+        )
     return _memory_store
 
 
@@ -536,37 +574,24 @@ def _get_worker_workflows() -> Dict[str, Any]:
 def create_async_checkpointer():
     """
     创建checkpointer用于持久化。
-
-    注意: AsyncSqliteSaver.from_conn_string() 返回的是异步上下文管理器，
-    需要 async with 语法才能正确初始化。为了避免复杂的异步初始化问题，
-    当前版本直接使用 MemorySaver（内存持久化）。
-
-    如果需要持久化到文件/数据库，请考虑以下方案:
-    1. 使用 LangGraph API 环境（自动处理持久化）
-    2. 使用同步版本的 SqliteSaver（需要单独安装）
-    3. 在 async 上下文中初始化 AsyncSqliteSaver
-
-    Returns:
-        MemorySaver 实例
     """
-    # 检测LangGraph API环境
-    is_langgraph_api = (
-        os.getenv("LANGGRAPH_API_VERSION") is not None or
-        os.getenv("LANGGRAPH_RUNTIME") == "api"
-    )
-
-    if is_langgraph_api:
+    if CHECKPOINTER_RUNTIME_STATUS["effective_backend"] == "platform":
         logger.info("[MediArchGraph->Checkpointer] LangGraph API环境，使用平台内置持久化")
         return None  # LangGraph API会自动处理
 
-    # 使用 MemorySaver（内存持久化，进程重启后丢失）
-    # 这是最稳定的选择，避免 AsyncSqliteSaver 的异步上下文管理器问题
-    logger.info("[MediArchGraph->Checkpointer] 使用MemorySaver（内存持久化）")
-    logger.warning(
-        "[MediArchGraph→Checkpointer] ⚠️ MemorySaver会产生阻塞调用警告，"
-        "建议安装: pip install langgraph-checkpoint-sqlite 或 langgraph-checkpoint-postgres"
+    checkpointer = create_checkpointer_from_runtime(
+        CHECKPOINTER_RUNTIME_STATUS,
+        sqlite_path=SQLITE_CHECKPOINT_PATH,
+        postgres_uri=POSTGRES_CHECKPOINT_URI,
     )
-    return MemorySaver()
+    logger.info(
+        "[MediArchGraph->Checkpointer] 使用 %s（configured=%s, effective=%s, fallback_reason=%s）",
+        type(checkpointer).__name__ if checkpointer is not None else "None",
+        CHECKPOINTER_RUNTIME_STATUS["configured_backend"],
+        CHECKPOINTER_RUNTIME_STATUS["effective_backend"],
+        CHECKPOINTER_RUNTIME_STATUS["fallback_reason"],
+    )
+    return checkpointer
 
 
 # ============================================================================
@@ -611,7 +636,7 @@ def build_mediarch_graph():
         if request is None and query:
             request = AgentRequest(
                 query=query,
-                filters=None,
+                filters={},
                 top_k=DEFAULT_TOP_K,
                 lang="zh",
                 timeout_ms=DEFAULT_TIMEOUT_MS,
@@ -623,6 +648,7 @@ def build_mediarch_graph():
 
         return {
             "query": query,
+            "original_query": query,  # 在 Orchestrator 改写前保存原始查询
             "request": request,
             "user_id": state.get("user_id", "studio_user"),
             "session_id": state.get("session_id", "studio_session"),
@@ -651,7 +677,27 @@ def build_mediarch_graph():
     
     # 1. 上下文初始化
     def node_init_context_impl(_: MediArchGraphState) -> Dict[str, Any]:
-        return {"available_workers": workers_added}
+        diagnostics = {}
+        diagnostics.update(
+            build_phase1_runtime_diagnostics(PHASE1_RUNTIME_MODE["configured_mode"])
+        )
+        diagnostics.update(
+            build_checkpointer_runtime_diagnostics(CHECKPOINTER_RUNTIME_STATUS)
+        )
+        diagnostics.update(
+            build_store_runtime_diagnostics(STORE_RUNTIME_STATUS)
+        )
+        try:
+            from backend.app.services.query_expansion import get_query_expansion_runtime_status
+
+            diagnostics["query_expansion_runtime"] = get_query_expansion_runtime_status()
+        except Exception:
+            pass
+
+        return {
+            "available_workers": workers_added,
+            "diagnostics": diagnostics,
+        }
     
     builder.add_node("init_context", node_init_context_impl)
     
@@ -666,6 +712,7 @@ def build_mediarch_graph():
         """根据可用 Worker 并行调度，并预先生成启发式扩展供各检索器使用。"""
         query = state.get("query", "")
         available = state.get("available_workers") or workers_added
+        requested_workers = state.get("agents_to_call")
 
         if not state.get("is_hospital_related", True):
             logger.info("[MediArchGraph→PrepareParallel] 问题不属于医院建筑领域，跳过 Worker 调用")
@@ -675,10 +722,6 @@ def build_mediarch_graph():
                 "neo4j_expansion": {},
                 "subtopics": [],
             }
-
-        prioritized = [w for w in DEFAULT_WORKER_PRIORITY if w in available]
-        remaining = [w for w in available if w not in prioritized]
-        workers = prioritized + remaining
 
         # [STRICT DOC SCOPE] 若用户显式要求“仅基于指定资料/不要引用其它资料”，则禁用可能跨资料扩展的 Worker（如 Neo4j/OnlineSearch）
         strict_cross_doc_request = False
@@ -699,11 +742,33 @@ def build_mediarch_graph():
             strict_original_query = raw_query or strict_original_query
             wants_strict = any(k in raw_query for k in ("仅基于", "只基于", "不要引用", "交叉验证", "每条都必须带引用"))
             strict_cross_doc_request = bool(has_scope and wants_strict)
-            if strict_cross_doc_request:
-                workers = [w for w in workers if w in ("milvus_agent", "mongodb_agent")]
-                logger.info("[MediArchGraph→PrepareParallel] strict_doc_scope=on, scheduled_workers=%s", workers)
         except Exception as exc:
             logger.warning("[MediArchGraph→PrepareParallel] strict_doc_scope 检测失败: %s", exc)
+
+        workers = select_workers_for_execution(
+            available_workers=available,
+            agents_to_call=requested_workers,
+            priority=DEFAULT_WORKER_PRIORITY,
+            strict_cross_doc_request=strict_cross_doc_request,
+        )
+
+        # [Benchmark] retrieval_mode 过滤: R0=Milvus-only, R1=Neo4j+Milvus, R2=全部
+        _rm_request = state.get("request")
+        _retrieval_mode = ((_rm_request.metadata or {}).get("retrieval_mode", "R2") if _rm_request and getattr(_rm_request, "metadata", None) else "R2").upper()
+        if _retrieval_mode == "R0":
+            workers = [w for w in workers if w == "milvus_agent"]
+        elif _retrieval_mode == "R1":
+            workers = [w for w in workers if w in ("neo4j_agent", "milvus_agent")]
+
+        logger.info(
+            "[MediArchGraph→PrepareParallel] requested=%s, available=%s, scheduled=%s, retrieval_mode=%s",
+            requested_workers,
+            available,
+            workers,
+            _retrieval_mode,
+        )
+        if strict_cross_doc_request:
+            logger.info("[MediArchGraph→PrepareParallel] strict_doc_scope=on, scheduled_workers=%s", workers)
 
         if not workers:
             logger.warning("[MediArchGraph→PrepareParallel] 没有可用 Worker")
@@ -862,8 +927,6 @@ def build_mediarch_graph():
     builder.add_node("prepare_parallel_workers", node_prepare_parallel_workers)
     builder.add_node("fan_out_workers", node_fan_out_workers)
     builder.add_node("extract_neo4j_expansion", node_extract_neo4j_expansion)
-    # Neo4j-first sequential phase1 uses the same extractor, but with different routing.
-    builder.add_node("extract_neo4j_expansion_for_milvus", node_extract_neo4j_expansion)
 
     # ========== 2025-11-25 新增：Knowledge Fusion 节点 ==========
     def node_knowledge_fusion(state: MediArchGraphState) -> Dict[str, Any]:
@@ -886,12 +949,14 @@ def build_mediarch_graph():
 
         logger.info(f"[MediArchGraph→KnowledgeFusion] 开始融合，共 {len(worker_responses)} 个 Worker 响应")
 
-        # 1. 检查缓存
+        # 1. 检查缓存（加入 session_id 避免不同会话/上下文误命中）
         cache = get_retrieval_cache()
         request = state.get("request")
         filters = request.filters if request else None
+        session_id = state.get("session_id", "")
+        cache_filters = {**(filters or {}), "_sid": session_id} if session_id else filters
 
-        cached_fusion = cache.get(query, filters, cache_type="fusion")
+        cached_fusion = cache.get(query, cache_filters, cache_type="fusion")
         if cached_fusion is not None:
             logger.info("[MediArchGraph→KnowledgeFusion] 命中缓存，直接使用融合结果")
             return {
@@ -962,7 +1027,7 @@ def build_mediarch_graph():
                 "neo4j_items": neo4j_items,
                 "milvus_items": milvus_items,
             }
-            cache.set(query, filters, cache_data, cache_type="fusion", ttl=300)
+            cache.set(query, cache_filters, cache_data, cache_type="fusion", ttl=300)
 
             # 5. 更新 request.metadata，注入 unified_hints 供 MongoDB 使用
             updated_request = request
@@ -1016,12 +1081,10 @@ def build_mediarch_graph():
         阶段1屏障：等待 Neo4j 和 Milvus 都完成
 
         LangGraph 并行执行模型：
-        - 每个 worker 完成后会触发此节点
-        - 使用 completed_workers (Annotated[List[str], add]) 追踪完成的 workers
-        - 当两个 worker 都完成后，才标记 phase2_fusion
-
-        注意：由于 LangGraph 的 Send API，每个 worker 完成后会合并状态，
-        因此 completed_workers 会累积两次调用的结果。
+        - add_conditional_edges 返回 List[str] 时使用 fan-out/fan-in 语义
+        - 所有并行分支完成并合并状态后，才触发此节点（只调用一次）
+        - 因此 completed_workers 在此处已包含所有 phase1 workers
+        - 下方 "还有 worker 没完成" 分支在当前架构下不会执行（保留作为防御性代码）
         """
         completed = set(state.get("completed_workers", []) or [])
         scheduled = state.get("scheduled_workers", []) or []
@@ -1056,6 +1119,13 @@ def build_mediarch_graph():
 
         使用 Knowledge Fusion 生成的 unified_hints
         """
+        # [Benchmark] R0/R1 模式跳过 MongoDB
+        _rm_req = state.get("request")
+        _rm_mode = ((_rm_req.metadata or {}).get("retrieval_mode", "R2") if _rm_req and getattr(_rm_req, "metadata", None) else "R2").upper()
+        if _rm_mode in ("R0", "R1"):
+            logger.info("[MediArchGraph→ScheduleMongoDB] retrieval_mode=%s, skip MongoDB", _rm_mode)
+            return {"active_workers": []}
+
         unified_hints = state.get("unified_hints", {})
         available = state.get("available_workers", [])
         strict_cross_doc_request = bool(state.get("strict_cross_doc_request"))
@@ -1066,7 +1136,6 @@ def build_mediarch_graph():
         if "mongodb_agent" not in available:
             logger.warning("[MediArchGraph→ScheduleMongoDB] mongodb_agent 不可用")
             return {
-                "scheduled_workers": [],
                 "active_workers": [],
             }
 
@@ -1084,7 +1153,6 @@ def build_mediarch_graph():
         elif not chunk_ids and not entity_names:
             logger.info("[MediArchGraph→ScheduleMongoDB] 无需调用 MongoDB（无 chunk_ids 或 entity_names）")
             return {
-                "scheduled_workers": [],
                 "active_workers": [],
             }
 
@@ -1093,13 +1161,33 @@ def build_mediarch_graph():
             f"chunk_ids={len(chunk_ids)}, entity_names={len(entity_names)}"
         )
 
+        # 重置 completed_workers，避免 phase1 的累积值干扰 phase2 的 barrier 检查
+        # 注意：completed_workers 使用 add reducer，这里用负值列表抵消
+        # 但更安全的做法是在 route_after_mark 中只检查 active_workers
         return {
-            "scheduled_workers": ["mongodb_agent"],
             "active_workers": ["mongodb_agent"],
             "parallel_retrieval_phase": "phase3_mongodb",
         }
 
     builder.add_node("schedule_mongodb", node_schedule_mongodb)
+
+    def node_schedule_online_search(state: MediArchGraphState) -> Dict[str, Any]:
+        """在本地检索阶段后按需调度 Online Search。"""
+        scheduled = state.get("scheduled_workers", []) or []
+        available = state.get("available_workers", []) or []
+
+        if "online_search_agent" not in scheduled or "online_search_agent" not in available:
+            logger.info("[MediArchGraph→ScheduleOnlineSearch] 无需调用 Online Search")
+            return {
+                "active_workers": [],
+            }
+
+        logger.info("[MediArchGraph→ScheduleOnlineSearch] 调度 Online Search Agent")
+        return {
+            "active_workers": ["online_search_agent"],
+        }
+
+    builder.add_node("schedule_online_search", node_schedule_online_search)
 
     # 5. Gather Responses 节点
     builder.add_node("gather_responses", node_gather_responses)
@@ -1115,15 +1203,10 @@ def build_mediarch_graph():
     # 7. 记忆保存节点
     builder.add_node("save_memory", node_save_memory)
 
-    # 8. 屏障和空节点
-    def node_barrier_check(state: MediArchGraphState) -> Dict[str, Any]:
-        logger.info("[MediArchGraph→Barrier] 触发屏障检查，等待全部 worker 完成")
-        return {}
-    
+    # 8. 空节点（用于并行 fan-out 的 fallback）
     def node_noop(_: MediArchGraphState) -> Dict[str, Any]:
         return {}
-    
-    builder.add_node("barrier_check", node_barrier_check)
+
     builder.add_node("noop", node_noop)
     
     # ========== 设置边（2025-11-25 真正并行检索架构）==========
@@ -1154,76 +1237,31 @@ def build_mediarch_graph():
 
     # 依据是否有可用 worker，决定走通用回答还是并行 fan-out
     def route_after_prepare(state: MediArchGraphState) -> str:
-        """
-        根据 PHASE1_RETRIEVAL_MODE 决定检索策略：
-        - parallel（默认）：Neo4j + Milvus 并行执行
-        - neo4j_first：Neo4j → 提取扩展 → Milvus（串行，让Milvus能利用Neo4j的真实扩展）
-        """
+        """并行模式：Neo4j + Milvus 同时执行"""
         is_hospital_related = state.get("is_hospital_related", True)
         if not is_hospital_related:
             return "general_answer"
 
         scheduled = state.get("scheduled_workers", []) or []
-        # 检查是否有阶段1的 workers 可用
         phase1_available = [w for w in scheduled if w in PHASE1_WORKERS]
         if not phase1_available:
             return "general_answer"
 
-        # Neo4j-first 串行模式（推荐）：先执行Neo4j图谱扩展，再用扩展结果指导Milvus检索
-        if PHASE1_RETRIEVAL_MODE.startswith("neo4j"):
-            # 优先启动 Neo4j，提取扩展后再调用 Milvus
-            if "neo4j_agent" in phase1_available:
-                logger.info("[MediArchGraph->Route] 串行模式: Neo4j 先行")
-                return "neo4j_first"
-            # 如果只有 Milvus 可用（Neo4j不可用），直接调用
-            if "milvus_agent" in phase1_available:
-                logger.info("[MediArchGraph->Route] 串行模式: 仅 Milvus 可用")
-                return "milvus_only"
-            return "general_answer"
-
-        # 并行模式（默认）：Neo4j 和 Milvus 同时执行
         logger.info("[MediArchGraph->Route] 并行模式: Neo4j + Milvus 同时启动")
         return "fan_out_phase1"
 
-    prepare_route_mapping: Dict[str, str] = {"general_answer": "general_answer"}
-    if PHASE1_RETRIEVAL_MODE.startswith("neo4j"):
-        # Note: mapping keys must match route_after_prepare return values.
-        if "neo4j_agent" in workers_added:
-            prepare_route_mapping["neo4j_first"] = "neo4j_agent"
-        if "milvus_agent" in workers_added:
-            prepare_route_mapping["milvus_only"] = "milvus_agent"
-    else:
-        prepare_route_mapping["fan_out_phase1"] = "fan_out_workers"
+    prepare_route_mapping: Dict[str, str] = {
+        "general_answer": "general_answer",
+        "fan_out_phase1": "fan_out_workers",
+    }
 
     builder.add_conditional_edges("prepare_parallel_workers", route_after_prepare, prepare_route_mapping)
 
     # GeneralAnswer → save_memory → END
     builder.add_edge("general_answer", "save_memory")
 
-    # ========== 阶段1：Neo4j + Milvus ==========
-    if workers_added and PHASE1_RETRIEVAL_MODE.startswith("neo4j"):
-        # Sequential mode: Neo4j → extract expansion → Milvus → Knowledge Fusion
-        def route_after_extract_for_milvus(state: MediArchGraphState) -> str:
-            scheduled = state.get("scheduled_workers", []) or []
-            if "milvus_agent" in scheduled and "milvus_agent" in workers_added:
-                return "milvus_agent"
-            return "knowledge_fusion"
-
-        if "neo4j_agent" in workers_added:
-            builder.add_edge("neo4j_agent", "extract_neo4j_expansion_for_milvus")
-            builder.add_conditional_edges(
-                "extract_neo4j_expansion_for_milvus",
-                route_after_extract_for_milvus,
-                {
-                    "milvus_agent": "milvus_agent" if "milvus_agent" in workers_added else "knowledge_fusion",
-                    "knowledge_fusion": "knowledge_fusion",
-                },
-            )
-
-        if "milvus_agent" in workers_added:
-            builder.add_edge("milvus_agent", "knowledge_fusion")
-
-    elif workers_added:
+    # ========== 阶段1：Neo4j + Milvus 并行 ==========
+    if workers_added:
         # Parallel mode (default): Neo4j + Milvus run concurrently → phase1_barrier → Knowledge Fusion
         phase1_workers_available = [w for w in PHASE1_WORKERS if w in workers_added]
 
@@ -1269,7 +1307,14 @@ def build_mediarch_graph():
         active_workers = state.get("active_workers", []) or []
         if "mongodb_agent" in active_workers:
             return "mongodb_agent"
-        # 无需调用 MongoDB，直接进入 gather
+        # 无需调用 MongoDB，转入可选在线搜索阶段
+        return "schedule_online_search"
+
+    def route_after_schedule_online_search(state: MediArchGraphState) -> str:
+        """根据调度结果决定是否调用 Online Search。"""
+        active_workers = state.get("active_workers", []) or []
+        if "online_search_agent" in active_workers:
+            return "online_search_agent"
         return "gather_responses"
 
     # 只有当 mongodb_agent 可用时才添加路由
@@ -1279,13 +1324,26 @@ def build_mediarch_graph():
             route_after_schedule_mongodb,
             {
                 "mongodb_agent": "mongodb_agent",
+                "schedule_online_search": "schedule_online_search",
+            }
+        )
+        builder.add_edge("mongodb_agent", "schedule_online_search")
+    else:
+        # MongoDB 不可用，直接进入可选在线搜索阶段
+        builder.add_edge("schedule_mongodb", "schedule_online_search")
+
+    if "online_search_agent" in workers_added:
+        builder.add_conditional_edges(
+            "schedule_online_search",
+            route_after_schedule_online_search,
+            {
+                "online_search_agent": "online_search_agent",
                 "gather_responses": "gather_responses",
             }
         )
-        builder.add_edge("mongodb_agent", "gather_responses")
+        builder.add_edge("online_search_agent", "gather_responses")
     else:
-        # MongoDB 不可用，直接进入 gather
-        builder.add_edge("schedule_mongodb", "gather_responses")
+        builder.add_edge("schedule_online_search", "gather_responses")
 
     # ========== Gather → Synthesizer ==========
     def node_push_answer_message(state: MediArchGraphState) -> Dict[str, Any]:
@@ -1315,17 +1373,18 @@ def build_mediarch_graph():
 
     # 创建完全异步的checkpointer
     checkpointer = create_async_checkpointer()
+    store = get_memory_store()
 
     # 根据checkpointer是否可用决定编译方式
     if checkpointer is None:
         # LangGraph API环境，平台自动处理持久化
-        compiled_graph = builder.compile()
-        logger.info("[MediArchGraph] 图编译完成（LangGraph API环境，使用平台内置持久化）")
+        compiled_graph = builder.compile(store=store)
+        logger.info("[MediArchGraph] 图编译完成（LangGraph API环境，使用平台内置checkpointer + 自定义store）")
     else:
         # 本地环境，使用自定义checkpointer
-        compiled_graph = builder.compile(checkpointer=checkpointer)
+        compiled_graph = builder.compile(checkpointer=checkpointer, store=store)
         logger.info(
-            f"[MediArchGraph] 图编译完成（使用 {type(checkpointer).__name__}）"
+            f"[MediArchGraph] 图编译完成（使用 {type(checkpointer).__name__} + {type(store).__name__}）"
         )
 
     return compiled_graph

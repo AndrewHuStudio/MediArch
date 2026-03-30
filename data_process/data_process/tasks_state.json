@@ -1,0 +1,17 @@
+{
+  "914c5ad2-924": {
+    "status": "completed",
+    "module": "ocr",
+    "progress": null,
+    "result": {
+      "file_name": "g.pdf",
+      "total_pages": 1,
+      "success_pages": 1,
+      "duration_ms": 1,
+      "artifacts_dir": "标准规范/g"
+    },
+    "error": null,
+    "created_at": "2026-03-04T13:23:03.075919",
+    "doc_path": "标准规范/g.pdf"
+  }
+}

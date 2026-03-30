@@ -1,16 +1,69 @@
 """Document serving endpoints."""
 
 from functools import lru_cache
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-DOCUMENTS_DIR = (PROJECT_ROOT / "backend" / "databases" / "documents").resolve()
-OCR_OUTPUT_DIR = (PROJECT_ROOT / "backend" / "databases" / "documents_ocr").resolve()
+DOCUMENTS_DIR = Path(
+    os.getenv("DATA_PROCESS_DOCUMENTS_DIR", str(PROJECT_ROOT / "data_process" / "documents"))
+).resolve()
+OCR_OUTPUT_DIR = Path(
+    os.getenv("DATA_PROCESS_OCR_DIR", str(PROJECT_ROOT / "data_process" / "documents_ocr"))
+).resolve()
 
 router = APIRouter()
+
+
+def _strip_legacy_storage_prefix(path: str, marker: str) -> str:
+    normalized = str(path or "").strip().replace("\\", "/")
+    if not normalized:
+        return ""
+
+    lowered = normalized.lower()
+    marker_lower = marker.lower()
+    idx = lowered.find(marker_lower)
+    if idx >= 0:
+        return normalized[idx + len(marker) :].lstrip("/")
+
+    return normalized.lstrip("/")
+
+
+def _resolve_image_candidate(requested_path: str) -> Path | None:
+    """Resolve an OCR image path under OCR_OUTPUT_DIR.
+
+    Tolerates both current `.../full/images/<file>` layout and legacy
+    `.../images/<file>` references emitted by older indices.
+    """
+    if not requested_path:
+        return None
+
+    normalized = _strip_legacy_storage_prefix(requested_path, "documents_ocr/")
+    parts = [p for p in normalized.split("/") if p]
+    if not parts or ".." in parts:
+        return None
+
+    candidates: list[Path] = []
+
+    direct = (OCR_OUTPUT_DIR / Path(*parts)).resolve()
+    candidates.append(direct)
+
+    if len(parts) >= 4 and parts[2] == "images":
+        with_full = (OCR_OUTPUT_DIR / Path(parts[0], parts[1], "full", *parts[2:])).resolve()
+        candidates.append(with_full)
+
+    for candidate in candidates:
+        try:
+            candidate.relative_to(OCR_OUTPUT_DIR)
+        except ValueError:
+            continue
+        if candidate.is_file():
+            return candidate
+
+    return None
 
 
 @lru_cache(maxsize=2048)
@@ -25,14 +78,18 @@ def _resolve_pdf_candidate(requested_path: str) -> Path | None:
 
     import glob
 
-    normalized = requested_path.strip().lstrip("/").replace("\\", "/")
+    normalized = _strip_legacy_storage_prefix(requested_path, "documents/")
 
     # 1) Direct hit
     direct = (DOCUMENTS_DIR / normalized).resolve()
     try:
         direct.relative_to(DOCUMENTS_DIR)
     except ValueError:
-        return None
+        pass
+    else:
+        if direct.is_file():
+            return direct
+
     if direct.is_file():
         return direct
 
@@ -41,7 +98,7 @@ def _resolve_pdf_candidate(requested_path: str) -> Path | None:
         return None
 
     # 2) If the first segment is wrong, try replacing it with an existing top dir
-    if len(parts) >= 2:
+    if len(parts) >= 2 and DOCUMENTS_DIR.exists():
         tail = Path(*parts[1:])
         for top in DOCUMENTS_DIR.iterdir():
             if not top.is_dir():
@@ -133,14 +190,8 @@ async def serve_image(path: str = Query(..., description="相对 backend/databas
     if not path:
         raise HTTPException(status_code=400, detail="缺少文件路径")
 
-    # 安全检查：防止路径遍历攻击
-    candidate = (OCR_OUTPUT_DIR / path).resolve()
-    try:
-        candidate.relative_to(OCR_OUTPUT_DIR)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="文件不存在或路径非法")
-
-    if not candidate.is_file():
+    candidate = _resolve_image_candidate(path)
+    if candidate is None:
         raise HTTPException(status_code=404, detail="文件不存在")
 
     # 根据文件扩展名设置 MIME 类型

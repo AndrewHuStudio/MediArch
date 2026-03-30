@@ -4,12 +4,16 @@ import type React from "react"
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 import type { PDFSource } from "@/components/chat/pdf-source-card"
 import type { GraphData } from "@/components/ui/knowledge-graph-d3"
+import type { AssistantDisplayLanguage } from "@/lib/chat/message-translation"
 
 // 消息类型定义
 export interface Message {
   id: string
   role: "user" | "assistant"
   content: string
+  translatedContent?: string
+  displayLanguage?: AssistantDisplayLanguage
+  isTranslating?: boolean
   timestamp: Date
   files?: File[]
   agentThinking?: AgentThinkingStep[]

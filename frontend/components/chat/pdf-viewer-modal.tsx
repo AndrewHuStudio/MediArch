@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { PDFSource } from "./pdf-source-card"
 import { buildPageValueSummary } from "./pdf-citation-badge"
+import { useT } from "@/lib/i18n"
 
 // 使用本地打包的 worker，避免 CDN 被阻断/跨域导致 PDF 无法加载
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -25,6 +26,7 @@ const MIN_SCALE = 0.8
 const MAX_SCALE = 2.0
 
 export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps) {
+  const { t } = useT()
   const [scale, setScale] = useState(1.1)
   const [numPages, setNumPages] = useState<number | null>(null)
   const [currentPage, setCurrentPage] = useState<number>(source?.pageNumber || 1)
@@ -61,7 +63,12 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
         }
         return null
       })
-      .filter((box): box is { page: number; x0: number; y0: number; x1: number; y1: number; contentType: string } => Boolean(box))
+      .filter(
+        (
+          box,
+        ): box is { page: number; x0: number; y0: number; x1: number; y1: number; contentType: "text" | "table" } =>
+          Boolean(box),
+      )
   }, [source])
 
   useEffect(() => {
@@ -187,7 +194,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           {source.title}
                         </div>
                         <div className="mt-1 text-[11px] text-gray-400">
-                          第 {currentPage} 页{numPages ? ` / 共 ${numPages} 页` : ""}{source.section ? ` · ${source.section}` : ""}
+                          {t('viewer.pageStatus', {
+                            current: currentPage,
+                            total: numPages ? t('viewer.pageTotal', { n: numPages }) : "",
+                          })}{source.section ? ` · ${source.section}` : ""}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {diagramType && (
@@ -197,7 +207,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           )}
                           {source.contentType && (
                             <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-gray-300">
-                              {source.contentType === "image" ? "图像" : source.contentType === "table" ? "表格" : "文本"}
+                              {source.contentType === "image" ? t('viewer.contentType.image') : source.contentType === "table" ? t('viewer.contentType.table') : t('viewer.contentType.text')}
                             </span>
                           )}
                         </div>
@@ -214,7 +224,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                         size="icon"
                         className="text-gray-300 hover:text-white hover:bg-white/10"
                         onClick={() => setIsSidebarOpen((v) => !v)}
-                        title={isSidebarOpen ? "收起侧边栏" : "展开侧边栏"}
+                        title={isSidebarOpen ? t('viewer.sidebar.collapse') : t('viewer.sidebar.expand')}
                       >
                         {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
                       </Button>
@@ -223,7 +233,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                         size="icon"
                         onClick={onClose}
                         className="text-gray-300 hover:text-white hover:bg-white/10"
-                        title="关闭"
+                        title={t('graph.close')}
                       >
                         <X className="w-4 h-4" />
                       </Button>
@@ -235,7 +245,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                     <div className="mt-4 space-y-3">
                       {valueSummary && (
                         <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                          <div className="text-[11px] font-semibold text-gray-200">本页价值</div>
+                          <div className="text-[11px] font-semibold text-gray-200">{t('viewer.valueTitle')}</div>
                           <div className="mt-1 text-[12px] text-gray-100 leading-relaxed">{valueSummary}</div>
                         </div>
                       )}
@@ -243,14 +253,14 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                       {sideInfoText && (
                         <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-[11px] font-semibold text-gray-200">重点说明</div>
+                            <div className="text-[11px] font-semibold text-gray-200">{t('viewer.infoTitle')}</div>
                             {sideInfoText.length > 220 && (
                               <button
                                 type="button"
                                 className="text-[11px] text-blue-300 hover:text-blue-200"
                                 onClick={() => setIsInfoExpanded((v) => !v)}
                               >
-                                {isInfoExpanded ? "收起" : "展开"}
+                                {isInfoExpanded ? t('viewer.collapse') : t('viewer.expand')}
                               </button>
                             )}
                           </div>
@@ -267,7 +277,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                     <div className={cn("space-y-2", isSidebarOpen ? "" : "flex flex-col items-center gap-2 space-y-0")}>
                        {/* Page controls */}
                        <div className={cn("rounded-lg border border-white/10 bg-white/5", isSidebarOpen ? "p-3" : "p-1")}>
-                         {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">文档控制</div>}
+                         {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">{t('viewer.docControls')}</div>}
                         <div className={cn("grid gap-2", isSidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
                           <Button
                             variant="ghost"
@@ -277,10 +287,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                             )}
                             onClick={() => jumpToPage(currentPage - 1)}
                             disabled={!canPrev}
-                            title="上一页"
+                            title={t('viewer.prevPage')}
                           >
                             <ChevronLeft className={cn("w-4 h-4", isSidebarOpen ? "mr-2" : "")} />
-                            {isSidebarOpen && "上一页"}
+                            {isSidebarOpen && t('viewer.prevPage')}
                           </Button>
                           <Button
                             variant="ghost"
@@ -290,9 +300,9 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                             )}
                             onClick={() => jumpToPage(currentPage + 1)}
                             disabled={!canNext}
-                            title="下一页"
+                            title={t('viewer.nextPage')}
                           >
-                            {isSidebarOpen && "下一页"}
+                            {isSidebarOpen && t('viewer.nextPage')}
                             <ChevronRight className={cn("w-4 h-4", isSidebarOpen ? "ml-2" : "")} />
                           </Button>
                         </div>
@@ -300,7 +310,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
 
                       {/* View controls */}
                       <div className={cn("rounded-lg border border-white/10 bg-white/5", isSidebarOpen ? "p-3" : "p-1")}>
-                        {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">视图控制</div>}
+                        {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">{t('viewer.viewControls')}</div>}
                         <div className={cn("grid gap-2", isSidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
                           <Button
                             variant="ghost"
@@ -310,10 +320,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                             )}
                             onClick={() => zoom("in")}
                             disabled={fitMode !== "free" ? false : scale >= MAX_SCALE}
-                            title="放大"
+                            title={t('viewer.zoomIn')}
                           >
                             <ZoomIn className={cn("w-4 h-4", isSidebarOpen ? "mr-2" : "")} />
-                            {isSidebarOpen && "放大"}
+                            {isSidebarOpen && t('viewer.zoomIn')}
                           </Button>
                           <Button
                             variant="ghost"
@@ -323,10 +333,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                             )}
                             onClick={() => zoom("out")}
                             disabled={fitMode !== "free" ? false : scale <= MIN_SCALE}
-                            title="缩小"
+                            title={t('viewer.zoomOut')}
                           >
                             <ZoomOut className={cn("w-4 h-4", isSidebarOpen ? "mr-2" : "")} />
-                            {isSidebarOpen && "缩小"}
+                            {isSidebarOpen && t('viewer.zoomOut')}
                           </Button>
                           <Button
                             variant="ghost"
@@ -336,10 +346,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                               fitMode === "width" && "bg-white/10",
                             )}
                             onClick={handleFitWidth}
-                            title="适应宽度"
+                            title={t('viewer.fitWidth')}
                           >
                             <ArrowLeftRight className={cn("w-4 h-4", isSidebarOpen ? "mr-2" : "")} />
-                            {isSidebarOpen && "适应宽度"}
+                            {isSidebarOpen && t('viewer.fitWidth')}
                           </Button>
                           <Button
                             variant="ghost"
@@ -349,10 +359,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                               fitMode === "page" && "bg-white/10",
                             )}
                             onClick={handleFitPage}
-                            title="适应页面"
+                            title={t('viewer.fitPage')}
                           >
                             <ArrowUpDown className={cn("w-4 h-4", isSidebarOpen ? "mr-2" : "")} />
-                            {isSidebarOpen && "适应页面"}
+                            {isSidebarOpen && t('viewer.fitPage')}
                           </Button>
 
                           {isSidebarOpen && (
@@ -362,7 +372,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                               onClick={resetView}
                             >
                               <RotateCcw className="w-4 h-4 mr-2" />
-                              重置视图
+                              {t('viewer.resetView')}
                             </Button>
                           )}
                         </div>
@@ -380,20 +390,20 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                       <div className="relative bg-white/95 rounded-lg shadow-xl overflow-hidden">
                         <Document
                           file={source.pdfUrl}
-                          loading={<div className="p-6 text-gray-200">正在加载 PDF ...</div>}
+                          loading={<div className="p-6 text-gray-200">{t('viewer.loadingPdf')}</div>}
                           error={
                             <div className="p-6 bg-white min-h-[480px] w-full max-w-3xl">
                               <div className="space-y-4">
                                 <div className="text-sm text-gray-600">
-                                  PDF 文件加载失败，以下为文本预览（引用定位信息仍可用于设计决策）。
+                                  {t('viewer.pdfLoadError')}
                                 </div>
                                 <div className="border border-gray-200 rounded-lg p-4 bg-yellow-50/60">
-                                  <div className="text-xs font-semibold text-gray-700 mb-2">关键内容</div>
-                                  <div className="text-sm text-gray-900 leading-relaxed">{highlightText}</div>
+                                  <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.keyContent')}</div>
+                              <div className="text-sm text-gray-900 leading-relaxed">{highlightText}</div>
                                 </div>
                                 {showFullSnippet && (
                                   <div className="border border-gray-200 rounded-lg p-4">
-                                    <div className="text-xs font-semibold text-gray-700 mb-2">上下文段落</div>
+                                    <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.contextParagraph')}</div>
                                     <div className="text-sm text-gray-800 leading-relaxed">{snippetText}</div>
                                   </div>
                                 )}
@@ -414,6 +424,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                               renderTextLayer={false}
                             />
                             {currentPageHighlights.map((box, idx) => {
+                              if (!box) return null
                               const highlightClass = "absolute border-2 border-yellow-400/80 bg-yellow-300/30 rounded-sm pointer-events-none"
                               return (
                                 <div
@@ -439,21 +450,21 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           <div className="border-b border-gray-200 pb-3">
                             <h2 className="text-xl font-bold text-gray-900">{source.title}</h2>
                             <div className="mt-1 text-sm text-gray-600">
-                              第 {source.pageNumber} 页{source.section ? ` · ${source.section}` : ""}
+                              {t('pdf.page', { n: source.pageNumber })}{source.section ? ` · ${source.section}` : ""}
                             </div>
                           </div>
                           <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-gray-700 mb-2">关键内容</div>
+                            <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.keyContent')}</div>
                             <div className="text-sm text-gray-900 leading-relaxed">{highlightText}</div>
                           </div>
                           {showFullSnippet && (
                             <div className="border border-gray-200 rounded-lg p-4">
-                              <div className="text-xs font-semibold text-gray-700 mb-2">上下文段落</div>
+                              <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.contextParagraph')}</div>
                               <div className="text-sm text-gray-800 leading-relaxed">{snippetText}</div>
                             </div>
                           )}
                           <div className="text-xs text-gray-500">
-                            提示：当前为文本预览模式；完整 PDF 预览需要后端可访问的 `pdfUrl`。
+                            {t('viewer.textPreviewHint')}
                           </div>
                         </div>
                       </div>
