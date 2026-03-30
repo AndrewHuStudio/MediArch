@@ -67,4 +67,6 @@ coverage/
 htmlcov/
 
 .tmp/
-data_process/documents/书籍报告/*.pdf
+docs/
+data_process/documents/
+data_process/documents_ocr/
