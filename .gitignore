@@ -70,3 +70,5 @@ htmlcov/
 docs/
 data_process/documents/
 data_process/documents_ocr/
+
+data_process/*.before_remove*.json
