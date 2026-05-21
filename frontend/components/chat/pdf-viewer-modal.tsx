@@ -35,6 +35,10 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
   const [isInfoExpanded, setIsInfoExpanded] = useState(false)
   const viewerRef = useRef<HTMLDivElement>(null)
   const [viewerSize, setViewerSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+  const cappedDevicePixelRatio = useMemo(() => {
+    if (typeof window === "undefined") return 1.5
+    return Math.min(1.5, window.devicePixelRatio || 1)
+  }, [])
 
   // [FIX 2025-12-09] 修复 Hooks 顺序问题：将 useMemo 移到 early return 之前
   const highlightBoxes = useMemo(() => {
@@ -385,7 +389,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
               {/* Main viewer */}
               <div ref={viewerRef} className="flex-1 min-w-0 bg-gray-900/30">
                 <div className="h-full overflow-auto">
-                  {source.pdfUrl ? (
+                  {isOpen && source.pdfUrl && (
                     <div className="min-h-full w-full flex justify-center p-2 md:p-4">
                       <div className="relative bg-white/95 rounded-lg shadow-xl overflow-hidden">
                         <Document
@@ -420,6 +424,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                                 : fitMode === "page"
                                   ? { height: Math.max(320, Math.floor(viewerSize.height - 24)) }
                                   : { scale })}
+                              devicePixelRatio={cappedDevicePixelRatio}
                               renderAnnotationLayer={false}
                               renderTextLayer={false}
                             />
@@ -443,7 +448,9 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                         </Document>
                       </div>
                     </div>
-                  ) : (
+                  )}
+
+                  {(!source.pdfUrl) && (
                     <div className="min-h-full w-full flex justify-center p-2 md:p-6">
                       <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6">
                         <div className="space-y-4">

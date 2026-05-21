@@ -15,9 +15,11 @@ MediArch FastAPI 主应用入口
 import asyncio
 import logging
 import os
+import socket
 import sys
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 from typing import Any, Dict
 
 # 确保项目根目录在 Python 路径中
@@ -50,6 +52,32 @@ from backend.app.agents.postgres_deployment_policy import (
 
 # 设置日志
 logger = setup_logging()
+
+
+def _parse_postgres_endpoint(uri: str | None) -> tuple[str, int] | None:
+    if not uri:
+        return None
+    try:
+        parsed = urlparse(uri)
+    except Exception:
+        return None
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        return None
+    if not parsed.hostname:
+        return None
+    return parsed.hostname, parsed.port or 5432
+
+
+def _postgres_endpoint_is_reachable(uri: str | None, *, timeout_s: float = 0.5) -> bool:
+    endpoint = _parse_postgres_endpoint(uri)
+    if endpoint is None:
+        return False
+    host, port = endpoint
+    try:
+        with socket.create_connection((host, port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
 
 
 def _validate_required_persistence_backends() -> None:
@@ -96,22 +124,45 @@ async def lifespan(app: FastAPI):
 
         # 预热 LangGraph MediArch Graph（可选，提升首次请求速度）
         if settings.PRELOAD_SUPERVISOR:
-            from backend.app.agents.mediarch_graph import graph as mediarch_graph
-            from backend.app.agents.mediarch_graph import SQLITE_CHECKPOINT_PATH
+            import backend.app.agents.mediarch_graph as mediarch_graph_module
             from backend.app.agents.persistence import SQLiteCheckpointSaver
+            mediarch_graph = mediarch_graph_module.graph
+            sqlite_checkpoint_path = getattr(
+                mediarch_graph_module,
+                "SQLITE_CHECKPOINT_PATH",
+                settings.SQLITE_SESSION_STORE_PATH,
+            )
+            postgres_checkpoint_uri = getattr(
+                mediarch_graph_module,
+                "POSTGRES_CHECKPOINT_URI",
+                settings.POSTGRES_CHECKPOINT_URI,
+            )
             # 初始化异步 Postgres checkpointer（open pool + create tables）
             _ckpt = getattr(mediarch_graph, 'checkpointer', None)
             if _ckpt is not None and hasattr(_ckpt, '_pool'):
-                try:
-                    await _ckpt._pool.open()
-                    await _ckpt.setup()
-                    logger.info("[OK] AsyncPostgresSaver pool opened & tables created")
-                except Exception as ckpt_error:
+                if not _postgres_endpoint_is_reachable(postgres_checkpoint_uri):
+                    if settings.REQUIRE_POSTGRES_PERSISTENCE:
+                        raise RuntimeError(
+                            f"PostgreSQL checkpoint endpoint is unreachable: {postgres_checkpoint_uri}"
+                        )
                     logger.warning(
-                        "[WARN] AsyncPostgresSaver init failed, fallback to SQLiteCheckpointSaver: %s",
-                        ckpt_error,
+                        "[WARN] PostgreSQL checkpoint endpoint unreachable, fallback to SQLiteCheckpointSaver: %s",
+                        postgres_checkpoint_uri,
                     )
-                    mediarch_graph.checkpointer = SQLiteCheckpointSaver(SQLITE_CHECKPOINT_PATH)
+                    mediarch_graph.checkpointer = SQLiteCheckpointSaver(sqlite_checkpoint_path)
+                else:
+                    try:
+                        await _ckpt._pool.open()
+                        await _ckpt.setup()
+                        logger.info("[OK] AsyncPostgresSaver pool opened & tables created")
+                    except Exception as ckpt_error:
+                        if settings.REQUIRE_POSTGRES_PERSISTENCE:
+                            raise
+                        logger.warning(
+                            "[WARN] AsyncPostgresSaver init failed, fallback to SQLiteCheckpointSaver: %s",
+                            ckpt_error,
+                        )
+                        mediarch_graph.checkpointer = SQLiteCheckpointSaver(sqlite_checkpoint_path)
             logger.info("[OK] LangGraph MediArch Graph 预热成功")
 
         # 初始化数据库连接池（如需要）

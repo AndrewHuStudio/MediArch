@@ -102,3 +102,33 @@ def test_extract_image_refs_returns_all_images_when_not_capped():
     refs = _extract_image_refs(citations, "http://localhost:8000")
 
     assert len(refs) == 6
+
+
+def test_inject_image_placeholders_keeps_later_sections_outside_retrieval_overview():
+    import os
+
+    os.environ["DEBUG"] = "true"
+    from backend.api.routers.chat import _inject_image_placeholders_inline
+
+    answer = (
+        "### 检索综述\n\n"
+        "- 已完成资料筛选\n\n"
+        "### 注\n\n"
+        "- 这一段不能被插图打断\n\n"
+        "### 优化建议\n\n"
+        "1. 保持最终答案结构稳定"
+    )
+    image_refs = [
+        {"url": "https://example.com/0.jpg", "caption": "总体平面"},
+        {"url": "https://example.com/1.jpg", "caption": "局部详图"},
+    ]
+
+    injected = _inject_image_placeholders_inline(answer, image_refs)
+
+    assert "### 检索综述" in injected
+    assert "[image:0]" in injected
+    assert "[image:1]" in injected
+    assert "### 注\n\n（图2：" not in injected
+    assert "### 优化建议\n\n（图" not in injected
+    assert injected.index("[image:0]") < injected.index("### 注")
+    assert injected.index("[image:1]") < injected.index("### 注")

@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { ChevronRight, RotateCcw } from 'lucide-react'
-import { startKgBuild } from '@/api/client'
+import { fetchKgStatus, startKgBuild } from '@/api/client'
 import { useTask } from '@/hooks/useTask'
 import { StatusBadge } from '@/components/shared/ProgressBar'
 import { StrategySelector } from './StrategySelector'
 import { ActionButtons } from './ActionButtons'
 import { BuildHistory } from './BuildHistory'
 import { KgBuildProgressCard } from './KgBuildProgressCard'
+import { getEffectiveKgTaskState } from './taskState'
 import './KgPanel.css'
 
 const STAGES = [
@@ -75,6 +76,30 @@ export function KgPanel() {
   useEffect(() => {
     loadHistory()
   }, [loadHistory])
+
+  useEffect(() => {
+    if (task.taskId || task.state === 'running' || task.state === 'pending') return
+    let cancelled = false
+
+    const loadKgStatus = async () => {
+      try {
+        const status = await fetchKgStatus()
+        if (cancelled) return
+        if (status.status === 'completed' && status.result) {
+          setKgResult(status.result)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load KG status:', error)
+        }
+      }
+    }
+
+    void loadKgStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [task.state, task.taskId])
 
   useEffect(() => {
     const defaults = STRATEGY_DEFAULTS[selectedStrategy]
@@ -150,6 +175,7 @@ export function KgPanel() {
   const currentStageIdx = STAGES.findIndex((s) => currentStage.includes(s.key))
 
   const stages = (kgResult?.stages as Array<Record<string, unknown>>) ?? []
+  const effectiveTaskState = getEffectiveKgTaskState(task.state, Boolean(kgResult))
 
   return (
     <div className="flex flex-col h-full space-y-6 overflow-y-auto">
@@ -236,7 +262,7 @@ export function KgPanel() {
               重置
             </button>
           )}
-          <StatusBadge status={task.state} />
+          <StatusBadge status={effectiveTaskState} />
         </div>
       </div>
 
@@ -252,10 +278,10 @@ export function KgPanel() {
       )}
 
       {/* 进度区与 4 阶段步骤条 */}
-      {(task.state === 'running' || task.state === 'completed' || task.state === 'failed') && (
+      {(effectiveTaskState === 'running' || effectiveTaskState === 'completed' || effectiveTaskState === 'failed') && (
         <div className="flex-none space-y-4">
           <KgBuildProgressCard
-            state={task.state}
+            state={effectiveTaskState}
             progress={task.progress}
             createdAt={task.createdAt}
           />
@@ -266,7 +292,7 @@ export function KgPanel() {
                 <h3 className="text-sm font-medium text-gray-700">处理阶段</h3>
                 <p className="text-xs text-gray-400 mt-1">保留 4 阶段主流程，并展示各阶段产物与执行状态。</p>
               </div>
-              {task.progress && task.state === 'running' && (
+              {task.progress && effectiveTaskState === 'running' && (
                 <p className="text-xs font-medium text-primary-600">
                   当前: {task.progress.stage || '准备构建'}
                 </p>
@@ -274,7 +300,7 @@ export function KgPanel() {
             </div>
           <div className="space-y-3">
             {STAGES.map((stage, idx) => {
-              const isActive = idx === currentStageIdx && task.state === 'running'
+              const isActive = idx === currentStageIdx && effectiveTaskState === 'running'
               const isDone = kgResult
                 ? idx < stages.length
                 : idx < currentStageIdx

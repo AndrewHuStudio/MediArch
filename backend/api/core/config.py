@@ -9,6 +9,7 @@
 import os
 from typing import List, Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 from backend.app.agents.postgres_deployment_policy import get_shared_postgres_uri
@@ -24,6 +25,17 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def _normalize_debug_value(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized == "debug":
+                return True
+            if normalized == "release":
+                return False
+        return value
 
     # ====================
     # API 服务器配置

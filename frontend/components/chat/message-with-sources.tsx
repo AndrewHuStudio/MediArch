@@ -8,8 +8,8 @@ import rehypeRaw from "rehype-raw"
 import { PDFCitationBadge, type PDFSource } from "./pdf-citation-badge"
 import { PDFViewerModal } from "./pdf-viewer-modal"
 import { ImageLightbox } from "@/components/ui/image-lightbox"
+import { buildMarkdownDisplayContent, parseCitationNumbers } from "@/lib/chat/markdown-display"
 import { buildHeadingIdPrefix, prepareMarkdownWithToc } from "@/lib/markdown-toc"
-import { getPdfThumbnail } from "@/lib/pdf-thumbnails"
 import { useT } from "@/lib/i18n"
 
 interface MarkdownContentProps {
@@ -22,166 +22,26 @@ interface MarkdownContentProps {
   headerActions?: React.ReactNode
 }
 
-const citationClassName =
-  "inline-flex items-center align-middle text-blue-200 text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-400/30 cursor-pointer hover:bg-blue-500/20 transition-colors mx-0.5 leading-none"
+const getImageRenderState = (imageIndex: number, images?: string[], sources?: PDFSource[]) => {
+  if (!Number.isFinite(imageIndex) || imageIndex < 0) return null
 
-const parseCitationNumbers = (raw: string | null): number[] => {
-  if (!raw) return []
-  const parts = raw
-    .split(/[,\s/，、]+/)
-    .map((t) => t.trim())
-    .filter(Boolean)
+  const src = images?.[imageIndex]
+  const imageSource = sources?.find((s) =>
+    s.contentType === "image" && src?.includes(s.id || "")
+  ) || sources?.find((s) => s.contentType === "image")
 
-  const numbers: number[] = []
+  const alt = imageSource
+    ? `${imageSource.title} · 第 ${imageSource.pageNumber} 页${imageSource.section ? ` · ${imageSource.section}` : ""}`
+    : `图 ${imageIndex + 1}: 来自数据库的相关资料`
 
-  for (const part of parts) {
-    if (part.includes("-")) {
-      const [startRaw, endRaw] = part.split("-", 2)
-      const start = Number.parseInt(startRaw, 10)
-      const end = Number.parseInt(endRaw, 10)
-      if (!Number.isFinite(start)) continue
-      if (!Number.isFinite(end)) {
-        numbers.push(start)
-        continue
-      }
-      const min = Math.min(start, end)
-      const max = Math.max(start, end)
-      for (let n = min; n <= max; n++) numbers.push(n)
-      continue
-    }
+  const meta = imageSource
+    ? `来源：${imageSource.title} · 第 ${imageSource.pageNumber} 页${imageSource.section ? ` · ${imageSource.section}` : ""}`
+    : null
 
-    const single = Number.parseInt(part, 10)
-    if (Number.isFinite(single)) numbers.push(single)
-  }
-
-  return numbers
+  return { src, alt, meta }
 }
 
-const normalizeCitationNumbers = (numbers: number[], maxCitation: number) => {
-  const filtered = numbers.filter((num) => Number.isFinite(num) && num > 0 && num <= maxCitation)
-  const ordered: number[] = []
-  const seen = new Set<number>()
-  filtered.forEach((num) => {
-    if (!seen.has(num)) {
-      seen.add(num)
-      ordered.push(num)
-    }
-  })
-  return ordered
-}
-
-const extractCitationNumbers = (raw: string) => {
-  const matches = raw.matchAll(/\[(\d+(?:\s*-\s*\d+)?(?:[\/,，、]\s*\d+)*)\]/g)
-  const numbers: number[] = []
-  for (const match of matches) {
-    numbers.push(...parseCitationNumbers(match[1]))
-  }
-  return numbers
-}
-
-const buildCitationTag = (number: number) =>
-  `<span data-citation="${number}" class="${citationClassName}">${number}</span>`
-
-const buildCitationTags = (numbers: number[], maxCitation: number) => {
-  const normalized = normalizeCitationNumbers(numbers, maxCitation)
-  if (normalized.length === 0) return ""
-  return normalized.map(buildCitationTag).join("")
-}
-
-const buildCitationTokens = (numbers: number[]) => numbers.map((num) => `[${num}]`).join("")
-
-const distributeTrailingCitations = (line: string) => {
-  const trailingCluster = /((?:\s*\[(?:\d+\s*-\s*\d+|\d+)\]\s*)+)$/
-  const match = trailingCluster.exec(line)
-  if (!match) return line
-
-  const cluster = match[1]
-  const numbers = extractCitationNumbers(cluster)
-  if (numbers.length <= 1) return line
-
-  const body = line.slice(0, match.index).trimEnd()
-  if (!body) return line
-
-  const sentences = body.match(/[^。！？.!?；;]+[。！？.!?；;]*/g) || [body]
-  if (sentences.length <= 1) {
-    return `${body} ${buildCitationTokens(numbers)}`
-  }
-
-  const grouped: number[][] = Array.from({ length: sentences.length }, () => [])
-  numbers.forEach((num, index) => {
-    const target = Math.min(index, sentences.length - 1)
-    grouped[target].push(num)
-  })
-
-  return sentences
-    .map((sentence, index) => {
-      const tokens = grouped[index]
-      if (tokens.length === 0) return sentence
-      return `${sentence.trimEnd()} ${buildCitationTokens(tokens)}`
-    })
-    .join("")
-}
-
-const distributeCitationClusters = (text: string) => {
-  const paragraphs = text.split(/\n{2,}/)
-  return paragraphs
-    .map((paragraph) => {
-      if (!paragraph.trim()) return paragraph
-
-      const lines = paragraph.split("\n")
-      const hasListLine = lines.some((line) => /^\s*([-*+]|(\d+)[.、])\s+/.test(line))
-      if (!hasListLine) {
-        const trimmed = paragraph.trimStart()
-        if (trimmed.startsWith("<a id=") || /^\s*#{1,6}\s+/.test(trimmed)) {
-          return paragraph
-        }
-        return distributeTrailingCitations(paragraph)
-      }
-
-      return lines
-        .map((line) => {
-          if (/^\s*#{1,6}\s+/.test(line) || line.startsWith("<a id=")) {
-            return line
-          }
-          return distributeTrailingCitations(line)
-        })
-        .join("\n")
-    })
-    .join("\n\n")
-}
-
-const replaceCitations = (input: string, maxCitation: number) => {
-  if (maxCitation <= 0) return input
-
-  return input
-    .replace(/(?:\[(?:\d+\s*-\s*\d+|\d+)\]\s*){2,}/g, (raw) => buildCitationTags(extractCitationNumbers(raw), maxCitation))
-    .replace(/\[(\d+(?:\s*-\s*\d+)?(?:[\/,，、]\s*\d+)*)\]/g, (raw, content) => {
-      const numbers = parseCitationNumbers(content)
-      const rendered = buildCitationTags(numbers, maxCitation)
-      return rendered || raw
-    })
-}
-
-const applyCitationMarkup = (text: string, maxCitation: number) => {
-  if (maxCitation <= 0) return text
-
-  const codeFenceRegex = /```[\s\S]*?```/g
-  let lastIndex = 0
-  let match
-  let result = ""
-
-  while ((match = codeFenceRegex.exec(text)) !== null) {
-    const segment = distributeCitationClusters(text.slice(lastIndex, match.index))
-    result += replaceCitations(segment, maxCitation)
-    result += match[0]
-    lastIndex = match.index + match[0].length
-  }
-
-  result += replaceCitations(distributeCitationClusters(text.slice(lastIndex)), maxCitation)
-  return result
-}
-
-const markdownComponents: Components = {
+const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Components => ({
   h1: ({ node: _node, ...props }) => (
     <h1
       className="text-3xl md:text-4xl font-bold mt-7 mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400"
@@ -260,7 +120,45 @@ const markdownComponents: Components = {
   td: ({ node: _node, ...props }) => (
     <td className="border border-white/20 px-4 py-2 text-sm text-gray-300" {...props} />
   ),
-}
+  figure: ({ node, ...props }) => {
+    const rawIndex = typeof props["data-chat-image-index"] === "string"
+      ? props["data-chat-image-index"]
+      : Array.isArray(node?.properties?.["data-chat-image-index"])
+        ? String(node?.properties?.["data-chat-image-index"]?.[0] ?? "")
+        : String(node?.properties?.["data-chat-image-index"] ?? "")
+    const imageIndex = Number.parseInt(rawIndex, 10)
+    const imageState = getImageRenderState(imageIndex, images, sources)
+
+    if (!imageState) {
+      return null
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="my-4"
+      >
+        {imageState.src ? (
+          <ImageLightbox
+            src={imageState.src}
+            alt={imageState.alt}
+          />
+        ) : (
+          <div className="max-w-xs rounded-lg border border-dashed border-white/15 bg-white/5 px-4 py-6 text-xs text-gray-400">
+            图片加载中
+          </div>
+        )}
+        {imageState.meta && (
+          <div className="mt-2 text-[11px] text-gray-500 leading-snug pl-2 border-l-2 border-white/10 bg-white/5 rounded">
+            {imageState.meta}
+          </div>
+        )}
+      </motion.div>
+    )
+  },
+})
 
 export function MarkdownContent({ content, images, sources, onCitationPositions, onCitationClick, positionAnchorRef }: MarkdownContentProps) {
   const contentRef = useRef<HTMLDivElement>(null)
@@ -321,78 +219,8 @@ export function MarkdownContent({ content, images, sources, onCitationPositions,
   }, [content, sources, onCitationPositions, positionAnchorRef])
 
   const maxCitation = sources?.length ?? 0
-
-  const renderMarkdownSegment = (segment: string, key: string) => (
-    <ReactMarkdown
-      key={key}
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeRaw]}
-      components={markdownComponents}
-    >
-      {applyCitationMarkup(segment, maxCitation)}
-    </ReactMarkdown>
-  )
-
-  const parseContentWithCitationsAndImages = (text: string) => {
-    const parts: React.ReactNode[] = []
-    // [FIX 2026-01-14] 仅拆分图片占位符；引用 `[n]` 交给 Markdown 渲染转为 <sup data-citation>
-    const regex = /\[image:(\d+)\]/g
-    let lastIndex = 0
-    let match
-    let keyIndex = 0
-
-    while ((match = regex.exec(text)) !== null) {
-      if (lastIndex < match.index) {
-        const textBefore = text.slice(lastIndex, match.index)
-        parts.push(renderMarkdownSegment(textBefore, `text-${keyIndex++}`))
-      }
-
-      if (match[1]) {
-        const imgIdx = parseInt(match[1])
-        if (images && images[imgIdx]) {
-          // 尝试从 sources 中找到对应的图片来源
-          const imageSource = sources?.find((s, idx) =>
-            s.contentType === 'image' && images[imgIdx]?.includes(s.id || '')
-          ) || sources?.find(s => s.contentType === 'image')
-          const altText = imageSource
-            ? `${imageSource.title} · 第 ${imageSource.pageNumber} 页${imageSource.section ? ` · ${imageSource.section}` : ""}`
-            : `图 ${imgIdx + 1}: 来自数据库的相关资料`
-
-          parts.push(
-            <motion.div
-              key={`image-${imgIdx}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: keyIndex * 0.05 }}
-              className="my-4"
-            >
-              <ImageLightbox
-                src={images[imgIdx] || "/placeholder.svg"}
-                alt={altText}
-              />
-              {/* 图片来源标注 - 仅显示来源信息 */}
-              {imageSource && (
-                <div className="mt-2 text-[11px] text-gray-500 leading-snug pl-2 border-l-2 border-white/10 bg-white/5 rounded">
-                  来源：{imageSource.title} · 第 {imageSource.pageNumber} 页
-                  {imageSource.section && ` · ${imageSource.section}`}
-                </div>
-              )}
-            </motion.div>
-          )
-        }
-      }
-
-      lastIndex = match.index + match[0].length
-      keyIndex++
-    }
-
-    if (lastIndex < text.length) {
-      const remainingText = text.slice(lastIndex)
-      parts.push(renderMarkdownSegment(remainingText, "text-final"))
-    }
-
-    return parts.length > 0 ? parts : renderMarkdownSegment(text, "text-all")
-  }
+  const displayContent = useMemo(() => buildMarkdownDisplayContent(content, maxCitation), [content, maxCitation])
+  const markdownComponents = useMemo(() => createMarkdownComponents(images, sources), [images, sources])
 
   return (
     <div
@@ -408,7 +236,13 @@ export function MarkdownContent({ content, images, sources, onCitationPositions,
         }
       }}
     >
-      {parseContentWithCitationsAndImages(content)}
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
+        components={markdownComponents}
+      >
+        {displayContent}
+      </ReactMarkdown>
     </div>
   )
 }
@@ -494,49 +328,7 @@ export function MessageWithSources({
     return { normalizedContent: contentWithToc, normalizedSources: validSources }
   }, [contentWithToc, sources])
 
-  const [resolvedSources, setResolvedSources] = useState<PDFSource[] | undefined>(normalizedSources)
-
-  useEffect(() => {
-    setResolvedSources(normalizedSources)
-  }, [normalizedSources])
-
-  useEffect(() => {
-    let cancelled = false
-    const loadThumbnails = async () => {
-      if (!normalizedSources || normalizedSources.length === 0) {
-        setResolvedSources(normalizedSources)
-        return
-      }
-
-      const updated = await Promise.all(
-        normalizedSources.map(async (source) => {
-          if (source.thumbnail) return source
-          if (source.imageUrl) return { ...source, thumbnail: source.imageUrl }
-
-          const pdfUrl = source.pdfUrl
-          if (!pdfUrl) return source
-
-          const thumb = await getPdfThumbnail(pdfUrl, 1, 320)
-          if (thumb) {
-            return { ...source, thumbnail: thumb }
-          }
-
-          return source
-        })
-      )
-
-      if (!cancelled) {
-        setResolvedSources(updated)
-      }
-    }
-
-    void loadThumbnails()
-    return () => {
-      cancelled = true
-    }
-  }, [normalizedSources])
-
-  const sourcesForRender = resolvedSources ?? normalizedSources
+  const sourcesForRender = normalizedSources
 
   const handlePDFClick = (source: PDFSource) => {
     setSelectedPDF(source)

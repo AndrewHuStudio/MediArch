@@ -915,6 +915,97 @@ def _create_mongo_client():
     return MongoClient(os.getenv("MONGODB_URI"))
 
 
+def _get_latest_completed_kg_history_record() -> Optional[Dict[str, Any]]:
+    with _kg_history_lock:
+        builds = sorted(
+            _kg_build_history.values(),
+            key=lambda item: str(item.get("timestamp") or ""),
+            reverse=True,
+        )
+    for build in builds:
+        result = build.get("result") or {}
+        if int(result.get("nodes_written") or 0) > 0 or int(result.get("edges_written") or 0) > 0:
+            return dict(build)
+    return None
+
+
+def _has_materialized_kg_graph() -> bool:
+    driver = None
+    try:
+        driver = _create_neo4j_driver()
+        neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
+        with driver.session(database=neo4j_database) as session:
+            count = int(
+                session.run(
+                    """
+                    MATCH (n)
+                    WHERE n.seed_source IS NULL AND (n.is_concept IS NULL OR n.is_concept = false)
+                    RETURN count(n) as count
+                    """
+                ).single()["count"] or 0
+            )
+        return count > 0
+    except Exception:
+        return False
+    finally:
+        if driver is not None:
+            try:
+                driver.close()
+            except Exception:
+                pass
+
+
+def _get_kg_status_snapshot() -> Dict[str, Any]:
+    with _tasks_lock:
+        latest_kg = _find_latest_task_for_module("kg")
+
+    if latest_kg:
+        task_id, task = latest_kg
+        st_raw = task.get("status")
+        status = st_raw.value if isinstance(st_raw, TaskStatus) else str(st_raw or "idle")
+        progress = task.get("progress") or {}
+        current = int(progress.get("current") or 0) if isinstance(progress, dict) else 0
+        total = int(progress.get("total") or 0) if isinstance(progress, dict) else 0
+        extra = progress.get("extra", {}) if isinstance(progress, dict) else {}
+        percent = (
+            int(extra.get("overall_percent") or 0)
+            if isinstance(extra, dict) and extra.get("overall_percent") is not None
+            else (int(round((current / total) * 100)) if total > 0 else (100 if status == "completed" else 0))
+        )
+        result = task.get("result") if isinstance(task.get("result"), dict) else None
+        return {
+            "task_id": task_id,
+            "status": status,
+            "progress_percent": max(0, min(100, percent)),
+            "stage": progress.get("stage", "") if isinstance(progress, dict) else "",
+            "updated_at": task.get("created_at"),
+            "result": result,
+            "source": "task",
+        }
+
+    latest_history = _get_latest_completed_kg_history_record()
+    if _has_materialized_kg_graph() and latest_history:
+        return {
+            "task_id": None,
+            "status": "completed",
+            "progress_percent": 100,
+            "stage": "done",
+            "updated_at": latest_history.get("timestamp"),
+            "result": dict(latest_history.get("result") or {}),
+            "source": "history",
+        }
+
+    return {
+        "task_id": None,
+        "status": "idle",
+        "progress_percent": 0,
+        "stage": "",
+        "updated_at": None,
+        "result": None,
+        "source": "none",
+    }
+
+
 def _create_kg_module(strategy: str = "B1", custom_config: Optional[Dict[str, Any]] = None):
     from data_process.kg.kg_module import KgModule
 
@@ -2812,36 +2903,14 @@ async def pipeline_overview():
                 "can_graphize": vector_status == "completed" and bool((vector_info or {}).get("doc_id")),
             })
 
-    with _tasks_lock:
-        latest_kg = _find_latest_task_for_module("kg")
-
+    kg_snapshot = _get_kg_status_snapshot()
     kg_payload: Dict[str, Any] = {
-        "task_id": None,
-        "status": "idle",
-        "progress_percent": 0,
-        "stage": "",
-        "updated_at": None,
+        "task_id": kg_snapshot.get("task_id"),
+        "status": kg_snapshot.get("status", "idle"),
+        "progress_percent": int(kg_snapshot.get("progress_percent") or 0),
+        "stage": str(kg_snapshot.get("stage") or ""),
+        "updated_at": kg_snapshot.get("updated_at"),
     }
-    if latest_kg:
-        task_id, task = latest_kg
-        st_raw = task.get("status")
-        status = st_raw.value if isinstance(st_raw, TaskStatus) else str(st_raw or "idle")
-        progress = task.get("progress") or {}
-        current = int(progress.get("current") or 0) if isinstance(progress, dict) else 0
-        total = int(progress.get("total") or 0) if isinstance(progress, dict) else 0
-        extra = progress.get("extra", {}) if isinstance(progress, dict) else {}
-        percent = (
-            int(extra.get("overall_percent") or 0)
-            if isinstance(extra, dict) and extra.get("overall_percent") is not None
-            else (int(round((current / total) * 100)) if total > 0 else (100 if status == "completed" else 0))
-        )
-        kg_payload = {
-            "task_id": task_id,
-            "status": status,
-            "progress_percent": max(0, min(100, percent)),
-            "stage": progress.get("stage", "") if isinstance(progress, dict) else "",
-            "updated_at": task.get("created_at"),
-        }
 
     return {
         "summary": {
@@ -3026,6 +3095,21 @@ async def get_kg_build_history():
             )
         ]
     return {"builds": builds}
+
+
+@router.get("/kg/status")
+async def get_kg_status():
+    """获取当前 KG 状态快照；无活动任务时尝试从持久化图谱恢复完成态。"""
+    snapshot = _get_kg_status_snapshot()
+    return {
+        "task_id": snapshot.get("task_id"),
+        "status": snapshot.get("status", "idle"),
+        "progress_percent": int(snapshot.get("progress_percent") or 0),
+        "stage": str(snapshot.get("stage") or ""),
+        "updated_at": snapshot.get("updated_at"),
+        "result": snapshot.get("result"),
+        "source": snapshot.get("source"),
+    }
 
 
 @router.delete("/kg/history/{build_id}")

@@ -169,6 +169,20 @@ export function startKgStage(params: {
   })
 }
 
+export interface KgStatusResponse {
+  task_id: string | null
+  status: 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+  progress_percent: number
+  stage: string
+  updated_at: string | null
+  result: Record<string, unknown> | null
+  source?: 'task' | 'history' | 'none'
+}
+
+export function fetchKgStatus() {
+  return request<KgStatusResponse>('/kg/status')
+}
+
 // ---- 任务状态 ----
 export function getTaskStatus(taskId: string) {
   return request<{

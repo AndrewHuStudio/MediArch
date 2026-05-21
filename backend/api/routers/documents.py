@@ -66,6 +66,37 @@ def _resolve_image_candidate(requested_path: str) -> Path | None:
     return None
 
 
+def _resolve_ocr_origin_pdf_candidate(parts: list[str]) -> Path | None:
+    if len(parts) < 2:
+        return None
+
+    category = parts[0]
+    filename = parts[-1]
+    stem = Path(filename).stem
+    if not stem:
+        return None
+
+    full_dir = (OCR_OUTPUT_DIR / category / stem / "full").resolve()
+    try:
+        full_dir.relative_to(OCR_OUTPUT_DIR)
+    except ValueError:
+        return None
+
+    if not full_dir.is_dir():
+        return None
+
+    origin_candidates = sorted(full_dir.glob("*_origin.pdf"))
+    if len(origin_candidates) == 1 and origin_candidates[0].is_file():
+        return origin_candidates[0].resolve()
+
+    if len(origin_candidates) > 1:
+        exact = [p for p in origin_candidates if p.name.lower().endswith("_origin.pdf")]
+        if len(exact) == 1 and exact[0].is_file():
+            return exact[0].resolve()
+
+    return None
+
+
 @lru_cache(maxsize=2048)
 def _resolve_pdf_candidate(requested_path: str) -> Path | None:
     """Resolve a requested PDF path to an existing file under DOCUMENTS_DIR.
@@ -110,6 +141,12 @@ def _resolve_pdf_candidate(requested_path: str) -> Path | None:
                 continue
             if cand.is_file():
                 return cand
+
+    # 2.5) Fallback: if source PDF has been removed from documents/,
+    # reuse OCR-preserved original PDF under documents_ocr/<category>/<stem>/full/*_origin.pdf.
+    ocr_origin = _resolve_ocr_origin_pdf_candidate(parts)
+    if ocr_origin is not None:
+        return ocr_origin
 
     # 3) Last resort: search by filename (only if it's unique)
     filename = parts[-1]

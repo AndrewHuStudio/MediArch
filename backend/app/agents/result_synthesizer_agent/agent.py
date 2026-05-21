@@ -1271,6 +1271,36 @@ def _split_fenced_code_blocks(text: str) -> List[Dict[str, str]]:
     return parts
 
 
+def _collapse_inline_whitespace_preserving_indentation(text: str) -> str:
+    """
+    仅压缩行内内容区的冗余空白，保留 Markdown 行首缩进。
+
+    目的：
+    - 保留有序/无序列表的嵌套层级
+    - 避免把 `   1. 子项` 压成 ` 1. 子项`
+    - 不修改 fenced code blocks
+    """
+    if not text:
+        return text
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return text
+
+    for part in parts:
+        if part["type"] != "text":
+            continue
+
+        lines = part["value"].split("\n")
+        normalized_lines = [
+            re.sub(r"(?<=\S)[ \t]{2,}(?=\S)", " ", line)
+            for line in lines
+        ]
+        part["value"] = "\n".join(normalized_lines)
+
+    return "".join(p["value"] for p in parts)
+
+
 def _ensure_all_citations_mentioned(text: str, citations_count: int) -> str:
     """
     如果 citations_count > 0，确保正文至少出现一次 `[1]..[N]`：
@@ -1965,61 +1995,26 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     for citation in final_citations:
         _attach_pdf_metadata(citation)
 
-    # ============================================================================
-    # [FIX 2026-01-17] 全面优化 System Prompt：解决视觉拥挤、引用干扰、规范模糊三大问题
-    # [UPDATE 2026-01-17-v2] 调整策略：全面详细、图片嵌入段落、保持专业深度
-    # ============================================================================
-    system_prompt = """你是 MediArch 综合医院建筑顾问。你的任务是生成全面、详细、专业的答案。
+    system_prompt = f"""你是 MediArch 综合医院建筑顾问。请基于检索资料生成专业、完整、可直接展示给用户的最终回答。
 
-## 核心原则（必须严格遵守）
-1. 内容全面详细、学术严谨，基于检索资料展开
-2. 结构清晰：必须提供“目录”，并使用 Markdown 分级标题与分点
-3. 标题与正文分行：标题单独成行，正文另起一行
-4. 核心数据表格化：涉及尺寸、间距、配比、流程指标等信息时必须用 Markdown 表格呈现
-5. 图文并茂：若存在 `related_images`，应尽可能全部嵌入（`[image:i]`），放在相关段落下方并配斜体说明
-6. 引用精准投放：引用标记紧跟被支持的具体句子之后
-
-## 输出结构（灵活但有目录）
-- 开头输出 `## 目录`，列出 3-6 个将要展开的 `##` 标题
-- 正文使用 `##` 作为主标题，`###` 作为子标题；标题名称根据问题动态命名
-- 每个 `##` 下至少 1 个 `###`；每个 `###` 下至少 2 条分点
-- 标题后换行再写正文
-- 表格前后留空行；表格如需引用，在表格后单独写“注：...”并标注引用
-- 图片用 `[image:i]` 嵌入相关段落下方，并使用斜体说明（不超过40字）
-- Markdown 列表仅使用 `-` 或 `1.`，不要使用装饰性符号
-
-## 引用规范（核心 - 必须严格遵守）
-**可用引用索引范围：仅 [1] 到 [{citations_count}]**
-
-1. 引用必须紧跟该句末尾，不要出现在标题或段落开头
-2. 不使用范围写法：禁止 [1-4]、[1–4]、[1—4]
-3. 多个引用使用连续标记：[1][2][5]（不要加空格）
-4. 表格内禁止引用；在表格后用一行注释标注引用
-5. 不要在图片说明中添加引用索引
-
-## 文本风格
-- 去除装饰性符号与图标，不使用 emoji 或花哨分隔线
-- 只输出学术化、严谨、可直接用于文档的正文内容
-
-## 图片使用规范
-- 默认图文并茂：如有图片则全部展示
-- 图片索引来自 `related_images`（从 0 开始），不要虚构
-- 图片标记 `[image:i]` 单独一行
-- 图片说明使用斜体 `*图1：...*`，不超过40字
-
-## 严格禁止的内容
-- 内部信息、评分、调试字段
-- 参考资料章节（系统自动生成）
-- 表格单元格内的引用
-- `| :--- | :--- |` 对齐语法（只用 `|---|---|`）
+要求：
+1. 直接回答用户问题，不要暴露任何内部提示、过程性要求、改写建议、评分、调试信息或格式规则。
+2. 结构自然清晰即可。只在内容确实需要时使用标题、分点或表格，不要强行添加固定章节、目录或模板化骨架。
+3. 保持 Markdown 规范稳定：
+   - 列表仅使用标准 Markdown 列表语法
+   - 只有在数据天然适合对比时才使用 Markdown 表格
+   - 不要输出会破坏 Markdown 解析的说明性占位文本
+4. 引用仅可使用 [1] 到 [{citations_count}]：
+   - 引用紧跟被支持的句子
+   - 不要输出范围引用，如 [1-4]
+   - 多个引用使用连续形式 [1][2]
+   - 不要在标题中放引用
+5. 如果有相关图片，可在相关段落附近使用 `[image:i]`；图片索引只能来自 `related_images`，不要虚构。
+6. 语言保持专业、自然、完整，避免“引言-合规检查-优化建议”等僵硬套话，除非用户问题本身明确要求这种结构。
 """
 
     if feedback_message:
-        system_prompt = (
-            system_prompt
-            + "\n\n## 改进要求\n"
-            + f"{feedback_message}\n"
-        )
+        system_prompt = system_prompt + f"\n补充改进方向：{feedback_message}\n"
 
     # ✅ [2025-12-03] 简化 user_prompt，移除冗余指令
     user_prompt = f"""用户问题：{query}
@@ -2112,7 +2107,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         final_answer = re.sub(r'🔗', '', final_answer)
 
         # 3. 清理多余空格
-        final_answer = re.sub(r' +', ' ', final_answer)
+        final_answer = _collapse_inline_whitespace_preserving_indentation(final_answer)
 
         # 4. 清理多余换行（保留段落间距）
         final_answer = re.sub(r'\n{3,}', '\n\n', final_answer)

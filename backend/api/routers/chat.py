@@ -225,6 +225,7 @@ def _postprocess_answer_and_align_citations(
         _relocate_heading_citations,
         _strip_citations_in_tables,
         _relocate_leading_citations,
+        _collapse_inline_whitespace_preserving_indentation,
     )
 
     citations_count = len(citations_full)
@@ -233,7 +234,7 @@ def _postprocess_answer_and_align_citations(
     cleaned = re.sub(r"\n+\s*(\[\d+\])", r"\1", answer)
     cleaned = re.sub(r"\+\d+", "", cleaned)
     cleaned = cleaned.replace("🔗", "")
-    cleaned = re.sub(r" +", " ", cleaned)
+    cleaned = _collapse_inline_whitespace_preserving_indentation(cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
 
     cleaned = _strip_decorative_symbols(cleaned)
@@ -678,7 +679,17 @@ def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, An
             insert_at, section_end = sec
             break
 
-    # Fallback: insert after the first paragraph.
+    # Fallback 1: if the answer already has sections, inject only into the first section body.
+    if insert_at == 0 and section_end == len(head):
+        first_heading = re.search(r"(?m)^###\s+.+$", head)
+        if first_heading:
+            first_heading_end = first_heading.end()
+            next_heading = re.search(r"(?m)^###\s+", head[first_heading_end:])
+            section_end = first_heading_end + (next_heading.start() if next_heading else len(head[first_heading_end:]))
+            first_newline = head.find("\n", first_heading_end)
+            insert_at = (first_newline + 1) if first_newline != -1 and first_newline < section_end else first_heading_end
+
+    # Fallback 2: plain text answer without sections, insert after the first paragraph.
     if insert_at == 0 and section_end == len(head):
         first_break = head.find("\n\n")
         insert_at = (first_break + 2) if first_break != -1 else len(head)

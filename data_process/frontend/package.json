@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:vector-state": "tsc --noEmit false --outDir dist-test --target ES2020 --module NodeNext --moduleResolution NodeNext src/components/vector/vectorPanelState.ts && node --test test/vectorPanelState.force-rerun.test.mjs",
-    "test:kg-progress": "tsc --noEmit false --outDir dist-test --target ES2020 --module NodeNext --moduleResolution NodeNext src/components/kg/progressUtils.ts && node --test test/kgProgress.test.mjs"
+    "test:kg-progress": "tsc --noEmit false --outDir dist-test --target ES2020 --module NodeNext --moduleResolution NodeNext src/components/kg/progressUtils.ts && node --test test/kgProgress.test.mjs",
+    "test:kg-task-state": "tsc --noEmit false --outDir dist-test --target ES2020 --module NodeNext --moduleResolution NodeNext src/components/kg/taskState.ts && node --test test/kgTaskState.test.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",

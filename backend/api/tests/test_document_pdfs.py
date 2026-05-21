@@ -118,3 +118,33 @@ def test_documents_pdf_endpoint_accepts_legacy_absolute_path(tmp_path, monkeypat
 
     assert response.status_code == 200
     assert response.content == b"%PDF-1.4 fake"
+
+
+def test_documents_pdf_endpoint_falls_back_to_ocr_origin_pdf_when_source_pdf_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.setenv("DATA_PROCESS_DOCUMENTS_DIR", str(tmp_path / "documents"))
+    monkeypatch.setenv("DATA_PROCESS_OCR_DIR", str(tmp_path / "documents_ocr"))
+
+    import backend.api.routers.documents as documents
+
+    reloaded = importlib.reload(documents)
+
+    ocr_origin_pdf = (
+        tmp_path
+        / "documents_ocr"
+        / "书籍报告"
+        / "医疗功能房间详图集3"
+        / "full"
+        / "28bb39ec-a968-48ed-95b1-995ff17fe1f0_origin.pdf"
+    )
+    ocr_origin_pdf.parent.mkdir(parents=True)
+    ocr_origin_pdf.write_bytes(b"%PDF-1.4 ocr-origin")
+
+    app = FastAPI()
+    app.include_router(reloaded.router, prefix="/api/v1")
+    client = TestClient(app)
+
+    response = client.get("/api/v1/documents/pdf", params={"path": "书籍报告/医疗功能房间详图集3.pdf"})
+
+    assert response.status_code == 200
+    assert response.content == b"%PDF-1.4 ocr-origin"

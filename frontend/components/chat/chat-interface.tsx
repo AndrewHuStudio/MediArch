@@ -19,12 +19,13 @@ import { ChatInput } from "@/components/chat/chat-input"
 import { initializeDemoConversations } from "@/lib/init-demo-conversations"
 import { convertKnowledgeGraphData } from "@/lib/chat/knowledge-graph-normalization"
 import { runChatWithFallback, type ChatExecutionResult } from "@/lib/chat/chat-execution"
+import { buildImageUrl, buildPdfUrl } from "@/lib/chat/pdf-source-url"
 import { useT } from "@/lib/i18n"
 import { getChatAgentDefinitions } from "@/lib/i18n/ui-copy"
 import type { AssistantDisplayLanguage } from "@/lib/chat/message-translation"
 
 // API 客户端
-import { chatApi, type StreamCallbacks, getApiUrl } from "@/lib/api"
+import { chatApi, type StreamCallbacks } from "@/lib/api"
 import { mockChatStreamRequest } from "@/lib/api/mock-client"
 import type { Citation, KnowledgeGraphData, AgentStatusUpdate } from "@/lib/api/types"
 
@@ -81,49 +82,6 @@ const saveConversationToStorage = (conversation: StoredConversation) => {
   } catch (error) {
     console.error("Failed to save conversation:", error)
   }
-}
-
-const buildImageUrl = (rawImagePath?: string) => {
-  if (!rawImagePath) return undefined
-
-  const normalized = rawImagePath.replace(/\\/g, "/")
-  if (/^(https?:)?\/\//i.test(normalized) || normalized.startsWith("data:")) {
-    return normalized
-  }
-  if (normalized.startsWith("/api/")) {
-    return getApiUrl(normalized.replace(/^\/api\/v1/, ""))
-  }
-  if (normalized.startsWith("/documents/image")) {
-    return getApiUrl(normalized)
-  }
-
-  const match = normalized.match(/documents_ocr\/(.+)$/i)
-  const relative = match ? match[1] : normalized.replace(/^\/+/, "")
-  return getApiUrl(`/documents/image?path=${encodeURIComponent(relative)}`)
-}
-
-const inferPdfRelativePath = (fallbackPath?: string, imagePath?: string, title?: string) => {
-  const normalizedFallback = String(fallbackPath || "").replace(/\\/g, "/").trim()
-  if (normalizedFallback) {
-    const match = normalizedFallback.match(/documents\/(.+)$/i)
-    return match ? match[1] : normalizedFallback.replace(/^\/+/, "")
-  }
-
-  const normalizedImage = String(imagePath || "").replace(/\\/g, "/").trim()
-  if (normalizedImage) {
-    const ocrMatch = normalizedImage.match(/documents_ocr\/([^/]+)\/([^/]+)\/(?:full\/)?images\//i)
-    if (ocrMatch) return `${ocrMatch[1]}/${ocrMatch[2]}.pdf`
-
-    const relMatch = normalizedImage.match(/^([^/]+)\/([^/]+)\/(?:full\/)?images\//i)
-    if (relMatch) return `${relMatch[1]}/${relMatch[2]}.pdf`
-  }
-
-  const normalizedTitle = String(title || "").trim().replace(/\.pdf$/i, "")
-  if (normalizedTitle) {
-    return `书籍报告/${normalizedTitle}.pdf`
-  }
-
-  return undefined
 }
 
 const normalizeStoredSource = (source: PDFSource): PDFSource => {
@@ -205,45 +163,6 @@ const createConversationSummary = (raw: string, emptySummary: string) => {
   const normalized = raw.replace(/\s+/g, " ").trim()
   if (!normalized) return emptySummary
   return normalized.length > 60 ? `${normalized.slice(0, 60)}...` : normalized
-}
-
-const buildPdfUrl = (
-  rawPdfPath?: string,
-  documentPath?: string,
-  filePath?: string,
-  imagePath?: string,
-  title?: string,
-) => {
-  const toApiUrl = (path: string) => getApiUrl(path.startsWith("/") ? path : `/${path}`)
-
-  const normalizeRelativePath = (path: string) => {
-    // 去掉重复的 /api/v1 前缀，统一用 getApiUrl 拼接
-    if (path.startsWith("/api/v1/")) return path.replace(/^\/api\/v1/, "")
-    return path
-  }
-
-  const resolvePath = (path?: string) => {
-    if (!path) return undefined
-    const normalized = normalizeRelativePath(path)
-    const isAbsolute = /^https?:\/\//i.test(normalized)
-    if (isAbsolute) {
-      return normalized
-    }
-    return toApiUrl(normalized)
-  }
-
-  // 1) 优先使用后端返回的 pdf_url
-  const fromPdfUrl = resolvePath(rawPdfPath)
-  if (fromPdfUrl) return fromPdfUrl
-
-  // 2) 其次用 document_path / file_path 组装
-  const relative = inferPdfRelativePath(documentPath || filePath, imagePath, title)
-  if (relative) {
-    return toApiUrl(`/documents/pdf?path=${encodeURIComponent(relative)}`)
-  }
-
-  // 3) 无路径时返回 undefined，让上层走文本预览兜底
-  return undefined
 }
 
 // 将后端引用格式转换为前端 PDFSource 格式
