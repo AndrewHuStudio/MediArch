@@ -14,6 +14,7 @@ backend/.env
 .langgraph_api/
 backend/.langgraph_api/
 youtu-graphrag/
+.worktrees/
 
 # Node
 node_modules/
