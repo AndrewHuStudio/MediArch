@@ -2,12 +2,12 @@
 """
 MediArch Benchmark 批量测试脚本
 
-读取 benchmark_scoring.csv 中的 18 道题，
-分别以 R0/R1/R2 三种检索模式调用 API，
+读取 benchmark_scoring.csv 中的题目，
+分别以 R0/R1/R2/BM25/VRAG 检索模式调用 API，
 将真实系统回答写回 CSV。
 
 用法:
-    python script/benchmark_run.py                          # 跑全部 (R0+R1+R2)
+    python script/benchmark_run.py                          # 跑全部
     python script/benchmark_run.py --mode R0                # 只跑 R0
     python script/benchmark_run.py --mode R0 R1             # 跑 R0 和 R1
     python script/benchmark_run.py --ids Q01 Q05 Q12        # 只跑指定题目
@@ -30,7 +30,13 @@ CSV_PATH = PROJECT_ROOT / "docs" / "智能体检索实验" / "benchmark_scoring.
 DEFAULT_API = "http://localhost:8010"
 
 # ---------- 列名映射 ----------
-MODE_COL = {"R0": "R0_Answer", "R1": "R1_Answer", "R2": "R2_Answer"}
+MODE_COL = {
+    "R0": "R0_Answer",
+    "R1": "R1_Answer",
+    "R2": "R2_Answer",
+    "BM25": "BM25_Answer",
+    "VRAG": "VRAG_Answer",
+}
 
 
 def call_chat_api(api_base: str, question: str, mode: str, timeout: int = 180) -> str:
@@ -69,8 +75,12 @@ def load_csv(path: Path):
 
 def save_csv(path: Path, headers, rows):
     """写回 CSV。"""
+    header_list = list(headers or [])
+    for col in MODE_COL.values():
+        if col not in header_list:
+            header_list.append(col)
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=headers)
+        writer = csv.DictWriter(f, fieldnames=header_list)
         writer.writeheader()
         writer.writerows(rows)
 
@@ -78,8 +88,8 @@ def save_csv(path: Path, headers, rows):
 def main():
     parser = argparse.ArgumentParser(description="MediArch Benchmark Runner")
     parser.add_argument("--api", default=DEFAULT_API, help=f"API base URL (default: {DEFAULT_API})")
-    parser.add_argument("--mode", nargs="+", default=["R0", "R1", "R2"],
-                        choices=["R0", "R1", "R2"], help="Retrieval modes to run")
+    parser.add_argument("--mode", nargs="+", default=["R0", "R1", "R2", "BM25", "VRAG"],
+                        choices=["R0", "R1", "R2", "BM25", "VRAG"], help="Retrieval modes to run")
     parser.add_argument("--ids", nargs="+", default=None, help="Only run specific question IDs (e.g. Q01 Q05)")
     parser.add_argument("--timeout", type=int, default=180, help="API timeout per request in seconds")
     parser.add_argument("--delay", type=float, default=2.0, help="Delay between requests in seconds")

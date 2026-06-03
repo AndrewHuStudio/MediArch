@@ -42,9 +42,11 @@ class ChatRequest(BaseModel):
     # 思考模式（可选，预留）
     thinking_mode: Optional[bool] = Field(default=False, description="是否启用思考模式")
 
-    # 检索模式（实验用）：R0=Milvus-only, R1=Neo4j+Milvus, R2=Full pipeline
-    retrieval_mode: Optional[Literal["R0", "R1", "R2"]] = Field(
-        default=None, description="检索模式: R0(Milvus-only), R1(Neo4j+Milvus), R2(完整管线). 默认None=R2"
+    # 检索模式（实验用）：
+    # - R0/R1/R2: MediArch 内部消融
+    # - BM25/VRAG: 外部 baseline
+    retrieval_mode: Optional[Literal["R0", "R1", "R2", "BM25", "VRAG"]] = Field(
+        default=None, description="检索模式: R0/R1/R2 为内部消融, BM25/VRAG 为外部 baseline. 默认 None = R2"
     )
 
 

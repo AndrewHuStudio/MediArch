@@ -1,11 +1,11 @@
 # Findings
 
-- Initial suspicion: backend synthesis prompt is leaking instruction text into final answer.
-- Initial suspicion: frontend Markdown pre-processing in `frontend/components/chat/message-with-sources.tsx` is altering Markdown before render and may flatten list/table structure.
-- Confirmed hotspot: `backend/app/agents/result_synthesizer_agent/agent.py` around the synthesizer prompt contains hard formatting requirements such as mandatory TOC and mandatory Markdown tables.
-- Confirmed hotspot: `frontend/components/chat/message-with-sources.tsx` uses `distributeCitationClusters()` and `replaceCitations()` before `ReactMarkdown`, so Markdown can be structurally changed before parsing.
-- Confirmed additional frontend root cause: `frontend/lib/chat/markdown-display.ts` only repaired partially collapsed Markdown tables. When a numbered item and the full table body were flattened into one line, the separator/body rows stayed collapsed, so `remark-gfm` treated the final answer as plain paragraph text instead of a table.
-- Confirmed deeper frontend root cause on 2026-04-26: even when table rows were already split into valid Markdown lines, `remark-gfm` still would not parse a table that immediately followed an ordered-list item without a blank line. The renderer needed to normalize `list item -> blank line -> table` boundaries, not just collapsed table rows.
-- Confirmed remaining frontend root cause on 2026-04-27 for the numbering jump between streaming and final render: continuous citation replacement in `frontend/lib/chat/markdown-display.ts` used `\s*`, so a citation-only line like `[1][2]` consumed the following newline during final normalization. That merged the next same-level ordered item onto the citation line, making the final Markdown parser treat it as part of the previous list item.
-- Confirmed backend root cause on 2026-04-27 for the HDMS QA "streaming correct, final result wrong" hierarchy jump: final answer post-processing in both `backend/app/agents/result_synthesizer_agent/agent.py` and `backend/api/routers/chat.py` used global space-collapsing (`re.sub(r' +', ' ', ...)`). That compressed Markdown line indentation, turning nested list prefixes like `   1.` / `      1.` / `   -` into single-space-prefixed lines. The final Markdown renderer then flattened or misparsed numbering levels even though the semantic content was otherwise correct.
-- Confirmed this backend indentation loss matches the user symptom more closely than the earlier generic frontend table fix, because the frontend displays `streamingMessage` progressively and then re-renders the saved final Markdown after completion. Once indentation is collapsed in the finalized answer, the completed render diverges from the streaming render.
+- Existing API schema only accepts `retrieval_mode` values `R0`, `R1`, and `R2`.
+- Current comments define `R0=Milvus-only`, `R1=Neo4j+Milvus`, and `R2=Full pipeline`.
+- `R0/R1/R2` are internal MediArch ablations, not independent external systems. This matches the reviewer's criticism.
+- `backend/api/routers/chat.py` forwards `retrieval_mode` into `AgentRequest.metadata` before invoking `mediarch_graph`.
+- `mediarch_graph` filters workers for `R0` and `R1`, and skips MongoDB for `R0/R1`. This confirms the current modes are implemented inside the MediArch graph.
+- `script/benchmark_run.py`, `script/benchmark_score.py`, and `script/benchmark_review_helper.py` currently assume only `R0/R1/R2`.
+- MongoDB has text-index and regex keyword retrieval, but that is not necessarily BM25. A paper baseline named `BM25+LLM` should use BM25 scoring directly or be renamed as keyword retrieval.
+- The system already uses `text-embedding-3-large` with 3072-dimensional vectors in Milvus (`COSINE + IVF_FLAT`) and a `qwen3-reranker-8b` reranker in the Milvus agent.
+- Reusing the existing result synthesizer is preferable for fair comparison because it keeps the generation model and answer formatting constant across BM25, vector RAG, and MediArch.

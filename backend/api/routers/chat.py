@@ -43,7 +43,9 @@ from backend.api.session_store import (
 
 # 导入 LangGraph MediArch Graph
 from backend.app.agents.mediarch_graph import graph as mediarch_graph
+from backend.app.agents.result_synthesizer_agent.agent import graph as result_synthesizer_graph
 from backend.app.agents.base_agent import AgentRequest, AgentResponse, get_llm_manager
+from backend.app.services.baseline_rag import get_baseline_rag_service
 from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 logger = logging.getLogger("mediarch_api")
@@ -833,6 +835,79 @@ def _extract_agent_key(namespace: tuple[str, ...], node_name: str) -> Optional[s
     return None
 
 
+BASELINE_RETRIEVAL_MODES = {"BM25", "VRAG"}
+
+
+async def _run_baseline_pipeline(
+    http_request: Request,
+    request: ChatRequest,
+    agent_request: AgentRequest,
+    session_id: str,
+    retrieval_mode: str,
+) -> Dict[str, Any]:
+    """Run an external retrieval baseline and reuse the standard synthesizer."""
+    service = get_baseline_rag_service()
+    filters = request.filters or {}
+    source_documents = filters.get("source_documents") or filters.get("source_document") or []
+    doc_ids = filters.get("doc_ids") or filters.get("doc_id") or []
+    if isinstance(source_documents, str):
+        source_documents = [source_documents]
+    if isinstance(doc_ids, str):
+        doc_ids = [doc_ids]
+
+    top_k = max(1, int(agent_request.top_k or request.top_k or 8))
+    mode = retrieval_mode.upper()
+
+    if mode == "BM25":
+        baseline = await asyncio.to_thread(
+            service.retrieve_bm25,
+            request.message,
+            top_k=top_k,
+            doc_ids=list(doc_ids),
+            source_documents=list(source_documents),
+        )
+        worker_name = "bm25_baseline"
+    elif mode == "VRAG":
+        baseline = await asyncio.to_thread(
+            service.retrieve_vector,
+            request.message,
+            top_k=top_k,
+            doc_ids=list(doc_ids),
+            source_documents=list(source_documents),
+        )
+        worker_name = "vector_rag_baseline"
+    else:
+        raise ValueError(f"Unsupported baseline mode: {mode}")
+
+    worker_response = {
+        "agent_name": worker_name,
+        "items": baseline.items,
+        "diagnostics": baseline.diagnostics,
+        "used_query": request.message,
+        "item_count": len(baseline.items),
+    }
+
+    synth_input = {
+        "request": agent_request,
+        "query": request.message,
+        "worker_responses": [worker_response],
+        "items": baseline.items,
+    }
+    config = {"configurable": {"thread_id": session_id}}
+    result = await result_synthesizer_graph.ainvoke(synth_input, config=config)
+
+    result = dict(result or {})
+    result.setdefault("worker_responses", [worker_response])
+    result.setdefault("items", baseline.items)
+    result.setdefault("diagnostics", baseline.diagnostics)
+    result.setdefault("answer_graph_data", {})
+    result.setdefault("unified_hints", {})
+    result.setdefault("strict_cross_doc", False)
+    result.setdefault("strict_citations_candidate_count", 0)
+    result.setdefault("final_citations", [])
+    return result
+
+
 # ============================================================================
 # 会话更新请求模型
 # ============================================================================
@@ -900,12 +975,23 @@ async def chat(http_request: Request, request: ChatRequest):
             metadata=metadata,
         )
 
-        # 调用 LangGraph MediArch Graph
-        config = {"configurable": {"thread_id": session_id}}
-        result = await mediarch_graph.ainvoke(
-            {"request": agent_request, "original_query": request.message},
-            config=config
-        )
+        retrieval_mode = metadata["retrieval_mode"]
+
+        # 调用检索管线：外部 baseline 走独立检索器，MediArch 变体走主图
+        if retrieval_mode in BASELINE_RETRIEVAL_MODES:
+            result = await _run_baseline_pipeline(
+                http_request,
+                request,
+                agent_request,
+                session_id,
+                retrieval_mode,
+            )
+        else:
+            config = {"configurable": {"thread_id": session_id}}
+            result = await mediarch_graph.ainvoke(
+                {"request": agent_request, "original_query": request.message},
+                config=config
+            )
 
         # 提取响应
         final_answer = result.get("final_answer", "抱歉，我无法回答这个问题。")
@@ -1118,6 +1204,88 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                 timeout_ms=settings.SUPERVISOR_TIMEOUT_MS,
                 metadata=metadata,
             )
+
+            retrieval_mode = metadata["retrieval_mode"]
+            if retrieval_mode in BASELINE_RETRIEVAL_MODES:
+                result = await _run_baseline_pipeline(
+                    http_request,
+                    request,
+                    agent_request,
+                    session_id,
+                    retrieval_mode,
+                )
+                final_answer = result.get("final_answer", "")
+                worker_responses = result.get("worker_responses", [])
+                all_items = result.get("items", [])
+                all_citations = result.get("final_citations", [])
+                if not all_citations:
+                    all_citations = _extract_citations_from_items(
+                        all_items,
+                        max_citations=max_citations_setting,
+                        allow_images=_wants_images_in_answer(request.message),
+                    )
+                kg_data = result.get("answer_graph_data") or None
+                recommended_questions = result.get("recommended_questions", [])
+                image_refs = _extract_image_refs(all_citations, api_base)
+                images = [ref.get("url") for ref in image_refs if ref.get("url")]
+                final_answer, all_citations = _postprocess_answer_and_align_citations(
+                    final_answer,
+                    all_citations,
+                    include_citations=bool(request.include_citations),
+                )
+                if final_answer:
+                    for i in range(0, len(final_answer), 10):
+                        chunk_text = final_answer[i:i+10]
+                        chunk = StreamingChatChunk(
+                            chunk_type="content",
+                            content=chunk_text,
+                            is_final=False,
+                        )
+                        yield f"data: {chunk.model_dump_json()}\n\n"
+                        await asyncio.sleep(0.02)
+
+                if all_citations and request.include_citations:
+                    chunk = StreamingChatChunk(
+                        chunk_type="citations",
+                        citations=all_citations,
+                        is_final=False,
+                    )
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+
+                if kg_data:
+                    chunk = StreamingChatChunk(
+                        chunk_type="knowledge_graph",
+                        knowledge_graph_path=kg_data,
+                        is_final=False,
+                    )
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+
+                if recommended_questions:
+                    chunk = StreamingChatChunk(
+                        chunk_type="recommendations",
+                        recommended_questions=recommended_questions,
+                        is_final=False,
+                    )
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+
+                if images:
+                    chunk = StreamingChatChunk(
+                        chunk_type="images",
+                        images=images,
+                        is_final=False,
+                    )
+                    yield f"data: {chunk.model_dump_json()}\n\n"
+
+                _add_message_to_session(session_id, "assistant", final_answer, all_citations, images)
+                took_ms = int((time.time() - start_time) * 1000)
+                chunk = StreamingChatChunk(
+                    chunk_type="done",
+                    content=json.dumps({"took_ms": took_ms}),
+                    is_final=True,
+                )
+                yield f"data: {chunk.model_dump_json()}\n\n"
+                logger.info(f"[Chat Stream] baseline 回复完成 | Session: {session_id} | Mode: {retrieval_mode} | Time: {took_ms}ms")
+                return
 
             # 调用 LangGraph MediArch Graph（使用 astream 获取中间状态）
             config = {"configurable": {"thread_id": session_id}}

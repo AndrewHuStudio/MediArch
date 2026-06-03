@@ -10,7 +10,7 @@ CSV_PATH = ROOT / "docs" / "智能体检索实验" / "benchmark_scoring.csv"
 SCORES_PATH = ROOT / "docs" / "智能体检索实验" / "benchmark_scores.json"
 SUMMARY_PATH = ROOT / "docs" / "智能体检索实验" / "benchmark_summary.json"
 
-MODES = ("R0", "R1", "R2")
+MODES = ("R0", "R1", "R2", "BM25", "VRAG")
 
 
 def load_csv() -> tuple[list[dict[str, str]], list[str]]:
@@ -57,8 +57,14 @@ def apply_scores(rows: list[dict[str, str]], scores: dict[str, dict[str, dict[st
 
 
 def write_csv(rows: list[dict[str, str]], fieldnames: list[str]) -> None:
+    header_list = list(fieldnames or [])
+    for mode in MODES:
+        for suffix in ("_Evidence_Hit", "_Accuracy", "_Completeness"):
+            col = f"{mode}{suffix}"
+            if col not in header_list:
+                header_list.append(col)
     with CSV_PATH.open("w", encoding="utf-8-sig", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=header_list)
         writer.writeheader()
         writer.writerows(rows)
 

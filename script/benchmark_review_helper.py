@@ -39,7 +39,7 @@ def main() -> None:
         parts.append("```")
         parts.append("")
 
-        for mode in ("R0", "R1", "R2"):
+        for mode in ("R0", "R1", "R2", "BM25", "VRAG"):
             answer = (row.get(f"{mode}_Answer") or "").strip()
             parts.append(f"### {mode}")
             parts.append("")
