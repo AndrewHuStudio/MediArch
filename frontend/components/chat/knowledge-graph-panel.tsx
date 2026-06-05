@@ -84,22 +84,22 @@ export default function KnowledgeGraphPanel({ graphData, isAnimating }: Knowledg
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="flex h-full flex-col rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md"
+      className="flex h-full flex-col rounded-lg border border-[#cfe2e7] bg-white/72 p-4 backdrop-blur-md shadow-[0_18px_48px_rgba(15,78,99,0.1)]"
     >
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Network className="h-5 w-5 text-yellow-400" />
-          <h3 className="text-sm font-semibold text-white">{t('chat.kgPanel.title')}</h3>
+          <Network className="h-5 w-5 text-[#0e7490]" />
+          <h3 className="text-sm font-semibold text-[#12323a]">{t('chat.kgPanel.title')}</h3>
         </div>
         <div className="flex items-center gap-2">
           {isTranslating && (
-            <span className="text-[11px] text-gray-400">{t("translate.translating")}</span>
+            <span className="text-[11px] text-[#6c858c]">{t("translate.translating")}</span>
           )}
           <button
             type="button"
             onClick={() => void handleToggleLanguage()}
             disabled={isTranslating || graphData.nodes.length === 0}
-            className="rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-xs text-gray-200 transition-colors hover:border-white/40 hover:text-white disabled:cursor-wait disabled:opacity-70"
+            className="rounded-full border border-[#cfe2e7] bg-white/80 px-2.5 py-1 text-xs text-[#0f4e63] transition-colors hover:border-[#0e7490]/40 hover:bg-[#e6f4f6] disabled:cursor-wait disabled:opacity-70"
             title={displayLanguage === "en" ? t("translate.toChinese") : t("translate.toEnglish")}
           >
             中 / EN
@@ -109,8 +109,8 @@ export default function KnowledgeGraphPanel({ graphData, isAnimating }: Knowledg
 
       {queryPath && (
         <div className="mb-3">
-          <div className="text-[11px] text-gray-300">
-            <span className="text-gray-400">{t('chat.kgPanel.queryPath')}</span>
+          <div className="text-[11px] text-[#335158]">
+            <span className="text-[#6c858c]">{t('chat.kgPanel.queryPath')}</span>
             {queryPath}
           </div>
         </div>
@@ -132,26 +132,26 @@ export default function KnowledgeGraphPanel({ graphData, isAnimating }: Knowledg
               <div className="relative mx-auto h-48 w-48">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-yellow-500/50 bg-yellow-500/20">
-                    <span className="text-xs text-yellow-300">{t('chat.kgPanel.coreConcept')}</span>
+                    <span className="text-xs text-yellow-700">{t('chat.kgPanel.coreConcept')}</span>
                   </div>
                 </div>
                 <div className="absolute left-1/2 top-0 -translate-x-1/2">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full border border-blue-500/50 bg-blue-500/20">
-                    <span className="text-[10px] text-blue-300">{t('chat.kgPanel.node1')}</span>
+                    <span className="text-[10px] text-blue-700">{t('chat.kgPanel.node1')}</span>
                   </div>
                 </div>
                 <div className="absolute bottom-0 left-0">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full border border-green-500/50 bg-green-500/20">
-                    <span className="text-[10px] text-green-300">{t('chat.kgPanel.node2')}</span>
+                    <span className="text-[10px] text-green-700">{t('chat.kgPanel.node2')}</span>
                   </div>
                 </div>
                 <div className="absolute bottom-0 right-0">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full border border-purple-500/50 bg-purple-500/20">
-                    <span className="text-[10px] text-purple-300">{t('chat.kgPanel.node3')}</span>
+                    <span className="text-[10px] text-purple-700">{t('chat.kgPanel.node3')}</span>
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-400">{t('chat.kgPanel.empty')}</p>
+              <p className="text-xs text-[#6c858c]">{t('chat.kgPanel.empty')}</p>
             </div>
           </div>
         )}

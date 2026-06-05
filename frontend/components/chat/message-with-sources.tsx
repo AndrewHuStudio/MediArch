@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useId } from "react"
 import { motion } from "framer-motion"
+import { FileText, Lightbulb } from "lucide-react"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeRaw from "rehype-raw"
@@ -44,33 +45,33 @@ const getImageRenderState = (imageIndex: number, images?: string[], sources?: PD
 const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Components => ({
   h1: ({ node: _node, ...props }) => (
     <h1
-      className="text-3xl md:text-4xl font-bold mt-7 mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400"
+      className="text-3xl md:text-4xl font-bold mt-7 mb-4 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#12323a] via-[#0e7490] to-[#059669]"
       {...props}
     />
   ),
   h2: ({ node: _node, ...props }) => (
-    <h2 className="text-2xl font-semibold mt-6 mb-3 text-cyan-200 border-b border-white/10 pb-1 tracking-tight" {...props} />
+    <h2 className="text-2xl font-semibold mt-6 mb-3 text-[#0f4e63] border-b border-[#d9e7eb] pb-1 tracking-tight" {...props} />
   ),
   h3: ({ node: _node, ...props }) => (
-    <h3 className="text-lg font-semibold mt-5 mb-2 text-sky-200/90 tracking-tight" {...props} />
+    <h3 className="text-lg font-semibold mt-5 mb-2 text-[#0e7490] tracking-tight" {...props} />
   ),
   h4: ({ node: _node, ...props }) => (
-    <h4 className="text-sm font-semibold mt-3 mb-1.5 text-blue-200 uppercase tracking-wide" {...props} />
+    <h4 className="text-sm font-semibold mt-3 mb-1.5 text-[#0f4e63] uppercase tracking-wide" {...props} />
   ),
-  p: ({ node: _node, ...props }) => <p className="my-3 whitespace-pre-wrap leading-relaxed text-[15px] text-gray-100" {...props} />,
-  ul: ({ node: _node, ...props }) => <ul className="list-disc ml-5 my-3 space-y-1.5 text-gray-100 leading-relaxed" {...props} />,
-  ol: ({ node: _node, ...props }) => <ol className="list-decimal ml-5 my-3 space-y-1.5 text-gray-100 leading-relaxed" {...props} />,
+  p: ({ node: _node, ...props }) => <p className="my-3 whitespace-pre-wrap leading-relaxed text-[15px] text-[#335158]" {...props} />,
+  ul: ({ node: _node, ...props }) => <ul className="list-disc ml-5 my-3 space-y-1.5 text-[#335158] leading-relaxed" {...props} />,
+  ol: ({ node: _node, ...props }) => <ol className="list-decimal ml-5 my-3 space-y-1.5 text-[#335158] leading-relaxed" {...props} />,
   li: ({ node: _node, ...props }) => <li className="my-1 leading-relaxed" {...props} />,
   blockquote: ({ node: _node, ...props }) => (
-    <blockquote className="border-l-2 border-blue-500/50 pl-3 my-3 text-gray-300 italic bg-white/5 rounded-lg py-2" {...props} />
+    <blockquote className="border-l-2 border-[#0e7490]/50 pl-3 my-3 text-[#516b72] italic bg-[#e6f4f6]/70 rounded-lg py-2" {...props} />
   ),
-  hr: ({ node: _node, ...props }) => <hr className="border-white/10 my-6" {...props} />,
-  a: ({ node: _node, ...props }) => <a className="text-blue-400 hover:text-blue-300 underline" {...props} />,
+  hr: ({ node: _node, ...props }) => <hr className="border-[#d9e7eb] my-6" {...props} />,
+  a: ({ node: _node, ...props }) => <a className="text-[#0e7490] hover:text-[#0f4e63] underline" {...props} />,
   pre: ({ node: _node, ...props }) => <>{props.children}</>,
   strong: ({ node: _node, ...props }) => (
-    <strong className="text-white font-semibold bg-white/5 rounded-sm px-0.5 tracking-tight" {...props} />
+    <strong className="text-[#12323a] font-semibold bg-[#e6f4f6] rounded-sm px-0.5 tracking-tight" {...props} />
   ),
-  em: ({ node: _node, ...props }) => <em className="text-gray-200" {...props} />,
+  em: ({ node: _node, ...props }) => <em className="text-[#516b72]" {...props} />,
   code: ({ node: _node, className, children, ...props }) => {
     const raw = String(children)
     const match = /language-(\w+)/.exec(className || "")
@@ -78,7 +79,7 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
 
     if (!isBlock) {
       return (
-        <code className="bg-gray-700/50 px-1.5 py-0.5 rounded text-sm font-mono text-blue-300" {...props}>
+        <code className="bg-[#e6f4f6] px-1.5 py-0.5 rounded text-sm font-mono text-[#0f4e63]" {...props}>
           {children}
         </code>
       )
@@ -88,12 +89,12 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
     const codeText = raw.replace(/\n$/, "")
 
     return (
-      <div className="my-3 rounded-lg overflow-hidden bg-gray-900 border border-gray-700">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700">
-          <span className="text-xs text-gray-400 font-mono">{lang}</span>
+      <div className="my-3 rounded-lg overflow-hidden bg-[#f8fcfd] border border-[#cfe2e7]">
+        <div className="flex items-center justify-between px-4 py-2 bg-[#e6f4f6] border-b border-[#cfe2e7]">
+          <span className="text-xs text-[#6c858c] font-mono">{lang}</span>
         </div>
         <pre className="p-4 overflow-x-auto">
-          <code className="text-sm font-mono text-gray-100">{codeText}</code>
+          <code className="text-sm font-mono text-[#12323a]">{codeText}</code>
         </pre>
       </div>
     )
@@ -102,7 +103,7 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
     <div className="my-4 overflow-x-auto">
       <table
         className={[
-          "min-w-full border-collapse border border-white/20 rounded-lg overflow-hidden",
+          "min-w-full border-collapse border border-[#cfe2e7] rounded-lg overflow-hidden",
           className,
         ]
           .filter(Boolean)
@@ -113,12 +114,12 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
       </table>
     </div>
   ),
-  thead: ({ node: _node, ...props }) => <thead className="bg-white/10" {...props} />,
+  thead: ({ node: _node, ...props }) => <thead className="bg-[#e6f4f6]" {...props} />,
   th: ({ node: _node, ...props }) => (
-    <th className="border border-white/20 px-4 py-2 text-left text-sm font-semibold text-white" {...props} />
+    <th className="border border-[#cfe2e7] px-4 py-2 text-left text-sm font-semibold text-[#12323a]" {...props} />
   ),
   td: ({ node: _node, ...props }) => (
-    <td className="border border-white/20 px-4 py-2 text-sm text-gray-300" {...props} />
+    <td className="border border-[#cfe2e7] px-4 py-2 text-sm text-[#335158]" {...props} />
   ),
   figure: ({ node, ...props }) => {
     const rawIndex = typeof props["data-chat-image-index"] === "string"
@@ -146,12 +147,12 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
             alt={imageState.alt}
           />
         ) : (
-          <div className="max-w-xs rounded-lg border border-dashed border-white/15 bg-white/5 px-4 py-6 text-xs text-gray-400">
+          <div className="max-w-xs rounded-lg border border-dashed border-[#cfe2e7] bg-[#f8fcfd] px-4 py-6 text-xs text-[#6c858c]">
             图片加载中
           </div>
         )}
         {imageState.meta && (
-          <div className="mt-2 text-[11px] text-gray-500 leading-snug pl-2 border-l-2 border-white/10 bg-white/5 rounded">
+          <div className="mt-2 text-[11px] text-[#6c858c] leading-snug pl-2 border-l-2 border-[#cfe2e7] bg-[#f8fcfd] rounded">
             {imageState.meta}
           </div>
         )}
@@ -225,7 +226,7 @@ export function MarkdownContent({ content, images, sources, onCitationPositions,
   return (
     <div
       ref={contentRef}
-      className="prose prose-invert prose-sm max-w-none leading-relaxed tracking-wide"
+      className="prose prose-sm max-w-none leading-relaxed tracking-wide"
       onClick={(e) => {
         const target = e.target as HTMLElement | null
         const badge = target?.closest?.('[data-citation]') as HTMLElement | null
@@ -452,7 +453,7 @@ export function MessageWithSources({
         className="flex justify-start"
       >
         <div ref={messageRef} className="relative flex-1 max-w-[90%]">
-          <div className="bg-black/60 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20 text-white" >
+          <div className="bg-white/84 backdrop-blur-md rounded-2xl px-6 py-4 border border-[#cfe2e7] text-[#12323a] shadow-[0_12px_30px_rgba(15,78,99,0.08)]" >
             {(tocItems.length > 0 || headerActions) && (
               <div className="sticky top-2 z-10 mb-2 flex items-center justify-end gap-2">
                 {headerActions}
@@ -460,7 +461,7 @@ export function MessageWithSources({
                   <button
                     type="button"
                     onClick={scrollToToc}
-                    className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
+                    className="text-xs px-2.5 py-1 rounded-full border border-[#cfe2e7] bg-white/82 text-[#0f4e63] hover:border-[#0e7490]/40 hover:bg-[#e6f4f6] transition-colors"
                   >
                     {t('chat.backToToc')}
                   </button>
@@ -471,10 +472,10 @@ export function MessageWithSources({
               <div
                 ref={tocRef}
                 id={`${headingIdPrefix}-toc`}
-                className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+                className="mb-4 rounded-lg border border-[#cfe2e7] bg-white/70 px-4 py-3"
               >
-                <div className="text-sm font-semibold text-white mb-2">{t('chat.toc')}</div>
-                <ul className="space-y-1 text-sm text-gray-200">
+                <div className="text-sm font-semibold text-[#12323a] mb-2">{t('chat.toc')}</div>
+                <ul className="space-y-1 text-sm text-[#335158]">
                   {tocItems.map((item) => (
                     <li key={item.id} className={`flex items-start gap-2 ${getTocIndentClass(item.level)}`}>
                       <span
@@ -484,7 +485,7 @@ export function MessageWithSources({
                       <button
                         type="button"
                         onClick={() => scrollToHeading(item.id)}
-                        className="text-left text-blue-300 hover:text-blue-200 transition-colors leading-relaxed"
+                        className="text-left text-[#0e7490] hover:text-[#0f4e63] transition-colors leading-relaxed"
                       >
                         {item.text}
                       </button>
@@ -538,9 +539,9 @@ export function MessageWithSources({
           className="mt-4 flex justify-start"
         >
           <div className="w-full max-w-[90%]">
-            <div className="bg-black/40 backdrop-blur-md rounded-xl px-5 py-4 border border-white/10">
-              <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <span className="text-blue-400">📚</span>
+            <div className="bg-white/76 backdrop-blur-md rounded-xl px-5 py-4 border border-[#cfe2e7] shadow-[0_12px_30px_rgba(15,78,99,0.08)]">
+              <h3 className="text-sm font-semibold text-[#12323a] mb-3 flex items-center gap-2">
+                <FileText className="h-4 w-4 text-[#0e7490]" />
                 {t('source.references')}
               </h3>
               <div className="space-y-3.5">
@@ -551,32 +552,33 @@ export function MessageWithSources({
                   return (
                     <div
                       key={source.id}
-                      className="flex items-start gap-4 text-sm text-gray-300 hover:bg-white/5 rounded-lg p-3 transition-colors cursor-pointer border border-white/5"
+                      className="flex items-start gap-4 text-sm text-[#335158] hover:bg-[#e6f4f6] rounded-lg p-3 transition-colors cursor-pointer border border-[#d9e7eb]"
                       onClick={() => handlePDFClick(source)}
                     >
-                      <span className="text-blue-400 font-semibold min-w-[2rem] text-base">[{number > 0 ? number : "·"}]</span>
+                      <span className="text-[#0e7490] font-semibold min-w-[2rem] text-base">[{number > 0 ? number : "·"}]</span>
                       <div className="flex-1 min-w-0 space-y-1.5">
                         {/* 资料标题和位置 */}
                         <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="font-medium text-white text-base">{source.title}</span>
-                          <span className="text-xs text-gray-400 bg-white/5 px-2 py-0.5 rounded">
+                          <span className="font-medium text-[#12323a] text-base">{source.title}</span>
+                          <span className="text-xs text-[#6c858c] bg-[#f8fcfd] px-2 py-0.5 rounded">
                             {t('pdf.page', { n: source.pageNumber })}
                           </span>
                           {source.section && (
-                            <span className="text-xs text-gray-500">· {source.section}</span>
+                            <span className="text-xs text-[#8ba4ad]">· {source.section}</span>
                           )}
                         </div>
 
                         {/* 资料用途说明 */}
                         {purposeDescription && (
-                          <div className="text-xs text-yellow-200/80 bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/20">
-                            💡 {purposeDescription}
+                          <div className="text-xs text-[#7c4a03] bg-yellow-100/70 px-2 py-1 rounded border border-yellow-300/60 flex items-start gap-1.5">
+                            <Lightbulb className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                            <span>{purposeDescription}</span>
                           </div>
                         )}
 
                         {/* 资料摘要 */}
                         {source.snippet && (
-                          <div className="text-xs text-gray-400 leading-relaxed line-clamp-2 pl-2 border-l-2 border-gray-700">
+                          <div className="text-xs text-[#516b72] leading-relaxed line-clamp-2 pl-2 border-l-2 border-[#cfe2e7]">
                             {source.snippet}
                           </div>
                         )}

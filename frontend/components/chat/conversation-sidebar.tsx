@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { MessageSquarePlus, Trash2, ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { MessageSquarePlus, Trash2, ArrowLeft, Pin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
-import { usePageTransition } from "@/components/page-transition"
 import { useT } from "@/lib/i18n"
 import { formatConversationTimestamp } from "@/lib/i18n/ui-copy"
 
@@ -83,9 +84,13 @@ export function ConversationSidebar({
   currentConversationId,
   onConversationSelect,
 }: ConversationSidebarProps) {
-  const { startTransition } = usePageTransition()
+  const router = useRouter()
   const { locale, t } = useT()
   const [conversations, setConversations] = useState<Conversation[]>([])
+
+  useEffect(() => {
+    void router.prefetch("/")
+  }, [router])
 
   // 从 localStorage 加载对话历史
   const loadConversations = () => {
@@ -143,10 +148,6 @@ export function ConversationSidebar({
     return formatConversationTimestamp(date, locale, t)
   }
 
-  const handleGoHome = () => {
-    startTransition("/")
-  }
-
   return (
     <motion.div
       onMouseEnter={() => onCollapsedChange(false)}
@@ -157,28 +158,35 @@ export function ConversationSidebar({
       }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
       className={cn(
-        "h-full bg-black/40 backdrop-blur-md border-r border-white/10",
+        "h-full bg-white/72 backdrop-blur-md border-r border-[#d9e7eb]",
         "flex flex-col overflow-hidden flex-shrink-0",
       )}
     >
       {/* Header with New Conversation Button */}
-      <div className="p-3 border-b border-white/10 flex-shrink-0">
+      <div className="p-3 border-b border-[#d9e7eb] flex-shrink-0">
         <Button
-          onClick={handleGoHome}
+          asChild
           className={cn(
-            "w-full bg-white/10 hover:bg-white/20 text-white border border-white/20",
+            "w-full bg-white/80 hover:bg-[#e6f4f6] text-[#0f4e63] border border-[#cfe2e7]",
             "transition-all duration-200 mb-2",
             isCollapsed ? "px-0 justify-center" : "justify-start gap-2",
           )}
         >
-          <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-          {!isCollapsed && <span className="text-sm">{t('chat.goHome')}</span>}
+          <Link
+            href="/"
+            prefetch
+            onMouseEnter={() => router.prefetch("/")}
+            onFocus={() => router.prefetch("/")}
+          >
+            <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+            {!isCollapsed && <span className="text-sm">{t('chat.goHome')}</span>}
+          </Link>
         </Button>
 
         <Button
           onClick={onNewConversation}
           className={cn(
-            "w-full bg-white/10 hover:bg-white/20 text-white border border-white/20",
+            "w-full bg-[#0e7490] hover:bg-[#0f4e63] text-white border border-[#0e7490]",
             "transition-all duration-200",
             isCollapsed ? "px-0 justify-center" : "justify-start gap-2",
           )}
@@ -199,11 +207,11 @@ export function ConversationSidebar({
               transition={{ duration: 0.2 }}
               className="space-y-1"
             >
-              <div className="px-2 py-1 text-xs text-gray-400 font-medium">{t('chat.history')}</div>
+              <div className="px-2 py-1 text-xs text-[#6c858c] font-medium">{t('chat.history')}</div>
               {conversations.length === 0 ? (
                 <div className="px-2 py-8 text-center">
-                  <p className="text-xs text-gray-500">{t('chat.noHistory')}</p>
-                  <p className="text-xs text-gray-600 mt-1">{t('chat.noHistoryHint')}</p>
+                  <p className="text-xs text-[#6c858c]">{t('chat.noHistory')}</p>
+                  <p className="text-xs text-[#8ba4ad] mt-1">{t('chat.noHistoryHint')}</p>
                 </div>
               ) : (
                 conversations.map((conversation) => (
@@ -219,10 +227,10 @@ export function ConversationSidebar({
                     onClick={() => handleSelectConversation(conversation.id)}
                     className={cn(
                       "w-full text-left p-3 rounded-lg transition-all duration-200 cursor-pointer",
-                      "hover:bg-white/10 group relative",
+                      "hover:bg-[#e6f4f6] group relative",
                       currentConversationId === conversation.id
-                        ? "bg-white/15 border border-white/20 ring-1 ring-white/10"
-                        : "bg-white/5 border border-transparent",
+                        ? "bg-[#e6f4f6] border border-[#0e7490]/30 ring-1 ring-[#0e7490]/10"
+                        : "bg-white/60 border border-transparent",
                     )}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -235,21 +243,21 @@ export function ConversationSidebar({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1">
                           {conversation.isPinned && (
-                            <span className="text-yellow-400 text-xs">📌</span>
+                            <Pin className="h-3 w-3 text-[#0e7490]" />
                           )}
-                          <h4 className="text-sm font-medium text-white truncate flex-1">
+                          <h4 className="text-sm font-medium text-[#12323a] truncate flex-1">
                             {conversation.title}
                           </h4>
                         </div>
                         {conversation.preview && (
-                          <p className="text-xs text-gray-400 truncate mt-1">{conversation.preview}</p>
+                          <p className="text-xs text-[#516b72] truncate mt-1">{conversation.preview}</p>
                         )}
-                        <p className="text-xs text-gray-500 mt-1">{formatTimestamp(conversation.timestamp)}</p>
+                        <p className="text-xs text-[#8ba4ad] mt-1">{formatTimestamp(conversation.timestamp)}</p>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-gray-400 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-[#6c858c] hover:text-red-600 hover:bg-red-500/10 flex-shrink-0"
                         onClick={(e) => handleDeleteConversation(conversation.id, e)}
                       >
                         <Trash2 className="w-3 h-3" />

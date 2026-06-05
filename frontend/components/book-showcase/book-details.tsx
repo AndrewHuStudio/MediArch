@@ -10,12 +10,12 @@ interface BookDetailsProps {
 }
 
 export function BookDetails({ book, isVisible, textColor }: BookDetailsProps) {
-  const primaryTextClass = textColor === "white" ? "text-white" : "text-black"
-  const secondaryTextClass = textColor === "white" ? "text-white/80" : "text-black/80"
-  const mutedTextClass = textColor === "white" ? "text-white/60" : "text-black/60"
+  const primaryTextClass = textColor === "white" ? "text-white" : "text-[#12323a]"
+  const secondaryTextClass = textColor === "white" ? "text-white/80" : "text-[#335158]"
+  const mutedTextClass = textColor === "white" ? "text-white/60" : "text-[#6c858c]"
 
   const badgeClass =
-    textColor === "white" ? "bg-white/20 text-white border-white/30" : "bg-black/20 text-black border-black/30"
+    textColor === "white" ? "bg-white/20 text-white border-white/30" : "bg-white/75 text-[#0f4e63] border-[#cfe2e7]"
 
   return (
     <div

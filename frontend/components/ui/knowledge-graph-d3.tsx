@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react"
 import { createPortal } from "react-dom"
 import * as d3 from "d3"
 import { motion, AnimatePresence } from "framer-motion"
-import { Maximize2, X } from "lucide-react"
+import { Maximize2, Network, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useT } from "@/lib/i18n"
 import { getKnowledgeGraphNodeTypeItems } from "@/lib/i18n/ui-copy"
@@ -40,6 +40,44 @@ interface KnowledgeGraphD3Props {
   width?: number
   height?: number
   isAnimating?: boolean
+}
+
+const lightGraphTheme = {
+  marker: "#6f8d96",
+  link: "#7f9aa3",
+  visualBridgeLink: "#a6b8bf",
+  linkLabel: "#335158",
+  linkLabelShadow: "0 1px 0 rgba(255,255,255,0.96), 0 0 5px rgba(255,255,255,0.9)",
+  nodeLabel: "#12323a",
+  selectedStroke: "#0e7490",
+  nodeShadow: "drop-shadow(0 8px 14px rgba(15,78,99,0.18))",
+  nodeHoverShadow: "drop-shadow(0 12px 20px rgba(14,116,144,0.24))",
+} as const
+
+const nodeTypePaints: Record<string, { fill: string; hoverFill: string; stroke: string }> = {
+  Hospital: { fill: "#e0f2fe", hoverFill: "#bae6fd", stroke: "#0369a1" },
+  DepartmentGroup: { fill: "#dcfce7", hoverFill: "#bbf7d0", stroke: "#059669" },
+  FunctionalZone: { fill: "#ccfbf1", hoverFill: "#99f6e4", stroke: "#0f766e" },
+  Space: { fill: "#ecfeff", hoverFill: "#cffafe", stroke: "#0891b2" },
+  DesignMethod: { fill: "#eef2ff", hoverFill: "#e0e7ff", stroke: "#4f46e5" },
+  DesignMethodCategory: { fill: "#f0fdfa", hoverFill: "#ccfbf1", stroke: "#0d9488" },
+  Case: { fill: "#ffe4e6", hoverFill: "#fecdd3", stroke: "#be123c" },
+  Source: { fill: "#f1f5f9", hoverFill: "#e2e8f0", stroke: "#475569" },
+  KnowledgePoint: { fill: "#f7fee7", hoverFill: "#ecfccb", stroke: "#65a30d" },
+  MedicalService: { fill: "#e0f2fe", hoverFill: "#bae6fd", stroke: "#0284c7" },
+  MedicalEquipment: { fill: "#dbeafe", hoverFill: "#bfdbfe", stroke: "#2563eb" },
+  TreatmentMethod: { fill: "#fce7f3", hoverFill: "#fbcfe8", stroke: "#db2777" },
+  hospital: { fill: "#e0f2fe", hoverFill: "#bae6fd", stroke: "#0369a1" },
+  room: { fill: "#ecfeff", hoverFill: "#cffafe", stroke: "#0891b2" },
+  spec: { fill: "#eef2ff", hoverFill: "#e0e7ff", stroke: "#4f46e5" },
+  document: { fill: "#f1f5f9", hoverFill: "#e2e8f0", stroke: "#475569" },
+  entity: { fill: "#f8fafc", hoverFill: "#f1f5f9", stroke: "#64748b" },
+  concept: { fill: "#f7fee7", hoverFill: "#ecfccb", stroke: "#65a30d" },
+  relation: { fill: "#f0fdfa", hoverFill: "#ccfbf1", stroke: "#0d9488" },
+}
+
+function getNodePaint(type: string) {
+  return nodeTypePaints[type] || nodeTypePaints.entity
 }
 
 export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating = false }: KnowledgeGraphD3Props) {
@@ -151,34 +189,8 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .force("x", d3.forceX(actualWidth / 2).strength(0.05))
       .force("y", d3.forceY(actualHeight / 2).strength(0.05))
 
-    const typeColors: Record<string, string> = {
-      // 科技感配色 - 柔和不浓重的颜色
-      Hospital: "#8B7355",              // 柔和金棕色 - 医院
-      DepartmentGroup: "#5B7FA8",       // 柔和蓝色 - 部门
-      FunctionalZone: "#7B68A8",        // 柔和紫色 - 功能分区
-      Space: "#5A9B7D",                 // 柔和绿色 - 空间
-      DesignMethod: "#C17A4F",          // 柔和橙色 - 设计方法
-      DesignMethodCategory: "#A89968",  // 柔和金色 - 设计方法分类
-      Case: "#C97B9E",                  // 柔和粉色 - 案例
-      Source: "#B85C6F",                // 柔和红色 - 资料来源
-      KnowledgePoint: "#B8A858",       // 柔和黄绿色 - 知识点
-      MedicalService: "#8B7BA8",        // 柔和蓝紫色 - 医疗服务
-      MedicalEquipment: "#6B8BA8",      // 柔和钢蓝色 - 医疗设备
-      TreatmentMethod: "#9B7BA8",       // 柔和兰花紫 - 治疗方法
-
-      // 兼容旧的类型名称
-      hospital: "#8B7355",
-      room: "#5A9B7D",
-      spec: "#7B68A8",
-      document: "#B85C6F",
-
-      // 默认
-      entity: "#7A8A9A",
-      concept: "#B8A858",
-      relation: "#9B7BA8",
-    }
-
-    const getNodeColor = (type: string) => typeColors[type] || "#7A8A9A"
+    const getBaseLinkOpacity = (linkData: GraphLink) => (linkData.isVisualBridge ? 0.38 : 0.58)
+    const getSelectedLinkOpacity = (linkData: GraphLink) => (linkData.isVisualBridge ? 0.62 : 0.82)
 
     svg
       .append("defs")
@@ -195,7 +207,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .attr("orient", "auto")
       .append("path")
       .attr("d", "M0,-5L10,0L0,5")
-      .attr("fill", "#64748b")
+      .attr("fill", lightGraphTheme.marker)
 
     const link = container
       .append("g")
@@ -203,9 +215,9 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .data(links)
       .enter()
       .append("line")
-      .attr("stroke", (d: any) => (d.isVisualBridge ? "#94a3b8" : "#64748b"))
+      .attr("stroke", (d: any) => (d.isVisualBridge ? lightGraphTheme.visualBridgeLink : lightGraphTheme.link))
       .attr("stroke-width", (d: any) => (d.isVisualBridge ? (isFullscreenMode ? 1.5 : 1.2) : (isFullscreenMode ? 2 : 1.5)))
-      .attr("stroke-opacity", (d: any) => (d.isVisualBridge ? 0.4 : 0.7))
+      .attr("stroke-opacity", (d: any) => getBaseLinkOpacity(d))
       .attr("stroke-dasharray", (d: any) => (d.isVisualBridge ? (isFullscreenMode ? "10 6" : "7 5") : null))
       .attr("marker-end", `url(#${isFullscreenMode ? "arrow-fullscreen" : "arrow"})`)
 
@@ -217,12 +229,12 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .append("text")
       .attr("class", "link-label")
       .attr("font-size", isFullscreenMode ? "13px" : "11px")
-      .attr("fill", "#cbd5e1")
+      .attr("fill", lightGraphTheme.linkLabel)
       .attr("font-weight", "500")
       .attr("text-anchor", "middle")
       .attr("pointer-events", "none")
       .attr("opacity", (d: any) => (d.isVisualBridge ? 0.55 : 1))
-      .style("text-shadow", "0 0 3px rgba(0, 0, 0, 0.8), 0 0 6px rgba(0, 0, 0, 0.6)")
+      .style("text-shadow", lightGraphTheme.linkLabelShadow)
       .text((d) => d.label)
 
     const node = container
@@ -255,22 +267,18 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
     node
       .append("circle")
       .attr("r", nodeRadius)
-      .attr("fill", (d) => {
-        const color = getNodeColor(d.type)
-        // 将颜色转换为半透明
-        return color + "CC" // 添加CC的透明度 (约80%不透明度)
-      })
-      .attr("stroke", (d) => getNodeColor(d.type))
+      .attr("fill", (d) => getNodePaint(d.type).fill)
+      .attr("stroke", (d) => getNodePaint(d.type).stroke)
       .attr("stroke-width", isFullscreenMode ? 3 : 2)
-      .style("filter", "drop-shadow(0 0 8px rgba(0,0,0,0.3))")
+      .style("filter", lightGraphTheme.nodeShadow)
       .on("mouseenter", function (event, d) {
         setHoveredNode(d)
         d3.select(this)
           .transition()
           .duration(200)
           .attr("r", nodeRadius * 1.25)
-          .attr("fill", (d: any) => getNodeColor(d.type) + "EE") // hover时增加不透明度
-          .style("filter", "drop-shadow(0 0 12px currentColor)")
+          .attr("fill", (d: any) => getNodePaint(d.type).hoverFill)
+          .style("filter", lightGraphTheme.nodeHoverShadow)
       })
       .on("mouseleave", function () {
         setHoveredNode(null)
@@ -278,8 +286,8 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
           .transition()
           .duration(200)
           .attr("r", nodeRadius)
-          .attr("fill", (d: any) => getNodeColor(d.type) + "CC")
-          .style("filter", "drop-shadow(0 0 8px rgba(0,0,0,0.3))")
+          .attr("fill", (d: any) => getNodePaint(d.type).fill)
+          .style("filter", lightGraphTheme.nodeShadow)
       })
 
     // Build adjacency map for click-to-focus interaction
@@ -302,17 +310,18 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       node
         .selectAll("circle")
         .attr("opacity", (d: any) => (nodeId ? (neighbors.has(d.id) ? 1 : 0.15) : 1))
+        .attr("stroke", (d: any) => (nodeId && d.id === nodeId ? lightGraphTheme.selectedStroke : getNodePaint(d.type).stroke))
         .attr("stroke-width", (d: any) => (nodeId && d.id === nodeId ? (isFullscreenMode ? 5 : 4) : (isFullscreenMode ? 3 : 2)))
 
       node.selectAll("text").attr("opacity", (d: any) => (nodeId ? (neighbors.has(d.id) ? 1 : 0.25) : 1))
 
       link
         .attr("stroke-opacity", (d: any) => {
-          if (!nodeId) return d.isVisualBridge ? 0.4 : 0.7
+          if (!nodeId) return getBaseLinkOpacity(d)
           const sid = d?.source?.id || d?.source
           const tid = d?.target?.id || d?.target
           if (sid === nodeId || tid === nodeId) {
-            return d.isVisualBridge ? 0.65 : 0.9
+            return getSelectedLinkOpacity(d)
           }
           return 0.1
         })
@@ -351,8 +360,9 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
       .attr("text-anchor", "middle")
       .attr("dy", labelOffset)
       .attr("font-size", fontSize)
-      .attr("fill", "#e2e8f0")
+      .attr("fill", lightGraphTheme.nodeLabel)
       .attr("font-weight", "500")
+      .style("text-shadow", lightGraphTheme.linkLabelShadow)
       .text((d) => d.label)
 
     if (isAnimating) {
@@ -375,7 +385,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
         .delay((d, i) => i * 100 + 300)
         .style("opacity", 1)
 
-      link.attr("stroke-opacity", 0).transition().delay(800).duration(600).attr("stroke-opacity", 0.6)
+      link.attr("stroke-opacity", 0).transition().delay(800).duration(600).attr("stroke-opacity", (d: any) => getBaseLinkOpacity(d))
 
       linkLabel.style("opacity", 0).transition().delay(1000).duration(400).style("opacity", 1)
     }
@@ -443,25 +453,25 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
           variant="ghost"
           size="icon"
           onClick={handleExpandClick}
-          className="absolute top-2 right-2 bg-transparent hover:bg-white/10 text-white border-none p-1.5 h-auto w-auto"
+          className="absolute top-2 right-2 h-auto w-auto rounded-full border border-[#cfe2e7] bg-white/86 p-1.5 text-[#0f4e63] shadow-[0_8px_20px_rgba(15,78,99,0.12)] transition-colors hover:border-[#0e7490]/40 hover:bg-[#e6f4f6]"
           title={t('graph.expand')}
         >
           <Maximize2 className="w-4 h-4" />
         </Button>
 
         {selectedNode && (
-          <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
-            <p className="text-xs text-white">
-              {t('graph.selected')}: {selectedNode.label} <span className="text-gray-400">({nodeTypeLabelMap[selectedNode.type] || selectedNode.type})</span>
+          <div className="absolute top-2 left-2 rounded-lg border border-[#cfe2e7] bg-white/92 px-3 py-2 shadow-[0_10px_28px_rgba(15,78,99,0.12)] backdrop-blur-sm">
+            <p className="text-xs text-[#12323a]">
+              {t('graph.selected')}: {selectedNode.label} <span className="text-[#6c858c]">({nodeTypeLabelMap[selectedNode.type] || selectedNode.type})</span>
             </p>
-            <p className="text-[10px] text-gray-400">{t('graph.clearSelection')}</p>
+            <p className="text-[10px] text-[#6c858c]">{t('graph.clearSelection')}</p>
           </div>
         )}
 
         {hoveredNode && !selectedNode && (
-          <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/20">
-            <p className="text-xs text-white">
-              {t('graph.node')}: {hoveredNode.label} <span className="text-gray-400">({nodeTypeLabelMap[hoveredNode.type] || hoveredNode.type})</span>
+          <div className="absolute top-2 left-2 rounded-lg border border-[#cfe2e7] bg-white/92 px-3 py-2 shadow-[0_10px_28px_rgba(15,78,99,0.12)] backdrop-blur-sm">
+            <p className="text-xs text-[#12323a]">
+              {t('graph.node')}: {hoveredNode.label} <span className="text-[#6c858c]">({nodeTypeLabelMap[hoveredNode.type] || hoveredNode.type})</span>
             </p>
           </div>
         )}
@@ -475,7 +485,7 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[9999] bg-black/98 backdrop-blur-xl flex items-center justify-center"
+                className="fixed inset-0 z-[9999] bg-[#f7fbfc]/96 backdrop-blur-xl flex items-center justify-center"
                 onClick={handleCloseClick}
               >
                 <motion.div
@@ -487,15 +497,15 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="absolute top-8 left-8 right-8 z-10 flex items-center justify-between">
-                    <h2 className="text-2xl font-semibold text-white flex items-center gap-3">
-                      <span className="text-yellow-400">🔗</span>
+                    <h2 className="text-2xl font-semibold text-[#12323a] flex items-center gap-3">
+                      <Network className="h-6 w-6 text-[#0e7490]" />
                       {t('graph.fullscreenTitle')}
                     </h2>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={handleCloseClick}
-                      className="bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg"
+                      className="rounded-lg border border-[#cfe2e7] bg-white/86 text-[#0f4e63] shadow-[0_10px_28px_rgba(15,78,99,0.12)] transition-colors hover:border-[#0e7490]/40 hover:bg-[#e6f4f6]"
                       title={t('graph.close')}
                     >
                       <X className="w-6 h-6" />
@@ -504,8 +514,8 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
 
                   {/* 节点类型统计图例 - 仅在全屏模式显示 */}
                   {nodeTypeStats.length > 0 && (
-                    <div className="absolute top-24 left-8 z-10 bg-black/60 backdrop-blur-md rounded-lg border border-white/20 p-4 max-w-xs">
-                      <h3 className="text-sm font-semibold text-white mb-3">{t('graph.nodeTypeStats')}</h3>
+                    <div className="absolute top-24 left-8 z-10 max-w-xs rounded-lg border border-[#cfe2e7] bg-white/88 p-4 shadow-[0_18px_46px_rgba(15,78,99,0.14)] backdrop-blur-md">
+                      <h3 className="text-sm font-semibold text-[#12323a] mb-3">{t('graph.nodeTypeStats')}</h3>
                       <div className="space-y-2">
                         {nodeTypeStats.map(stat => (
                           <div key={stat.type} className="flex items-center justify-between gap-4">
@@ -513,13 +523,13 @@ export function KnowledgeGraphD3({ data, width = 600, height = 400, isAnimating 
                               <div
                                 className="w-3 h-3 rounded-full border-2"
                                 style={{
-                                  backgroundColor: stat.color + "40",
-                                  borderColor: stat.color
+                                  backgroundColor: getNodePaint(stat.type).fill,
+                                  borderColor: getNodePaint(stat.type).stroke
                                 }}
                               />
-                              <span className="text-xs text-gray-300">{stat.label}</span>
+                              <span className="text-xs text-[#335158]">{stat.label}</span>
                             </div>
-                            <span className="text-xs font-medium text-white">{stat.count}</span>
+                            <span className="text-xs font-medium text-[#12323a]">{stat.count}</span>
                           </div>
                         ))}
                       </div>

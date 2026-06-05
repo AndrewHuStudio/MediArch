@@ -22,10 +22,18 @@ export interface Citation {
   sub_section?: string
   content_type?: string
   image_url?: string
+  imageUrl?: string
   file_path?: string
+  filePath?: string
   document_path?: string
+  documentPath?: string
   pdf_url?: string
+  pdfUrl?: string
   highlight_text?: string
+  page_value?: string
+  key_explanation?: string
+  pageValue?: string
+  keyExplanation?: string
   doc_id?: string
   doc_category?: string
   // PDF 高亮相关（与后端 positions 字段兼容）

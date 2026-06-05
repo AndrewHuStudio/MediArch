@@ -19,6 +19,7 @@ import { ChatInput } from "@/components/chat/chat-input"
 import { initializeDemoConversations } from "@/lib/init-demo-conversations"
 import { convertKnowledgeGraphData } from "@/lib/chat/knowledge-graph-normalization"
 import { runChatWithFallback, type ChatExecutionResult } from "@/lib/chat/chat-execution"
+import { citationsToPDFSources } from "@/lib/chat/pdf-source-mapping"
 import { buildImageUrl, buildPdfUrl } from "@/lib/chat/pdf-source-url"
 import { useT } from "@/lib/i18n"
 import { getChatAgentDefinitions } from "@/lib/i18n/ui-copy"
@@ -32,12 +33,12 @@ import type { Citation, KnowledgeGraphData, AgentStatusUpdate } from "@/lib/api/
 // 延迟加载非关键组件 - 性能优化
 const AgentThinkingPanel = dynamic(() => import("@/components/chat/agent-thinking-panel"), {
   ssr: false,
-  loading: () => <div className="h-full animate-pulse rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md" />,
+  loading: () => <div className="h-full animate-pulse rounded-lg border border-[#cfe2e7] bg-white/72 p-4 backdrop-blur-md" />,
 })
 
 const KnowledgeGraphPanel = dynamic(() => import("@/components/chat/knowledge-graph-panel"), {
   ssr: false,
-  loading: () => <div className="h-full animate-pulse rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md" />,
+  loading: () => <div className="h-full animate-pulse rounded-lg border border-[#cfe2e7] bg-white/72 p-4 backdrop-blur-md" />,
 })
 
 // localStorage 相关常量
@@ -165,52 +166,6 @@ const createConversationSummary = (raw: string, emptySummary: string) => {
   return normalized.length > 60 ? `${normalized.slice(0, 60)}...` : normalized
 }
 
-// 将后端引用格式转换为前端 PDFSource 格式
-const citationsToPDFSources = (citations: Citation[]): PDFSource[] => {
-  return citations.map((cite, index) => {
-    const documentPath = cite.document_path || (cite as any).documentPath
-    const filePath = cite.file_path || (cite as any).filePath
-    const imageUrl = (cite as any).imageUrl || cite.image_url
-    const rawPdfPath = cite.pdf_url || (cite as any).pdfUrl
-    const pdfUrl = buildPdfUrl(rawPdfPath as string | undefined, documentPath, filePath, imageUrl, cite.source)
-    const normalizedPositions =
-      Array.isArray(cite.positions) && cite.positions.length > 0
-        ? cite.positions.map((pos: any) => {
-            if (!pos) return null
-            if (Array.isArray(pos.bbox)) {
-              return { page: pos.page ?? cite.page_number ?? 1, bbox: pos.bbox as number[] }
-            }
-            // 兼容旧格式
-            if (typeof pos.x === "number" && typeof pos.y === "number" && typeof pos.width === "number" && typeof pos.height === "number") {
-              return {
-                page: pos.page ?? cite.page_number ?? 1,
-                bbox: [pos.x, pos.y, pos.x + pos.width, pos.y + pos.height],
-              }
-            }
-            return null
-          }).filter(Boolean)
-        : undefined
-
-    return {
-      id: cite.chunk_id || `pdf-${index}`,
-      title: cite.source,
-      pageNumber: cite.page_number || 1,
-      snippet: cite.snippet,
-      highlightText: cite.highlight_text || cite.snippet,
-      positions: normalizedPositions as PDFSource["positions"],
-      pdfUrl,
-      documentPath: cite.document_path,
-      filePath: cite.file_path,
-      imageUrl,
-      thumbnail: imageUrl,
-      section: cite.section || cite.sub_section,
-      metadata: cite.metadata,
-      docId: cite.doc_id,
-      contentType: ((cite.content_type as any) || (cite.image_url ? "image" : undefined)) as any,
-    }
-  })
-}
-
 // 快速操作按钮组件
 function QuickActionComponent({
   icon,
@@ -225,7 +180,7 @@ function QuickActionComponent({
     <Button
       variant="outline"
       onClick={onClick}
-      className="flex items-center gap-2 rounded-full border transition-colors pointer-events-auto bg-transparent"
+      className="flex items-center gap-2 rounded-full border border-[#cfe2e7] bg-white/78 text-[#0f4e63] transition-colors pointer-events-auto hover:bg-[#e6f4f6]"
     >
       {icon}
       <span className="text-xs">{label}</span>
@@ -269,10 +224,10 @@ function InitialChatState({
           transition={{ delay: 0.2, duration: 0.5 }}
           className="text-center space-y-4"
         >
-          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-br from-white via-gray-200 to-gray-400 bg-clip-text text-transparent drop-shadow-2xl tracking-tight">
+          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-br from-[#12323a] via-[#0e7490] to-[#8ba4ad] bg-clip-text text-transparent tracking-tight">
             MediArch AI
           </h1>
-          <p className="text-neutral-400 text-lg font-light tracking-wide">{t('chat.initialSubtitle')}</p>
+          <p className="text-[#516b72] text-lg font-light tracking-wide">{t('chat.initialSubtitle')}</p>
         </motion.div>
 
         <motion.div
@@ -989,16 +944,16 @@ function ChatInterfaceContent() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="relative w-full h-screen flex flex-col overflow-hidden"
+      className="relative w-full h-screen flex flex-col overflow-hidden bg-[#f7fbfc] text-[#12323a]"
     >
       <div className="absolute inset-0 z-0">
         <EtherealShadow
-          color="rgba(255, 255, 255, 0.35)"
+          color="rgba(14, 116, 144, 0.16)"
           animation={{ scale: 100, speed: 30 }}
-          noise={{ opacity: 0.3, scale: 1.5 }}
+          noise={{ opacity: 0.18, scale: 1.5 }}
           sizing="fill"
         />
-        <div className="absolute inset-0 bg-black" style={{ zIndex: -1 }} />
+        <div className="absolute inset-0 bg-[#f7fbfc]" style={{ zIndex: -1 }} />
       </div>
 
       {/* API 错误提示 */}
@@ -1055,7 +1010,7 @@ function ChatInterfaceContent() {
                       variant="ghost"
                       size="icon"
                       onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                      className="text-white hover:bg-white/10 backdrop-blur-sm transition-all duration-300"
+                      className="text-[#0f4e63] hover:bg-[#e6f4f6] backdrop-blur-sm transition-all duration-300"
                       aria-label={isSidebarCollapsed ? t('chat.aria.showSidebar') : t('chat.aria.hideSidebar')}
                     >
                       {isSidebarCollapsed ? (

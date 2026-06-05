@@ -20,6 +20,8 @@ export interface PDFSource {
   section?: string
   metadata?: Record<string, unknown>
   docId?: string
+  pageValue?: string
+  keyExplanation?: string
   contentType?: 'text' | 'image' | 'table'  // [FIX 2025-12-27] 添加 content_type 字段
   // PDF 高亮位置信息
   positions?: Array<{

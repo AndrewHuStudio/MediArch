@@ -30,8 +30,8 @@ export function SuggestedQuestions({
       className={cn("w-full", className)}
     >
       <div className="flex items-center gap-2 mb-2">
-        <Lightbulb className="w-3.5 h-3.5 text-blue-400" />
-        <span className="text-xs text-gray-400 font-medium">{t('chat.suggestedQuestions')}</span>
+        <Lightbulb className="w-3.5 h-3.5 text-[#0e7490]" />
+        <span className="text-xs text-[#6c858c] font-medium">{t('chat.suggestedQuestions')}</span>
       </div>
 
       {/* 使用 2x2 网格布局，更紧凑 */}
@@ -44,11 +44,11 @@ export function SuggestedQuestions({
             transition={{ duration: 0.2, delay: index * 0.03 }}
             onClick={() => onQuestionClick(question)}
             className={cn(
-              "group relative px-3 py-1.5 rounded-md text-xs text-gray-300 text-left",
-              "bg-white/5 border border-white/15",
-              "hover:border-blue-500/50 hover:text-white hover:bg-white/10",
+              "group relative px-3 py-1.5 rounded-md text-xs text-[#335158] text-left",
+              "bg-white/78 border border-[#cfe2e7]",
+              "hover:border-[#0e7490]/50 hover:text-[#0f4e63] hover:bg-[#e6f4f6]",
               "transition-all duration-200",
-              "hover:shadow-[0_0_10px_rgba(59,130,246,0.2)]",
+              "hover:shadow-[0_8px_18px_rgba(14,116,144,0.14)]",
               "active:scale-[0.98]",
               "truncate",
             )}
@@ -58,7 +58,7 @@ export function SuggestedQuestions({
             <div
               className={cn(
                 "absolute inset-0 rounded-md opacity-0 group-hover:opacity-100",
-                "bg-gradient-to-r from-blue-500/10 to-transparent",
+                "bg-gradient-to-r from-[#d9f2ed]/80 to-transparent",
                 "transition-opacity duration-200",
               )}
             />

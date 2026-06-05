@@ -98,16 +98,16 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
     <section
       id="section-2"
       ref={sectionRef}
-      className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-black text-white"
+      className="relative min-h-screen flex flex-col justify-center overflow-hidden bg-[#f7fbfc] text-[#12323a]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,#1f2937,transparent_55%)]" />
-      <div className="absolute inset-0 opacity-40 blur-3xl bg-gradient-to-br from-teal-500 via-cyan-500/40 to-indigo-500/20" />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(14,116,144,0.08)_1px,transparent_1px),linear-gradient(0deg,rgba(14,116,144,0.08)_1px,transparent_1px)] bg-[size:48px_48px]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.78),rgba(247,251,252,0.28))]" />
 
       {/* 向上跳转按钮 */}
       <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-50">
         <button
           onClick={() => onNavigate(1)}
-          className="text-white/60 hover:text-white transition-colors animate-bounce"
+          className="text-[#6c858c] hover:text-[#0e7490] transition-colors animate-bounce"
           aria-label={t('kg.aria.jumpKb')}
         >
           <ChevronUp className="w-6 h-6" />
@@ -118,7 +118,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50">
         <button
           onClick={() => onNavigate(3)}
-          className="text-white/60 hover:text-white transition-colors animate-bounce"
+          className="text-[#6c858c] hover:text-[#0e7490] transition-colors animate-bounce"
           aria-label={t('kg.aria.jumpNext')}
         >
           <ChevronDown className="w-6 h-6" />
@@ -127,28 +127,28 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
 
       <div className="relative z-10 max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[1.1fr_1.2fr] gap-10 px-6 py-16">
         <div className="space-y-6">
-          <p className="text-sm text-cyan-200 tracking-[0.3em] uppercase">{t('kg.sectionLabel')}</p>
-          <h2 className="text-4xl md:text-5xl font-semibold leading-tight bg-gradient-to-br from-white via-slate-200 to-slate-500 bg-clip-text text-transparent">
+          <p className="text-sm text-[#0e7490] tracking-[0.3em] uppercase">{t('kg.sectionLabel')}</p>
+          <h2 className="text-4xl md:text-5xl font-semibold leading-tight bg-gradient-to-br from-[#12323a] via-[#0e7490] to-[#8ba4ad] bg-clip-text text-transparent">
             {t('kg.title')}
           </h2>
-          <p className="text-base text-white/80 leading-relaxed">
+          <p className="text-base text-[#335158] leading-relaxed">
             {t('kg.desc')}
           </p>
 
           <div className="grid grid-cols-2 gap-6 pt-4">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+            <div className="rounded-2xl border border-[#cfe2e7] bg-white/80 p-5 backdrop-blur shadow-[0_14px_34px_rgba(15,78,99,0.08)]">
               <p className="text-3xl font-bold">{t('kg.stat.nodes')}</p>
-              <p className="text-sm text-white/70">{t('kg.stat.nodesLabel')}</p>
-              <span className="text-xs text-cyan-200 mt-2 inline-flex">{t('kg.stat.nodesDetail')}</span>
+              <p className="text-sm text-[#516b72]">{t('kg.stat.nodesLabel')}</p>
+              <span className="text-xs text-[#0e7490] mt-2 inline-flex">{t('kg.stat.nodesDetail')}</span>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+            <div className="rounded-2xl border border-[#cfe2e7] bg-white/80 p-5 backdrop-blur shadow-[0_14px_34px_rgba(15,78,99,0.08)]">
               <p className="text-3xl font-bold">{t('kg.stat.links')}</p>
-              <p className="text-sm text-white/70">{t('kg.stat.linksLabel')}</p>
-              <span className="text-xs text-cyan-200 mt-2 inline-flex">{t('kg.stat.linksDetail')}</span>
+              <p className="text-sm text-[#516b72]">{t('kg.stat.linksLabel')}</p>
+              <span className="text-xs text-[#0e7490] mt-2 inline-flex">{t('kg.stat.linksDetail')}</span>
             </div>
           </div>
 
-          <div className="space-y-3 text-sm text-white/70">
+          <div className="space-y-3 text-sm text-[#516b72]">
             <p>{t('kg.feature.1')}</p>
             <p>{t('kg.feature.2')}</p>
             <p>{t('kg.feature.3')}</p>
@@ -156,22 +156,22 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
 
           <button
             onClick={() => onNavigate(1)}
-            className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+            className="inline-flex items-center justify-center rounded-full border border-[#0e7490]/30 bg-white/80 px-6 py-2 text-sm font-medium text-[#0f4e63] transition hover:bg-[#e6f4f6]"
           >
             {t('kg.btn.jumpKb')}
           </button>
         </div>
 
-        <div className="relative rounded-[32px] border border-white/10 bg-black/60 p-6 backdrop-blur-3xl">
-          <div className="absolute inset-0 rounded-[32px] bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
-          <div className="relative z-10 flex items-center justify-between text-sm text-white/70 mb-4">
-            <div className="uppercase tracking-[0.3em] text-xs text-cyan-200">{t('kg.preview')}</div>
+        <div className="relative rounded-[32px] border border-[#cfe2e7] bg-white/82 p-6 backdrop-blur-3xl shadow-[0_24px_70px_rgba(15,78,99,0.12)]">
+          <div className="absolute inset-0 rounded-[32px] bg-[linear-gradient(135deg,rgba(255,255,255,0.78),rgba(230,244,246,0.36))] pointer-events-none" />
+          <div className="relative z-10 flex items-center justify-between text-sm text-[#516b72] mb-4">
+            <div className="uppercase tracking-[0.3em] text-xs text-[#0e7490]">{t('kg.preview')}</div>
             <button
               onClick={() => {
                 setGraphView("force")
                 setIsFullscreen(true)
               }}
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full border border-[#0e7490]/30 bg-white/80 px-4 py-1.5 text-xs font-medium text-[#0f4e63] transition hover:bg-[#e6f4f6]"
             >
               <Maximize2 className="h-3.5 w-3.5" />
               {t('kg.btn.fullscreen')}
@@ -182,24 +182,24 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
       </div>
       {isFullscreen && (
         <div className="fixed inset-0 z-[200]">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur" onClick={() => setIsFullscreen(false)} />
+          <div className="absolute inset-0 bg-[#f7fbfc]/92 backdrop-blur" onClick={() => setIsFullscreen(false)} />
           <div
             className="relative z-10 flex h-full flex-col"
             onClick={(event) => {
               event.stopPropagation()
             }}
           >
-            <div className="flex flex-wrap items-center justify-between gap-4 px-8 pt-8 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-4 px-8 pt-8 text-[#12323a]">
               <div>
-                <p className="text-sm uppercase tracking-[0.4em] text-cyan-200">Knowledge Graph</p>
+                <p className="text-sm uppercase tracking-[0.4em] text-[#0e7490]">Knowledge Graph</p>
                 <h3 className="text-2xl font-semibold mt-2">{t('kg.fullscreenTitle')}</h3>
               </div>
               <div className="flex items-center gap-3">
-                <div className="inline-flex rounded-full border border-white/20 p-1">
+                <div className="inline-flex rounded-full border border-[#cfe2e7] bg-white/80 p-1">
                   <button
                     onClick={() => setGraphView("force")}
                     className={`inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm transition ${
-                      graphView === "force" ? "bg-white text-black" : "text-white hover:bg-white/10"
+                      graphView === "force" ? "bg-[#0e7490] text-white" : "text-[#516b72] hover:bg-[#e6f4f6]"
                     }`}
                   >
                     <Share2 className="h-4 w-4" />
@@ -208,7 +208,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
                   <button
                     onClick={() => setGraphView("radial")}
                     className={`inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm transition ${
-                      graphView === "radial" ? "bg-white text-black" : "text-white hover:bg-white/10"
+                      graphView === "radial" ? "bg-[#0e7490] text-white" : "text-[#516b72] hover:bg-[#e6f4f6]"
                     }`}
                   >
                     <GitBranch className="h-4 w-4" />
@@ -217,7 +217,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
                 </div>
                 <button
                   onClick={() => setIsFullscreen(false)}
-                  className="rounded-full border border-white/20 p-2 text-white transition hover:bg-white/10"
+                  className="rounded-full border border-[#cfe2e7] bg-white/80 p-2 text-[#0f4e63] transition hover:bg-[#e6f4f6]"
                   aria-label={t('kg.aria.closeFullscreen')}
                 >
                   <X className="h-5 w-5" />
@@ -225,7 +225,7 @@ export default function KnowledgeGraphSection({ onNavigate }: KnowledgeGraphSect
               </div>
             </div>
             <div className="flex-1 px-8 py-6">
-              <div className="relative h-full w-full rounded-[32px] border border-white/20 bg-black/60 p-4">
+              <div className="relative h-full w-full rounded-[32px] border border-[#cfe2e7] bg-white/82 p-4 shadow-[0_24px_70px_rgba(15,78,99,0.12)]">
                 <svg ref={fullscreenSvgRef} className="h-full w-full" />
               </div>
             </div>
@@ -316,7 +316,7 @@ function renderForceGraph(
 
   const link = container
     .append("g")
-    .attr("stroke", "rgba(255,255,255,0.25)")
+    .attr("stroke", "rgba(15,78,99,0.24)")
     .attr("stroke-opacity", 0.6)
     .selectAll("line")
     .data(links)
@@ -331,7 +331,7 @@ function renderForceGraph(
     .join("circle")
     .attr("r", (d) => d.value)
     .attr("fill", (d) => colorScale(d.cluster))
-    .attr("stroke", "rgba(255,255,255,0.6)")
+    .attr("stroke", "rgba(255,255,255,0.86)")
     .attr("stroke-width", 0.5)
     .call(
       d3
@@ -359,7 +359,7 @@ function renderForceGraph(
     .join("text")
     .text((d) => d.label)
     .attr("font-size", 10)
-    .attr("fill", "rgba(255,255,255,0.85)")
+    .attr("fill", "rgba(18,50,58,0.82)")
     .attr("text-anchor", "middle")
     .attr("pointer-events", "none")
 
@@ -438,7 +438,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
   // 添加连线，初始从中心开始
   const links = g.append("g")
     .attr("fill", "none")
-    .attr("stroke", "rgba(255,255,255,0.35)")
+    .attr("stroke", "rgba(15,78,99,0.28)")
     .attr("stroke-width", 1)
     .selectAll("path")
     .data(pointRoot.links())
@@ -465,11 +465,11 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
     .append("circle")
     .attr("r", 0) // 初始半径为 0
     .attr("fill", (d) => {
-      if (d.depth === 0) return "#f4f4f5"
-      if (d.depth === 1) return "#22d3ee"
-      return "#818cf8"
+      if (d.depth === 0) return "#0f4e63"
+      if (d.depth === 1) return "#0e7490"
+      return "#059669"
     })
-    .attr("stroke", "rgba(255,255,255,0.6)")
+    .attr("stroke", "rgba(255,255,255,0.82)")
     .attr("stroke-width", 0.5)
 
   const labels = node
@@ -478,7 +478,7 @@ function renderRadialTree(svgElement: SVGSVGElement | null, treeData: TreeNode, 
     .attr("x", (d) => ((d.x ?? 0) < Math.PI === !d.children ? 8 : -8))
     .attr("text-anchor", (d) => ((d.x ?? 0) < Math.PI === !d.children ? "start" : "end"))
     .attr("transform", (d) => ((d.x ?? 0) >= Math.PI ? "rotate(180)" : null))
-    .attr("fill", "rgba(255,255,255,0.85)")
+    .attr("fill", "rgba(18,50,58,0.86)")
     .attr("font-size", (d) => (d.depth <= 1 ? 12 : 10))
     .attr("opacity", 0) // 初始透明
     .text((d) => d.data.name)

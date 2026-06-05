@@ -25,7 +25,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
   const [backgroundBookIndex, setBackgroundBookIndex] = useState(0)
   const [initialBackgroundSet, setInitialBackgroundSet] = useState(false)
   const [bookOpacity, setBookOpacity] = useState(1)
-  const [textColor, setTextColor] = useState("white")
+  const [textColor, setTextColor] = useState("dark")
   const [hasRenderedWithTextures, setHasRenderedWithTextures] = useState(false)
   const [highlightIntensity, setHighlightIntensity] = useState(0)
   const [highlightTrigger, setHighlightTrigger] = useState(0)
@@ -36,7 +36,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     if (genres.includes("规范标准")) {
       return {
         colors: ["#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b"],
-        backgroundFill: "#000000",
+        backgroundFill: "#f7fbfc",
         waveOpacity: 0.4,
         blur: 8,
         speed: "fast" as const,
@@ -45,7 +45,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     if (genres.includes("书籍报告")) {
       return {
         colors: ["#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569"],
-        backgroundFill: "#000000",
+        backgroundFill: "#f7fbfc",
         waveOpacity: 0.4,
         blur: 9,
         speed: "fast" as const,
@@ -54,7 +54,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     if (genres.includes("参考论文")) {
       return {
         colors: ["#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155"],
-        backgroundFill: "#000000",
+        backgroundFill: "#f7fbfc",
         waveOpacity: 0.5,
         blur: 10,
         speed: "fast" as const,
@@ -63,7 +63,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     if (genres.includes("政策文件")) {
       return {
         colors: ["#94a3b8", "#64748b", "#475569", "#334155", "#1e293b"],
-        backgroundFill: "#000000",
+        backgroundFill: "#f7fbfc",
         waveOpacity: 0.5,
         blur: 9,
         speed: "fast" as const,
@@ -72,7 +72,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     if (genres.includes("在线案例")) {
       return {
         colors: ["#64748b", "#475569", "#334155", "#1e293b", "#0f172a"],
-        backgroundFill: "#000000",
+        backgroundFill: "#f7fbfc",
         waveOpacity: 0.6,
         blur: 8,
         speed: "fast" as const,
@@ -81,7 +81,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
     // Default fallback
     return {
       colors: ["#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b"],
-      backgroundFill: "#000000",
+      backgroundFill: "#f7fbfc",
       waveOpacity: 0.4,
       blur: 8,
       speed: "fast" as const,
@@ -505,6 +505,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
   }, [triggerHighlight])
 
   const wavyConfig = getWavyBackgroundConfig(currentBook.genres)
+  const controlColor = textColor === "white" ? "#ffffff" : "#0f4e63"
 
   return (
     <div ref={showcaseRef} className="h-full">
@@ -523,8 +524,8 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
             <Button
               onClick={previousBook}
               disabled={isTransitioning}
-              className="bg-white/10 border-white/30 hover:bg-white/20 disabled:opacity-50 transition-colors duration-700 rounded-full w-12 h-12 p-0"
-              style={{ color: textColor }}
+              className="bg-white/80 border-[#cfe2e7] hover:bg-white disabled:opacity-50 transition-colors duration-700 rounded-full w-12 h-12 p-0 shadow-[0_12px_30px_rgba(15,78,99,0.12)]"
+              style={{ color: controlColor }}
             >
               <ChevronLeft className="w-6 h-6" />
             </Button>
@@ -535,8 +536,8 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
           <Button
             onClick={nextBook}
             disabled={isTransitioning}
-            className="bg-white/10 border-white/30 hover:bg-white/20 disabled:opacity-50 transition-colors duration-700 rounded-full w-12 h-12 p-0"
-            style={{ color: textColor }}
+            className="bg-white/80 border-[#cfe2e7] hover:bg-white disabled:opacity-50 transition-colors duration-700 rounded-full w-12 h-12 p-0 shadow-[0_12px_30px_rgba(15,78,99,0.12)]"
+            style={{ color: controlColor }}
           >
             <ChevronRight className="w-6 h-6" />
           </Button>
@@ -545,7 +546,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
         <div className="absolute top-24 left-1/2 transform -translate-x-1/2 z-50">
           <button
             onClick={() => onNavigate(0)}
-            className="text-white/60 hover:text-white transition-colors animate-bounce"
+            className="text-[#6c858c] hover:text-[#0e7490] transition-colors animate-bounce"
           >
             <ChevronUp className="w-6 h-6" />
           </button>
@@ -554,7 +555,7 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <button
             onClick={() => onNavigate(2)}
-            className="text-white/60 hover:text-white transition-colors animate-bounce"
+            className="text-[#6c858c] hover:text-[#0e7490] transition-colors animate-bounce"
           >
             <ChevronDown className="w-6 h-6" />
           </button>

@@ -120,8 +120,8 @@ export const CircularGallery = React.forwardRef<HTMLDivElement, CircularGalleryP
                     transition: "opacity 0.3s linear",
                   }}
                 >
-                  <div className="relative w-full h-full rounded-lg shadow-2xl overflow-hidden border border-gray-700 bg-gray-900/70 backdrop-blur-lg flex flex-col group">
-                    <div className="flex-1 relative overflow-hidden bg-gray-800">
+                  <div className="relative w-full h-full rounded-lg shadow-[0_20px_45px_rgba(15,78,99,0.16)] overflow-hidden border border-[#d9e7eb] bg-white/82 backdrop-blur-lg flex flex-col group">
+                    <div className="flex-1 relative overflow-hidden bg-[#e6f4f6]">
                       {!hasError ? (
                         <>
                           <img
@@ -144,8 +144,8 @@ export const CircularGallery = React.forwardRef<HTMLDivElement, CircularGalleryP
                           </button>
                         </>
                       ) : (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                          <div className="text-center text-gray-400">
+                        <div className="absolute inset-0 flex items-center justify-center bg-[#e6f4f6]">
+                          <div className="text-center text-[#6c858c]">
                             <svg className="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path
                                 strokeLinecap="round"
@@ -159,7 +159,7 @@ export const CircularGallery = React.forwardRef<HTMLDivElement, CircularGalleryP
                         </div>
                       )}
                     </div>
-                    <div className="flex-shrink-0 p-3 bg-gradient-to-t from-black/80 to-transparent text-white">
+                    <div className="flex-shrink-0 p-3 bg-gradient-to-t from-white/95 to-white/70 text-[#12323a]">
                       <h2 className="text-lg font-bold">{item.common}</h2>
                       <em className="text-xs italic opacity-80">{item.binomial}</em>
                       <p className="text-xs mt-1 opacity-70">{item.photo.text}</p>
@@ -178,12 +178,12 @@ export const CircularGallery = React.forwardRef<HTMLDivElement, CircularGalleryP
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex items-center justify-center p-8"
+              className="fixed inset-0 z-[200] bg-[#f7fbfc]/95 backdrop-blur-sm flex items-center justify-center p-8"
               onClick={() => setLightboxImage(null)}
             >
               <button
                 onClick={() => setLightboxImage(null)}
-                className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white z-10"
+                className="absolute top-4 right-4 p-2 rounded-lg bg-white/80 hover:bg-white transition-colors text-[#0f4e63] border border-[#cfe2e7] z-10"
                 aria-label="关闭"
               >
                 <X className="w-5 h-5" />

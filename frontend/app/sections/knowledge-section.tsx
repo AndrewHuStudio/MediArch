@@ -16,7 +16,7 @@ export default function KnowledgeSection({ onNavigate }: KnowledgeSectionProps) 
       <div className="flex-1">
         <LazyMount
           className="h-full"
-          fallback={<div className="flex h-full w-full items-center justify-center text-white/50 text-sm">{t('kb.loading')}</div>}
+          fallback={<div className="flex h-full w-full items-center justify-center text-[#6c858c] text-sm">{t('kb.loading')}</div>}
         >
           <BookShowcase onNavigate={onNavigate} />
         </LazyMount>

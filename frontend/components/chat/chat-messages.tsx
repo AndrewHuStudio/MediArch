@@ -61,7 +61,7 @@ function AssistantMessageContent({
             <button
               type="button"
               onClick={scrollToToc}
-              className="text-xs px-2.5 py-1 rounded-full border border-white/20 bg-black/60 text-gray-200 hover:text-white hover:border-white/40 transition-colors"
+              className="text-xs px-2.5 py-1 rounded-full border border-[#cfe2e7] bg-white/82 text-[#0f4e63] hover:border-[#0e7490]/40 hover:bg-[#e6f4f6] transition-colors"
             >
               {t('chat.backToToc')}
             </button>
@@ -72,10 +72,10 @@ function AssistantMessageContent({
         <div
           ref={tocRef}
           id={`${headingIdPrefix}-toc`}
-          className="mb-4 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+          className="mb-4 rounded-lg border border-[#cfe2e7] bg-white/70 px-4 py-3"
         >
-          <div className="text-sm font-semibold text-white mb-2">{t('chat.toc')}</div>
-          <ul className="space-y-1 text-sm text-gray-200">
+          <div className="text-sm font-semibold text-[#12323a] mb-2">{t('chat.toc')}</div>
+          <ul className="space-y-1 text-sm text-[#335158]">
             {tocItems.map((item) => (
               <li key={item.id} className={`flex items-start gap-2 ${getTocIndentClass(item.level)}`}>
                 <span
@@ -85,7 +85,7 @@ function AssistantMessageContent({
                 <button
                   type="button"
                   onClick={() => scrollToHeading(item.id)}
-                  className="text-left text-blue-300 hover:text-blue-200 transition-colors leading-relaxed"
+                  className="text-left text-[#0e7490] hover:text-[#0f4e63] transition-colors leading-relaxed"
                 >
                   {item.text}
                 </button>
@@ -224,13 +224,13 @@ export function ChatMessages({ agents }: { agents: string[] }) {
     (msg: Message) => (
       <div className="flex items-center gap-2">
         {msg.isTranslating && (
-          <span className="text-[11px] text-gray-400">{t("translate.translating")}</span>
+          <span className="text-[11px] text-[#6c858c]">{t("translate.translating")}</span>
         )}
         <button
           type="button"
           onClick={() => void handleToggleTranslation(msg.id)}
           disabled={msg.isTranslating}
-          className="rounded-full border border-white/20 bg-black/60 px-2.5 py-1 text-xs text-gray-200 transition-colors hover:border-white/40 hover:text-white disabled:cursor-wait disabled:opacity-70"
+          className="rounded-full border border-[#cfe2e7] bg-white/82 px-2.5 py-1 text-xs text-[#0f4e63] transition-colors hover:border-[#0e7490]/40 hover:bg-[#e6f4f6] disabled:cursor-wait disabled:opacity-70"
           title={msg.displayLanguage === "en" ? t("translate.toChinese") : t("translate.toEnglish")}
         >
           中 / EN
@@ -262,8 +262,8 @@ export function ChatMessages({ agents }: { agents: string[] }) {
             <div
               className={`max-w-[60%] rounded-2xl px-4 py-3 ${
                 msg.role === "user"
-                  ? "bg-white/90 backdrop-blur-sm text-black"
-                  : "bg-black/60 backdrop-blur-md text-white border border-white/20"
+                  ? "bg-[#0e7490] backdrop-blur-sm text-white shadow-[0_12px_30px_rgba(14,116,144,0.18)]"
+                  : "bg-white/84 backdrop-blur-md text-[#12323a] border border-[#cfe2e7] shadow-[0_12px_30px_rgba(15,78,99,0.08)]"
               }`}
             >
               {msg.role === "assistant" ? (
@@ -307,12 +307,12 @@ export function ChatMessages({ agents }: { agents: string[] }) {
             transition={{ duration: 0.25 }}
             className="flex justify-start"
           >
-            <div className="max-w-[75%] bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20 text-white">
+            <div className="max-w-[75%] bg-white/84 backdrop-blur-md rounded-2xl px-4 py-3 border border-[#cfe2e7] text-[#12323a] shadow-[0_12px_30px_rgba(15,78,99,0.08)]">
               <div className="mb-2">
                 <ShiningText text={`${resolvedAgentIndex >= 0 ? agents[resolvedAgentIndex] : t('chat.system')} ${t('chat.thinking')}`} />
               </div>
               <div className="flex items-start gap-2 text-sm">
-                <span className="text-gray-400">{t('chat.thought')}</span>
+                <span className="text-[#6c858c]">{t('chat.thought')}</span>
                 <AnimatePresence mode="wait">
                   <motion.span
                     key={currentThought}
@@ -320,7 +320,7 @@ export function ChatMessages({ agents }: { agents: string[] }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.3 }}
-                    className="text-gray-300"
+                    className="text-[#335158]"
                   >
                     {currentThought}
                   </motion.span>
@@ -334,7 +334,7 @@ export function ChatMessages({ agents }: { agents: string[] }) {
       {/* 流式消息 */}
       {isLoading && streamingMessage && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <div className="max-w-[75%] bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20 text-white">
+          <div className="max-w-[75%] bg-white/84 backdrop-blur-md rounded-2xl px-4 py-3 border border-[#cfe2e7] text-[#12323a] shadow-[0_12px_30px_rgba(15,78,99,0.08)]">
             <AssistantMessageContent content={streamingMessage} images={[]} />
           </div>
         </motion.div>
@@ -343,11 +343,11 @@ export function ChatMessages({ agents }: { agents: string[] }) {
       {/* 加载动画 */}
       {isLoading && !streamingMessage && !isThinking && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex justify-start">
-          <div className="bg-black/60 backdrop-blur-md rounded-2xl px-4 py-3 border border-white/20">
+          <div className="bg-white/84 backdrop-blur-md rounded-2xl px-4 py-3 border border-[#cfe2e7] shadow-[0_12px_30px_rgba(15,78,99,0.08)]">
             <div className="flex gap-1">
-              <div className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-              <div className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-              <div className="w-2 h-2 rounded-full bg-white/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="w-2 h-2 rounded-full bg-[#0e7490]/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="w-2 h-2 rounded-full bg-[#0e7490]/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="w-2 h-2 rounded-full bg-[#0e7490]/60 animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
           </div>
         </motion.div>

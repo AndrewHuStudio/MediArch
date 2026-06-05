@@ -4,39 +4,39 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #f7fbfc;
+  --foreground: #12323a;
+  --card: #ffffff;
+  --card-foreground: #12323a;
+  --popover: #ffffff;
+  --popover-foreground: #12323a;
+  --primary: #0e7490;
+  --primary-foreground: #ffffff;
+  --secondary: #e6f4f6;
+  --secondary-foreground: #12323a;
+  --muted: #e9f2f4;
+  --muted-foreground: #516b72;
+  --accent: #d9f2ed;
+  --accent-foreground: #0f4e63;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --border: #cfe2e7;
+  --input: #cfe2e7;
+  --ring: #0891b2;
+  --chart-1: #0891b2;
+  --chart-2: #059669;
+  --chart-3: #2563eb;
+  --chart-4: #f59e0b;
+  --chart-5: #dc2626;
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #ffffff;
+  --sidebar-foreground: #12323a;
+  --sidebar-primary: #0e7490;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6f4f6;
+  --sidebar-accent-foreground: #12323a;
+  --sidebar-border: #cfe2e7;
+  --sidebar-ring: #0891b2;
 }
 
 .dark {
@@ -120,7 +120,7 @@
   }
   html,
   body {
-    @apply bg-black text-white;
+    @apply bg-background text-foreground;
     height: 100%;
   }
 }
@@ -170,11 +170,11 @@
 .rotatingGradient {
   background: conic-gradient(
     from var(--r, 0deg),
-    #ffffff 0deg,
-    #888888 90deg,
-    #ffffff 180deg,
-    #888888 270deg,
-    #ffffff 360deg
+    #0e7490 0deg,
+    #7dd3fc 90deg,
+    #059669 180deg,
+    #b7c9d3 270deg,
+    #0e7490 360deg
   );
   animation: rotate 3s linear infinite;
 }
@@ -236,29 +236,29 @@
 
 /* Adding white-to-black gradient background for knowledge base */
 .knowledge-base-gradient {
-  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 25%, #e9ecef 50%, #6c757d 75%, #000000 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f7fbfc 36%, #dcecef 68%, #b7c9d3 100%);
   min-height: 100vh;
 }
 
 /* Adding smooth gradient transitions for different book categories */
 .gradient-standards {
-  background: linear-gradient(135deg, #ffffff 0%, #e3f2fd 30%, #1e40af 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 45%, #bae6fd 100%);
 }
 
 .gradient-reports {
-  background: linear-gradient(135deg, #ffffff 0%, #e8f5e8 30%, #047857 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #dcfce7 45%, #bbf7d0 100%);
 }
 
 .gradient-research {
-  background: linear-gradient(135deg, #ffffff 0%, #ffebee 30%, #b91c1c 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #fee2e2 45%, #fecaca 100%);
 }
 
 .gradient-policy {
-  background: linear-gradient(135deg, #ffffff 0%, #f3e5f5 30%, #6d28d9 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f3e8ff 45%, #ddd6fe 100%);
 }
 
 .gradient-cases {
-  background: linear-gradient(135deg, #ffffff 0%, #fff7ed 30%, #c2410c 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #ffedd5 45%, #fed7aa 100%);
 }
 
 /* Adding rainbow border animation for input box */
@@ -288,11 +288,10 @@ input {
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.12), 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
-/* Adding dark theme scrollbar styling */
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar for light theme */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.2);
+  scrollbar-color: rgba(14, 116, 144, 0.35) rgba(247, 251, 252, 0.8);
 }
 
 /* For Webkit browsers (Chrome, Safari, Edge) */
@@ -302,18 +301,18 @@ input {
 }
 
 *::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(247, 251, 252, 0.8);
   border-radius: 4px;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(14, 116, 144, 0.35);
   border-radius: 4px;
   transition: background 0.2s ease;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(14, 116, 144, 0.55);
 }
 
 /* Adding vertical text for PDF tabs */

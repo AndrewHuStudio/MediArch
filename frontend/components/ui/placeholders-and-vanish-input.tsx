@@ -69,8 +69,8 @@ export function PlaceholdersAndVanishInput({
   return (
     <form
       className={cn(
-        "w-full relative max-w-2xl mx-auto bg-gray-900/80 backdrop-blur-sm h-14 rounded-full overflow-hidden border border-gray-700/50 shadow-2xl transition duration-200",
-        value && "bg-gray-800/90",
+        "w-full relative max-w-2xl mx-auto bg-white/95 backdrop-blur-sm h-14 rounded-full overflow-hidden border border-[#cfe2e7] shadow-[0_18px_50px_rgba(14,116,144,0.16)] transition duration-200",
+        value && "bg-white",
       )}
       onSubmit={handleSubmit}
     >
@@ -84,14 +84,14 @@ export function PlaceholdersAndVanishInput({
         value={value}
         type="text"
         className={cn(
-          "w-full relative text-sm sm:text-base z-50 border-none text-white bg-transparent h-full rounded-full focus:outline-none focus:ring-0 pl-6 sm:pl-12 pr-20",
+          "w-full relative text-sm sm:text-base z-50 border-none text-[#12323a] bg-transparent h-full rounded-full focus:outline-none focus:ring-0 pl-6 sm:pl-12 pr-20",
         )}
       />
 
       <button
         disabled={!value}
         type="submit"
-        className="absolute right-3 top-1/2 z-50 -translate-y-1/2 h-8 w-8 rounded-full disabled:bg-gray-700 bg-white text-black hover:bg-gray-200 transition duration-200 flex items-center justify-center"
+        className="absolute right-3 top-1/2 z-50 -translate-y-1/2 h-8 w-8 rounded-full disabled:bg-[#d9e7eb] disabled:text-[#7a9299] bg-[#0e7490] text-white hover:bg-[#0f4e63] transition duration-200 flex items-center justify-center"
       >
         <motion.svg
           xmlns="http://www.w3.org/2000/svg"
@@ -146,7 +146,7 @@ export function PlaceholdersAndVanishInput({
                 duration: 0.3,
                 ease: "linear",
               }}
-              className="text-sm sm:text-base font-normal text-gray-400 pl-6 sm:pl-12 text-left w-[calc(100%-2rem)] truncate"
+              className="text-sm sm:text-base font-normal text-[#6c858c] pl-6 sm:pl-12 text-left w-[calc(100%-2rem)] truncate"
             >
               {placeholders[currentPlaceholder]}
             </motion.p>

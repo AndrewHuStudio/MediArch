@@ -25,6 +25,11 @@ interface PDFViewerModalProps {
 const MIN_SCALE = 0.8
 const MAX_SCALE = 2.0
 
+const lightPanelClass = "rounded-lg border border-[#cfe2e7] bg-white/82 shadow-[0_10px_26px_rgba(15,78,99,0.08)]"
+const lightIconButtonClass = "text-[#0f4e63] hover:text-[#12323a] hover:bg-[#e6f4f6] disabled:text-[#9ab0b7]"
+const lightControlButtonClass = "text-[#0f4e63] hover:text-[#12323a] hover:bg-[#e6f4f6] disabled:text-[#9ab0b7] disabled:hover:bg-transparent"
+const activeControlClass = "bg-[#e6f4f6] text-[#0e7490] ring-1 ring-[#0e7490]/20"
+
 export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps) {
   const { t } = useT()
   const [scale, setScale] = useState(1.1)
@@ -146,7 +151,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
   const valueSummary = buildPageValueSummary(source)
   const diagramType = inferDiagramType(`${source.title} ${source.section || ""} ${highlightText} ${snippetText}`)
 
-  const sideInfoText = sanitizeSideInfoText(String(source.highlightText || source.snippet || ""))
+  const sideInfoText = sanitizeSideInfoText(String(source.keyExplanation || source.highlightText || source.snippet || ""))
   const infoPreview = sideInfoText.length > 220 ? `${sideInfoText.slice(0, 220)}…` : sideInfoText
 
   const jumpToPage = (page: number) => {
@@ -172,7 +177,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+            className="fixed inset-0 z-[100] bg-[#e6f4f6]/78 backdrop-blur-sm"
           />
 
           <motion.div
@@ -180,24 +185,24 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed inset-4 md:inset-8 z-[101] bg-gray-950 rounded-xl border border-white/10 shadow-2xl overflow-hidden"
+            className="fixed inset-3 z-[101] overflow-hidden rounded-2xl border border-[#cfe2e7] bg-[#f7fbfc] shadow-[0_28px_90px_rgba(15,78,99,0.2)] md:inset-6"
           >
             <div className="flex h-full">
               {/* Sidebar */}
               <div
                 className={cn(
-                  "h-full shrink-0 border-r border-white/10 bg-black/30 backdrop-blur-md",
-                  isSidebarOpen ? "w-[320px]" : "w-14",
+                  "h-full shrink-0 border-r border-[#cfe2e7] bg-white/86 backdrop-blur-md",
+                  isSidebarOpen ? "w-[360px] xl:w-[400px]" : "w-14",
                 )}
               >
-                <div className={cn("flex h-full flex-col overflow-y-auto", isSidebarOpen ? "p-4" : "p-2")}>
+                <div className={cn("flex h-full flex-col overflow-y-auto", isSidebarOpen ? "p-5" : "p-2")}>
                   <div className={cn("flex items-start gap-2", isSidebarOpen ? "justify-between" : "flex-col items-center")}>
                     {isSidebarOpen ? (
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-white line-clamp-2" title={source.title}>
+                        <div className="line-clamp-2 text-base font-semibold leading-snug text-[#12323a]" title={source.title}>
                           {source.title}
                         </div>
-                        <div className="mt-1 text-[11px] text-gray-400">
+                        <div className="mt-1 text-[11px] text-[#6c858c]">
                           {t('viewer.pageStatus', {
                             current: currentPage,
                             total: numPages ? t('viewer.pageTotal', { n: numPages }) : "",
@@ -205,19 +210,19 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2">
                           {diagramType && (
-                            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-gray-200">
+                            <span className="inline-flex items-center rounded-full border border-[#cfe2e7] bg-[#f8fcfd] px-2 py-0.5 text-[10px] text-[#0f4e63]">
                               {diagramType}
                             </span>
                           )}
                           {source.contentType && (
-                            <span className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-gray-300">
+                            <span className="inline-flex items-center rounded-full border border-[#cfe2e7] bg-[#f8fcfd] px-2 py-0.5 text-[10px] text-[#516b72]">
                               {source.contentType === "image" ? t('viewer.contentType.image') : source.contentType === "table" ? t('viewer.contentType.table') : t('viewer.contentType.text')}
                             </span>
                           )}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-[10px] text-gray-300 text-center leading-tight">
+                      <div className="text-center text-[10px] leading-tight text-[#516b72]">
                         P{currentPage}
                       </div>
                     )}
@@ -226,7 +231,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="text-gray-300 hover:text-white hover:bg-white/10"
+                        className={lightIconButtonClass}
                         onClick={() => setIsSidebarOpen((v) => !v)}
                         title={isSidebarOpen ? t('viewer.sidebar.collapse') : t('viewer.sidebar.expand')}
                       >
@@ -236,7 +241,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                         variant="ghost"
                         size="icon"
                         onClick={onClose}
-                        className="text-gray-300 hover:text-white hover:bg-white/10"
+                        className={lightIconButtonClass}
                         title={t('graph.close')}
                       >
                         <X className="w-4 h-4" />
@@ -248,27 +253,27 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                   {isSidebarOpen && (
                     <div className="mt-4 space-y-3">
                       {valueSummary && (
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                          <div className="text-[11px] font-semibold text-gray-200">{t('viewer.valueTitle')}</div>
-                          <div className="mt-1 text-[12px] text-gray-100 leading-relaxed">{valueSummary}</div>
+                        <div className={cn(lightPanelClass, "p-3")}>
+                          <div className="text-[11px] font-semibold uppercase tracking-wide text-[#0e7490]">{t('viewer.valueTitle')}</div>
+                          <div className="mt-1 text-[12px] leading-relaxed text-[#12323a]">{valueSummary}</div>
                         </div>
                       )}
 
                       {sideInfoText && (
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                        <div className={cn(lightPanelClass, "p-3")}>
                           <div className="flex items-center justify-between gap-2">
-                            <div className="text-[11px] font-semibold text-gray-200">{t('viewer.infoTitle')}</div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-[#0e7490]">{t('viewer.infoTitle')}</div>
                             {sideInfoText.length > 220 && (
                               <button
                                 type="button"
-                                className="text-[11px] text-blue-300 hover:text-blue-200"
+                                className="text-[11px] font-medium text-[#0e7490] hover:text-[#0f4e63]"
                                 onClick={() => setIsInfoExpanded((v) => !v)}
                               >
                                 {isInfoExpanded ? t('viewer.collapse') : t('viewer.expand')}
                               </button>
                             )}
                           </div>
-                          <div className="mt-1 text-[12px] text-gray-100 leading-relaxed whitespace-pre-wrap">
+                          <div className="mt-1 whitespace-pre-wrap text-[12px] leading-relaxed text-[#335158]">
                             {isInfoExpanded ? sideInfoText : infoPreview}
                           </div>
                         </div>
@@ -280,13 +285,13 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                   <div className={cn("mt-auto", isSidebarOpen ? "pt-4" : "pt-2")}>
                     <div className={cn("space-y-2", isSidebarOpen ? "" : "flex flex-col items-center gap-2 space-y-0")}>
                        {/* Page controls */}
-                       <div className={cn("rounded-lg border border-white/10 bg-white/5", isSidebarOpen ? "p-3" : "p-1")}>
-                         {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">{t('viewer.docControls')}</div>}
+                       <div className={cn(lightPanelClass, isSidebarOpen ? "p-3" : "p-1")}>
+                         {isSidebarOpen && <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#0e7490]">{t('viewer.docControls')}</div>}
                         <div className={cn("grid gap-2", isSidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "w-full justify-center" : "h-10 w-10 p-0 justify-center",
                             )}
                             onClick={() => jumpToPage(currentPage - 1)}
@@ -299,7 +304,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "w-full justify-center" : "h-10 w-10 p-0 justify-center",
                             )}
                             onClick={() => jumpToPage(currentPage + 1)}
@@ -313,13 +318,13 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                       </div>
 
                       {/* View controls */}
-                      <div className={cn("rounded-lg border border-white/10 bg-white/5", isSidebarOpen ? "p-3" : "p-1")}>
-                        {isSidebarOpen && <div className="text-[11px] font-semibold text-gray-200 mb-2">{t('viewer.viewControls')}</div>}
+                      <div className={cn(lightPanelClass, isSidebarOpen ? "p-3" : "p-1")}>
+                        {isSidebarOpen && <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#0e7490]">{t('viewer.viewControls')}</div>}
                         <div className={cn("grid gap-2", isSidebarOpen ? "grid-cols-2" : "grid-cols-1")}>
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "justify-start" : "h-10 w-10 p-0 justify-center",
                             )}
                             onClick={() => zoom("in")}
@@ -332,7 +337,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "justify-start" : "h-10 w-10 p-0 justify-center",
                             )}
                             onClick={() => zoom("out")}
@@ -345,9 +350,9 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "justify-start" : "h-10 w-10 p-0 justify-center",
-                              fitMode === "width" && "bg-white/10",
+                              fitMode === "width" && activeControlClass,
                             )}
                             onClick={handleFitWidth}
                             title={t('viewer.fitWidth')}
@@ -358,9 +363,9 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           <Button
                             variant="ghost"
                             className={cn(
-                              "text-gray-200 hover:text-white hover:bg-white/10",
+                              lightControlButtonClass,
                               isSidebarOpen ? "justify-start" : "h-10 w-10 p-0 justify-center",
-                              fitMode === "page" && "bg-white/10",
+                              fitMode === "page" && activeControlClass,
                             )}
                             onClick={handleFitPage}
                             title={t('viewer.fitPage')}
@@ -372,7 +377,7 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
                           {isSidebarOpen && (
                             <Button
                               variant="ghost"
-                              className="col-span-2 justify-start text-gray-200 hover:text-white hover:bg-white/10"
+                              className={cn("col-span-2 justify-start", lightControlButtonClass)}
                               onClick={resetView}
                             >
                               <RotateCcw className="w-4 h-4 mr-2" />
@@ -387,28 +392,28 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
               </div>
 
               {/* Main viewer */}
-              <div ref={viewerRef} className="flex-1 min-w-0 bg-gray-900/30">
+              <div ref={viewerRef} className="min-w-0 flex-1 bg-[#edf6f8]">
                 <div className="h-full overflow-auto">
                   {isOpen && source.pdfUrl && (
                     <div className="min-h-full w-full flex justify-center p-2 md:p-4">
-                      <div className="relative bg-white/95 rounded-lg shadow-xl overflow-hidden">
+                      <div className="relative overflow-hidden rounded-xl bg-white shadow-[0_18px_54px_rgba(15,78,99,0.16)]">
                         <Document
                           file={source.pdfUrl}
-                          loading={<div className="p-6 text-gray-200">{t('viewer.loadingPdf')}</div>}
+                          loading={<div className="p-6 text-[#516b72]">{t('viewer.loadingPdf')}</div>}
                           error={
-                            <div className="p-6 bg-white min-h-[480px] w-full max-w-3xl">
+                            <div className="min-h-[480px] w-full max-w-3xl bg-white p-6">
                               <div className="space-y-4">
-                                <div className="text-sm text-gray-600">
+                                <div className="text-sm text-[#516b72]">
                                   {t('viewer.pdfLoadError')}
                                 </div>
-                                <div className="border border-gray-200 rounded-lg p-4 bg-yellow-50/60">
-                                  <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.keyContent')}</div>
-                              <div className="text-sm text-gray-900 leading-relaxed">{highlightText}</div>
+                                <div className="rounded-lg border border-[#d7ead8] bg-[#f2fbf2] p-4">
+                                  <div className="mb-2 text-xs font-semibold text-[#0f6b4c]">{t('viewer.keyContent')}</div>
+                                  <div className="text-sm leading-relaxed text-[#12323a]">{highlightText}</div>
                                 </div>
                                 {showFullSnippet && (
-                                  <div className="border border-gray-200 rounded-lg p-4">
-                                    <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.contextParagraph')}</div>
-                                    <div className="text-sm text-gray-800 leading-relaxed">{snippetText}</div>
+                                  <div className="rounded-lg border border-[#cfe2e7] p-4">
+                                    <div className="mb-2 text-xs font-semibold text-[#0f4e63]">{t('viewer.contextParagraph')}</div>
+                                    <div className="text-sm leading-relaxed text-[#335158]">{snippetText}</div>
                                   </div>
                                 )}
                               </div>
@@ -452,25 +457,25 @@ export function PDFViewerModal({ isOpen, onClose, source }: PDFViewerModalProps)
 
                   {(!source.pdfUrl) && (
                     <div className="min-h-full w-full flex justify-center p-2 md:p-6">
-                      <div className="w-full max-w-3xl bg-white rounded-xl shadow-2xl p-6">
+                      <div className="w-full max-w-3xl rounded-xl border border-[#cfe2e7] bg-white p-6 shadow-[0_18px_54px_rgba(15,78,99,0.16)]">
                         <div className="space-y-4">
-                          <div className="border-b border-gray-200 pb-3">
-                            <h2 className="text-xl font-bold text-gray-900">{source.title}</h2>
-                            <div className="mt-1 text-sm text-gray-600">
+                          <div className="border-b border-[#d9e7eb] pb-3">
+                            <h2 className="text-xl font-bold text-[#12323a]">{source.title}</h2>
+                            <div className="mt-1 text-sm text-[#516b72]">
                               {t('pdf.page', { n: source.pageNumber })}{source.section ? ` · ${source.section}` : ""}
                             </div>
                           </div>
-                          <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
-                            <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.keyContent')}</div>
-                            <div className="text-sm text-gray-900 leading-relaxed">{highlightText}</div>
+                          <div className="rounded-lg border border-[#d7ead8] bg-[#f2fbf2] p-4">
+                            <div className="mb-2 text-xs font-semibold text-[#0f6b4c]">{t('viewer.keyContent')}</div>
+                            <div className="text-sm leading-relaxed text-[#12323a]">{highlightText}</div>
                           </div>
                           {showFullSnippet && (
-                            <div className="border border-gray-200 rounded-lg p-4">
-                              <div className="text-xs font-semibold text-gray-700 mb-2">{t('viewer.contextParagraph')}</div>
-                              <div className="text-sm text-gray-800 leading-relaxed">{snippetText}</div>
+                            <div className="rounded-lg border border-[#cfe2e7] p-4">
+                              <div className="mb-2 text-xs font-semibold text-[#0f4e63]">{t('viewer.contextParagraph')}</div>
+                              <div className="text-sm leading-relaxed text-[#335158]">{snippetText}</div>
                             </div>
                           )}
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-[#6c858c]">
                             {t('viewer.textPreviewHint')}
                           </div>
                         </div>

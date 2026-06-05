@@ -98,7 +98,7 @@ export function ChatInput({
   if (variant === "initial") {
     return (
       <div className="w-full">
-        <div className="relative bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden group hover:border-white/20 transition-colors duration-300">
+        <div className="relative bg-white/88 backdrop-blur-xl rounded-2xl border border-[#cfe2e7] shadow-[0_22px_60px_rgba(15,78,99,0.14)] overflow-hidden group hover:border-[#0e7490]/40 transition-colors duration-300">
           <Textarea
             ref={textareaRef}
             value={message}
@@ -110,9 +110,9 @@ export function ChatInput({
             placeholder={resolvedPlaceholder}
             className={cn(
               "w-full px-6 py-5 resize-none border-none",
-              "bg-transparent text-white text-lg",
+              "bg-transparent text-[#12323a] text-lg",
               "focus-visible:ring-0 focus-visible:ring-offset-0",
-              "placeholder:text-neutral-500 min-h-[80px] max-h-[200px]",
+              "placeholder:text-[#7a9299] min-h-[80px] max-h-[200px]",
               "overflow-y-auto",
             )}
           />
@@ -122,7 +122,7 @@ export function ChatInput({
               {uploadedFiles.map((file, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-1.5 text-xs text-white backdrop-blur-md"
+                  className="flex items-center gap-2 bg-[#e6f4f6] rounded-lg px-3 py-1.5 text-xs text-[#0f4e63] backdrop-blur-md"
                 >
                   {file.type.startsWith("image/") ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                   <span className="truncate max-w-[150px]">{file.name}</span>
@@ -137,14 +137,14 @@ export function ChatInput({
             </div>
           )}
 
-          <div className="flex items-center justify-between px-4 py-3 bg-white/5 border-t border-white/5">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#f8fcfd] border-t border-[#d9e7eb]">
             <div className="flex items-center gap-2">
               <input ref={fileInputRef} type="file" multiple onChange={handleFileChange} className="hidden" />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
+                className="text-[#6c858c] hover:text-[#0e7490] hover:bg-[#e6f4f6] transition-all"
               >
                 <Paperclip className="w-5 h-5" />
               </Button>
@@ -157,12 +157,12 @@ export function ChatInput({
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all text-xs",
                     deepSearch
-                      ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
-                      : "text-neutral-400 hover:text-white hover:bg-white/10"
+                      ? "bg-[#d9f2ed] text-[#047857] hover:bg-[#c8ebe4] border border-[#0e7490]/25"
+                      : "text-[#6c858c] hover:text-[#0e7490] hover:bg-[#e6f4f6]"
                   )}
                   title={t('chat.deepSearchTitle')}
                 >
-                  <Brain className={cn("w-3.5 h-3.5", deepSearch && "text-blue-300")} />
+                  <Brain className={cn("w-3.5 h-3.5", deepSearch && "text-[#047857]")} />
                   <span>{t('chat.deepSearch')}</span>
                 </Button>
               )}
@@ -174,8 +174,8 @@ export function ChatInput({
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300",
                 canSend
-                  ? "bg-white text-black hover:bg-neutral-200 shadow-lg shadow-white/10"
-                  : "bg-white/10 text-neutral-500 cursor-not-allowed",
+                  ? "bg-[#0e7490] text-white hover:bg-[#0f4e63] shadow-lg shadow-[#0e7490]/20"
+                  : "bg-[#d9e7eb] text-[#7a9299] cursor-not-allowed",
               )}
             >
               <span className="text-sm font-medium">{t('chat.send')}</span>
@@ -190,7 +190,7 @@ export function ChatInput({
   // 对话状态的样式
   return (
     <div className="space-y-3">
-      <div className="relative bg-black/60 backdrop-blur-md rounded-xl border border-neutral-700">
+      <div className="relative bg-white/88 backdrop-blur-md rounded-xl border border-[#cfe2e7] shadow-[0_16px_42px_rgba(15,78,99,0.1)]">
         <Textarea
           ref={textareaRef}
           value={message}
@@ -202,21 +202,21 @@ export function ChatInput({
           placeholder={resolvedPlaceholder}
           className={cn(
             "w-full px-4 py-3 resize-none border-none",
-            "bg-transparent text-white text-sm",
+            "bg-transparent text-[#12323a] text-sm",
             "focus-visible:ring-0 focus-visible:ring-offset-0",
-            "placeholder:text-neutral-400 min-h-[48px]",
+            "placeholder:text-[#7a9299] min-h-[48px]",
             "[&::-webkit-scrollbar]:w-2",
             "[&::-webkit-scrollbar-track]:bg-transparent",
-            "[&::-webkit-scrollbar-thumb]:bg-white/20",
+            "[&::-webkit-scrollbar-thumb]:bg-[#0e7490]/25",
             "[&::-webkit-scrollbar-thumb]:rounded-full",
-            "[&::-webkit-scrollbar-thumb]:hover:bg-white/30",
+            "[&::-webkit-scrollbar-thumb]:hover:bg-[#0e7490]/40",
           )}
         />
 
         {uploadedFiles.length > 0 && (
           <div className="px-4 pb-2 flex flex-wrap gap-2">
             {uploadedFiles.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-neutral-700/50 rounded-lg px-3 py-1.5 text-xs text-white">
+              <div key={idx} className="flex items-center gap-2 bg-[#e6f4f6] rounded-lg px-3 py-1.5 text-xs text-[#0f4e63]">
                 {file.type.startsWith("image/") ? <ImageIcon className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
                 <span className="truncate max-w-[150px]">{file.name}</span>
                 <button
@@ -237,7 +237,7 @@ export function ChatInput({
               variant="ghost"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              className="text-white hover:bg-neutral-700"
+              className="text-[#6c858c] hover:text-[#0e7490] hover:bg-[#e6f4f6]"
             >
               <Paperclip className="w-4 h-4" />
             </Button>
@@ -250,12 +250,12 @@ export function ChatInput({
                 className={cn(
                   "flex items-center gap-1 px-2 py-1 rounded-md transition-all text-xs",
                   deepSearch
-                    ? "bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-400/30"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-700"
+                    ? "bg-[#d9f2ed] text-[#047857] hover:bg-[#c8ebe4] border border-[#0e7490]/25"
+                    : "text-[#6c858c] hover:text-[#0e7490] hover:bg-[#e6f4f6]"
                 )}
                 title={t('chat.deepSearchTitle')}
               >
-                <Brain className={cn("w-3 h-3", deepSearch && "text-blue-300")} />
+                <Brain className={cn("w-3 h-3", deepSearch && "text-[#047857]")} />
                 <span className="hidden sm:inline">{t('chat.deepSearchShort')}</span>
               </Button>
             )}
@@ -266,7 +266,7 @@ export function ChatInput({
             onClick={onSend}
             className={cn(
               "flex items-center gap-1 px-3 py-2 rounded-lg transition-colors",
-              canSend ? "bg-white text-black hover:bg-neutral-200" : "bg-neutral-700 text-neutral-400 cursor-not-allowed",
+              canSend ? "bg-[#0e7490] text-white hover:bg-[#0f4e63]" : "bg-[#d9e7eb] text-[#7a9299] cursor-not-allowed",
             )}
           >
             <ArrowUpIcon className="w-4 h-4" />
@@ -274,7 +274,7 @@ export function ChatInput({
         </div>
       </div>
 
-      <p className="text-center text-[11px] text-gray-400">{t('chat.disclaimer')}</p>
+      <p className="text-center text-[11px] text-[#6c858c]">{t('chat.disclaimer')}</p>
     </div>
   )
 }

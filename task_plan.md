@@ -1,5 +1,35 @@
 # Task Plan
 
+## Current Task: 54-Question Benchmark Pipeline
+- [complete] Confirm reviewer-driven benchmark requirements: larger 54-question set, operationalized metrics, model-based judging, inter-rater reliability, and bootstrap confidence intervals.
+- [complete] Add tested benchmark schema/statistics module for canonical questions, run matrix, adjudication, kappa, and CI reporting.
+- [complete] Convert `benchmark_questions_54.csv` to the canonical model-judge-friendly schema.
+- [complete] Generate `benchmark_runs_54.csv` as the 54 x 5 long-form run table.
+- [complete] Replace benchmark runner/scorer/review helper scripts with canonical 54-question pipeline defaults.
+- [complete] Delete obsolete intermediate question tables and old CSV/XLSX scoring templates.
+- [complete] Run final focused verification and report remaining execution prerequisites.
+
+## Current Task: Related Sources Light Theme
+- [complete] Locate related-source/PDF preview UI and page metadata data flow.
+- [complete] Add focused light-theme/interface checks before production edits.
+- [complete] Convert related-source preview modal to the MediArch light theme and improve layout.
+- [complete] Verify "page value" and "key explanation" backend fields still render from API data.
+- [complete] Run theme and TypeScript checks, then report remaining risks.
+
+## Current Task Notes
+- Preserve existing benchmark-baseline planning content below.
+- Do not revert the existing light-theme edits already present in the workspace.
+
+## Current Task: Instant Navigation
+- [complete] Locate the route transition code causing black flashes.
+- [complete] Replace the full-screen black overlay and exit animation with immediate navigation.
+- [complete] Keep the existing `usePageTransition` API so current callers do not need large rewrites.
+- [complete] Add prefetching for primary routes and hover/focus prefetch for `/chat`.
+- [complete] Verify theme checks and TypeScript compilation.
+
+## Navigation Finding
+- The black interruption was caused by `frontend/components/page-transition.tsx`: it rendered a fixed `bg-black` overlay and used `AnimatePresence mode="wait"` with exit/enter opacity and scale transitions on every pathname change.
+
 ## Goal
 Add two independent experimental baselines for the MediArch QA benchmark:
 BM25+LLM and Vector RAG+LLM. Keep these separate from the existing

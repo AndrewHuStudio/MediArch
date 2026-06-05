@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${geistSans} ${geistMono} antialiased dark`}>
+    <html lang="en" suppressHydrationWarning className={`${geistSans} ${geistMono} antialiased`}>
       <head>
         <link rel="preload" href="/images/standard-front.png" as="image" />
         <link rel="preload" href="/images/policy-front.png" as="image" />
@@ -28,7 +28,7 @@ export default function RootLayout({
         <link rel="preload" href="/images/paper-front.png" as="image" />
         <link rel="preload" href="/images/online-cases-front.png" as="image" />
       </head>
-      <body className="bg-black" suppressHydrationWarning>
+      <body className="bg-background text-foreground" suppressHydrationWarning>
         <LanguageProvider>
           {children}
         </LanguageProvider>

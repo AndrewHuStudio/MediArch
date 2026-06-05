@@ -42,7 +42,7 @@ export function ChatHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm -z-10" />
+      <div className="absolute inset-0 bg-white/72 backdrop-blur-md border-b border-[#d9e7eb] -z-10" />
       <div className="max-w-7xl mx-auto flex items-center justify-end py-3 px-6 relative z-10">
         <nav className="flex items-center gap-8">
           {navItems.map((item) => (
@@ -56,8 +56,8 @@ export function ChatHeader() {
                 href={item.href}
                 className={`text-sm font-medium transition-colors cursor-pointer ${
                   hoveredItem === item.label
-                    ? "text-white border-b border-white pb-1"
-                    : "text-gray-400 hover:text-white"
+                    ? "text-[#12323a] border-b border-[#0e7490] pb-1"
+                    : "text-[#6c858c] hover:text-[#0e7490]"
                 }`}
               >
                 {item.label}
@@ -70,13 +70,13 @@ export function ChatHeader() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute top-full left-0 mt-2 min-w-[160px] bg-black/90 backdrop-blur-md border border-white/20 rounded-lg shadow-xl overflow-hidden"
+                    className="absolute top-full left-0 mt-2 min-w-[160px] bg-white/95 backdrop-blur-md border border-[#cfe2e7] rounded-lg shadow-xl overflow-hidden"
                   >
                     {item.dropdown.map((dropdownItem, index) => (
                       <Link
                         key={dropdownItem.label}
                         href={dropdownItem.href}
-                        className="block px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 cursor-pointer"
+                        className="block px-4 py-2.5 text-sm text-[#516b72] hover:text-[#0e7490] hover:bg-[#e6f4f6] transition-all duration-200 cursor-pointer"
                         style={{
                           animationDelay: `${index * 50}ms`,
                         }}
@@ -91,12 +91,12 @@ export function ChatHeader() {
           ))}
           <button
             onClick={() => setLocale(locale === 'zh' ? 'en' : 'zh')}
-            className="flex items-center gap-1.5 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-sm font-medium text-[#6c858c] hover:text-[#0e7490] transition-colors"
           >
             <Globe className="w-4 h-4" />
-            <span className={locale === 'zh' ? 'text-white' : ''}>{t('chatHeader.lang.zh')}</span>
-            <span className="text-gray-600">/</span>
-            <span className={locale === 'en' ? 'text-white' : ''}>{t('chatHeader.lang.en')}</span>
+            <span className={locale === 'zh' ? 'text-[#12323a]' : ''}>{t('chatHeader.lang.zh')}</span>
+            <span className="text-[#b7c9d3]">/</span>
+            <span className={locale === 'en' ? 'text-[#12323a]' : ''}>{t('chatHeader.lang.en')}</span>
           </button>
         </nav>
       </div>

@@ -130,7 +130,7 @@ export function getBooks(locale: Locale): BookData[] {
         offsetY: 0,
       },
       backgroundColor: "#1e40af",
-      textColor: "white",
+      textColor: "dark",
     },
     {
       id: "policy-documents",
@@ -159,7 +159,7 @@ export function getBooks(locale: Locale): BookData[] {
         offsetY: 0,
       },
       backgroundColor: "#6d28d9",
-      textColor: "white",
+      textColor: "dark",
     },
     {
       id: "books-reports",
@@ -188,7 +188,7 @@ export function getBooks(locale: Locale): BookData[] {
         offsetY: 0,
       },
       backgroundColor: "#047857",
-      textColor: "white",
+      textColor: "dark",
     },
     {
       id: "research-papers",
@@ -217,7 +217,7 @@ export function getBooks(locale: Locale): BookData[] {
         offsetY: 0,
       },
       backgroundColor: "#b91c1c",
-      textColor: "white",
+      textColor: "dark",
     },
     {
       id: "online-cases",
@@ -249,7 +249,7 @@ export function getBooks(locale: Locale): BookData[] {
         offsetY: 0,
       },
       backgroundColor: "#c2410c",
-      textColor: "white",
+      textColor: "dark",
     },
   ]
 }

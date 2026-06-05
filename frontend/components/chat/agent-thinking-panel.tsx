@@ -72,20 +72,20 @@ export default function AgentThinkingPanel({
     switch (agentStatus) {
       case "thinking":
         return {
-          bg: "bg-blue-950/50",
-          border: "border-blue-500/30",
+          bg: "bg-blue-50/90",
+          border: "border-blue-300/60",
           dot: "bg-blue-400 animate-pulse",
-          text: "text-blue-300",
+          text: "text-blue-700",
           label: t('agent.status.thinking'),
           loaderActive: true,
           loaderColor: "blue" as const,
         }
       case "synthesizing":
         return {
-          bg: "bg-green-950/50",
-          border: "border-green-500/50",
+          bg: "bg-emerald-50/90",
+          border: "border-emerald-300/70",
           dot: "bg-green-400",
-          text: "text-green-300",
+          text: "text-emerald-700",
           label: t('agent.status.synthesizing'),
           loaderActive: true,
           loaderColor: "green" as const,
@@ -93,10 +93,10 @@ export default function AgentThinkingPanel({
       case "idle":
       default:
         return {
-          bg: "bg-gray-950/50",
-          border: "border-gray-500/30",
-          dot: "bg-gray-400",
-          text: "text-gray-400",
+          bg: "bg-slate-50/90",
+          border: "border-[#cfe2e7]",
+          dot: "bg-[#8ba4ad]",
+          text: "text-[#6c858c]",
           label: t('agent.status.idle'),
           loaderActive: false,
           loaderColor: "blue" as const,
@@ -113,33 +113,33 @@ export default function AgentThinkingPanel({
 
     if (isActive && isThinking) {
       return {
-        className: "border-blue-500/60 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.2)]",
+        className: "border-blue-300/70 bg-blue-50 text-blue-700 shadow-[0_0_20px_rgba(59,130,246,0.14)]",
         icon: <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin" />,
         style: {
           boxShadow: "inset 0 0 0 2px hsla(210,100%,60%,.5)",
-          background: "linear-gradient(180deg, rgba(56,189,248,.08), transparent)",
+          background: "linear-gradient(180deg, rgba(224,242,254,.92), rgba(255,255,255,.4))",
         } as React.CSSProperties,
       }
     } else if (isComplete) {
       return {
-        className: "border-green-500/30 bg-green-500/10 text-green-400",
+        className: "border-green-300/60 bg-green-50 text-green-700",
         icon: <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />,
         style: undefined,
       }
     } else {
       return {
-        className: "border-white/10 bg-white/5 text-gray-400",
-        icon: <Circle className="w-3.5 h-3.5 text-gray-500" />,
+        className: "border-[#d9e7eb] bg-white/70 text-[#6c858c]",
+        icon: <Circle className="w-3.5 h-3.5 text-[#8ba4ad]" />,
         style: undefined,
       }
     }
   }
 
   return (
-    <div className="box-border flex h-full min-h-0 flex-col rounded-lg border border-white/10 bg-black/40 p-4 backdrop-blur-md">
+    <div className="box-border flex h-full min-h-0 flex-col rounded-lg border border-[#cfe2e7] bg-white/72 p-4 backdrop-blur-md shadow-[0_18px_48px_rgba(15,78,99,0.1)]">
       <div className="mb-4 flex flex-shrink-0 items-center gap-2">
         <Brain className="h-5 w-5 text-blue-400" />
-        <h3 className="text-sm font-semibold text-white">{t('agent.title')}</h3>
+        <h3 className="text-sm font-semibold text-[#12323a]">{t('agent.title')}</h3>
       </div>
 
       <div className="flex flex-1 min-h-0 flex-col gap-3">
@@ -149,13 +149,13 @@ export default function AgentThinkingPanel({
             <span className={`text-xs font-medium ${cardStyle.text}`}>{cardStyle.label}</span>
             <span className={`h-2 w-2 rounded-full ${cardStyle.dot}`} />
           </div>
-          <div className="relative z-10 text-sm text-white/90">
+          <div className="relative z-10 text-sm text-[#335158]">
             {isThinking ? currentThought : t('agent.waitingNext')}
           </div>
         </div>
 
         <div className="flex-1 space-y-2 overflow-hidden">
-          <p className="text-xs text-white/60">{t('agent.progress')}</p>
+          <p className="text-xs text-[#6c858c]">{t('agent.progress')}</p>
           <div className="custom-scrollbar flex-1 space-y-2 overflow-y-auto pr-1">
             {agents.map((agent, index) => {
               const style = getAgentStyle(agent, index)
@@ -164,7 +164,7 @@ export default function AgentThinkingPanel({
                   key={agent}
                   ref={(el) => { agentRefs.current[index] = el }}
                   className={cn(
-                    "rounded-lg border px-3 py-2 text-xs font-medium text-white/80 transition-all duration-300 flex items-center justify-between",
+                    "rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-300 flex items-center justify-between",
                     style.className,
                   )}
                   style={style.style}

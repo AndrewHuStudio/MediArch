@@ -8,7 +8,7 @@ interface ShiningTextProps {
 export function ShiningText({ text }: ShiningTextProps) {
   return (
     <motion.span
-      className="bg-[linear-gradient(110deg,#404040,35%,#fff,50%,#404040,75%,#404040)] bg-[length:200%_100%] bg-clip-text text-base font-regular text-transparent inline-block"
+      className="bg-[linear-gradient(110deg,#12323a,35%,#0e7490,50%,#12323a,75%,#12323a)] bg-[length:200%_100%] bg-clip-text text-base font-regular text-transparent inline-block"
       initial={{ backgroundPosition: "200% 0" }}
       animate={{ backgroundPosition: "-200% 0" }}
       transition={{

@@ -62,7 +62,7 @@ export function ConversationTopBar({
       transition={{ duration: 0.25, ease: "easeOut" }}
       className={cn(
         "w-full flex items-center justify-start",
-        "bg-black/30 backdrop-blur-sm border-b border-white/5",
+        "bg-white/72 backdrop-blur-sm border-b border-[#d9e7eb]",
         "px-2 lg:px-6 py-3"
       )}
     >
@@ -73,7 +73,7 @@ export function ConversationTopBar({
               value={draftTitle}
               onChange={(event) => setDraftTitle(event.target.value)}
               autoFocus
-              className="bg-white/5 border-white/20 text-sm text-white h-8 max-w-[400px]"
+              className="bg-white/90 border-[#cfe2e7] text-sm text-[#12323a] h-8 max-w-[400px]"
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   handleRenameConfirm()
@@ -86,7 +86,7 @@ export function ConversationTopBar({
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-300 hover:bg-white/10 h-8 w-8"
+              className="text-[#6c858c] hover:bg-[#e6f4f6] h-8 w-8"
               onClick={handleRenameCancel}
               aria-label={t('chat.aria.cancelRename')}
             >
@@ -95,7 +95,7 @@ export function ConversationTopBar({
             <Button
               variant="ghost"
               size="icon"
-              className="text-emerald-300 hover:bg-emerald-500/10 disabled:text-gray-500 h-8 w-8"
+              className="text-[#047857] hover:bg-emerald-500/10 disabled:text-[#8ba4ad] h-8 w-8"
               onClick={handleRenameConfirm}
               disabled={renameDisabled}
               aria-label={t('chat.aria.confirmRename')}
@@ -105,21 +105,21 @@ export function ConversationTopBar({
           </>
         ) : (
           <>
-            <h2 className="text-sm font-medium text-white/90 truncate max-w-[500px]">{title}</h2>
+            <h2 className="text-sm font-medium text-[#12323a] truncate max-w-[500px]">{title}</h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 flex-shrink-0"
+                  className="text-[#6c858c] hover:text-[#0e7490] hover:bg-[#e6f4f6] h-8 w-8 flex-shrink-0"
                   aria-label={t('chat.aria.actions')}
                 >
                   <EllipsisVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-black/90 backdrop-blur-md text-white border-white/10">
+              <DropdownMenuContent align="end" className="bg-white/95 backdrop-blur-md text-[#12323a] border-[#cfe2e7]">
                 <DropdownMenuItem
-                  className="gap-2 focus:bg-white/10"
+                  className="gap-2 focus:bg-[#e6f4f6]"
                   onSelect={(event) => {
                     event.preventDefault()
                     setIsRenaming(true)
@@ -129,7 +129,7 @@ export function ConversationTopBar({
                   {t('chat.rename')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  className="gap-2 focus:bg-white/10"
+                  className="gap-2 focus:bg-[#e6f4f6]"
                   onSelect={(event) => {
                     event.preventDefault()
                     onPinToggle()

@@ -23,10 +23,11 @@ const GradientButton = ({
 }: GradientButtonProps) => {
   const commonGradientStyles = `
     relative rounded-[50px] cursor-pointer
-    after:content-[""] after:block after:absolute after:bg-black
+    after:content-[""] after:block after:absolute after:bg-white
     after:inset-[2px] after:rounded-[48px] after:z-[1]
     after:transition-opacity after:duration-300 after:ease-linear
-    flex items-center justify-center
+    flex items-center justify-center shadow-[0_12px_28px_rgba(14,116,144,0.14)]
+    transition-shadow duration-300 hover:shadow-[0_16px_36px_rgba(14,116,144,0.2)]
     ${disabled ? "opacity-50 cursor-not-allowed" : ""}
   `
 
@@ -39,7 +40,7 @@ const GradientButton = ({
   }
 
   return (
-    <div className="text-white text-center">
+    <div className="text-[#12323a] text-center">
       <div
         role="button"
         tabIndex={disabled ? -1 : 0}
@@ -60,7 +61,7 @@ const GradientButton = ({
         aria-disabled={disabled}
         {...props}
       >
-        <span className="relative z-10 text-white flex items-center justify-center font-semibold">{children}</span>
+        <span className="relative z-10 text-[#12323a] flex items-center justify-center font-semibold">{children}</span>
       </div>
     </div>
   )

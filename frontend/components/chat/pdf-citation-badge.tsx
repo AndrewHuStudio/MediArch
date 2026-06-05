@@ -18,7 +18,7 @@ export function PDFCitationBadge({ source, citationNumber, onClick, style }: PDF
   return (
     <button
       type="button"
-      className="absolute pointer-events-auto rounded-md border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-200 shadow-sm hover:bg-blue-500/20 transition-colors"
+      className="absolute pointer-events-auto rounded-md border border-[#0e7490]/30 bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-[#0e7490] shadow-sm hover:bg-[#e6f4f6] transition-colors"
       style={style}
       onClick={onClick}
       title={`${source.title} · ${t('pdf.page', { n: source.pageNumber })}`}
@@ -29,6 +29,10 @@ export function PDFCitationBadge({ source, citationNumber, onClick, style }: PDF
 }
 
 export function buildPageValueSummary(source: PDFSource): string | null {
+  if (source.pageValue?.trim()) {
+    return source.pageValue.trim()
+  }
+
   const title = String(source.title || "")
   const section = String(source.section || "")
   const highlight = String(source.highlightText || "")

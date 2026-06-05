@@ -1,4 +1,4 @@
-import { getApiUrl } from "@/lib/api"
+import { getApiUrl } from "../api"
 
 const API_IMAGE_PATH_RE = /(?:\/api\/v1)?\/documents\/image\?path=([^&#]+)/i
 const OCR_IMAGE_PATH_RE = /documents_ocr\/([^/]+)\/([^/]+)\/(?:full\/)?images\//i

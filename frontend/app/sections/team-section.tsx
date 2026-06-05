@@ -113,13 +113,11 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
   }
 
   return (
-    <section id="section-3" ref={sectionRef} className="relative h-screen flex flex-col bg-slate-950 overflow-hidden">
+    <section id="section-3" ref={sectionRef} className="relative h-screen flex flex-col bg-[#eef7f8] overflow-hidden">
       {/* Layer 1: Background light effect layer */}
       <div
         className="pointer-events-none absolute inset-0 z-0
-        [background:radial-gradient(120%_80%_at_50%_0%,rgba(34,211,238,0.18),transparent_55%),
-        radial-gradient(80%_60%_at_0%_0%,rgba(2,6,23,0.65),transparent_60%),
-        radial-gradient(80%_60%_at_100%_0%,rgba(2,6,23,0.65),transparent_60%)]"
+        [background:linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(238,247,248,0.5)_46%,rgba(226,240,243,0.88)_100%)]"
       />
 
       {/* Layer 1: Light bar + glow */}
@@ -134,14 +132,14 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
             variants={lightBarVariants}
             style={{ transformOrigin: "50% 50%" }}
             className="relative h-[5px] w-full bg-cyan-300 rounded-[2px]
-                      shadow-[0_2px_30px_rgba(34,211,238,0.9),0_8px_80px_rgba(34,211,238,0.55)]"
+                      shadow-[0_2px_20px_rgba(14,116,144,0.45),0_8px_60px_rgba(34,211,238,0.28)]"
           />
 
           {/* Top highlight */}
           <motion.div
             variants={highlightVariants}
             className="pointer-events-none absolute -top-[1px] inset-x-0 h-px
-                      [background:linear-gradient(to_right,transparent,rgba(255,255,255,0.9)_10%,rgba(255,255,255,0.9)_90%,transparent)] opacity-90"
+                      [background:linear-gradient(to_right,transparent,rgba(255,255,255,0.95)_10%,rgba(255,255,255,0.95)_90%,transparent)] opacity-90"
           />
 
           {/* Bottom glow */}
@@ -150,8 +148,8 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
             style={{ transformOrigin: "top" }}
             className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2
                       h-[50vh] w-[125%]
-                      [background:radial-gradient(80%_110%_at_50%_0%,rgba(34,211,238,0.45),rgba(34,211,238,0.18)_40%,transparent_72%)]
-                      blur-[22px]"
+                      [background:linear-gradient(180deg,rgba(34,211,238,0.22),rgba(34,211,238,0.08)_38%,transparent_74%)]
+                      blur-[18px]"
           />
         </motion.div>
       </div>
@@ -165,7 +163,7 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
             relative z-[90] inline-block leading-[1.08] pb-[0.1em]
             bg-clip-text text-transparent [-webkit-text-fill-color:transparent]
             text-[clamp(2rem,5vw,3.5rem)] font-extrabold tracking-tight
-            bg-[linear-gradient(to_bottom,_#ffffff_0%,_#e9ecef_25%,_#c5cbd3_55%,_#5b636d_100%)]
+            bg-[linear-gradient(to_bottom,_#12323a_0%,_#0e7490_55%,_#8ba4ad_100%)]
           "
         >
           Design X Group
@@ -176,7 +174,7 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
       <div className="relative z-50 flex-1 flex items-center justify-center">
         <LazyMount
           className="w-[clamp(600px,70vw,900px)] h-[clamp(350px,45vh,500px)] -translate-y-4 md:-translate-y-6"
-          fallback={<div className="h-full w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur" />}
+          fallback={<div className="h-full w-full rounded-2xl border border-[#cfe2e7] bg-white/70 backdrop-blur" />}
         >
           <CircularGallery items={teamMembers} radius={280} />
         </LazyMount>
@@ -187,7 +185,7 @@ export default function TeamSection({ onNavigate }: TeamSectionProps) {
         <button
           onClick={() => onNavigate(2)}
           data-nav-button
-          className="text-white/60 hover:text-white transition-colors"
+          className="text-[#6c858c] hover:text-[#0e7490] transition-colors"
         >
           <ChevronUp className="w-6 h-6" />
         </button>
