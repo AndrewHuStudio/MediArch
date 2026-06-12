@@ -18,6 +18,7 @@ import hashlib
 from typing import Optional, Dict, Any, List, Callable, Tuple, Set
 from dataclasses import dataclass, field
 from collections import defaultdict
+from data_process.kg.concurrency import map_chunks_concurrent
 from datetime import datetime
 
 from backend.databases.graph.utils.call_llm_api import LLMClient
@@ -113,6 +114,13 @@ class KgModule:
             custom_config: 自定义配置(当strategy="custom"时使用)
         """
         self.llm = LLMClient()
+
+        # chunk 级并发数 (I/O 密集: 等 LLM 返回)。env KG_MAX_WORKERS 可调,
+        # 默认保守 6, 避免触发 LLM 代理限流。1 = 退回串行。
+        try:
+            self.max_workers = max(1, int(os.getenv("KG_MAX_WORKERS", "6")))
+        except (TypeError, ValueError):
+            self.max_workers = 6
 
         # 加载策略配置
         if strategy == "custom" and custom_config:
@@ -524,6 +532,86 @@ class KgModule:
     # Stage 1: 多阶段 E-A 识别
     # ============================================================
 
+    def _process_chunk_ea(
+        self,
+        chunk: Dict[str, Any],
+        build_signature: Optional[str],
+        schema_types_json: str,
+    ):
+        """处理单个 chunk 的 E-A 识别 (并发安全, 在工作线程内运行)。
+
+        返回 (chunk_ea: Dict[str, EAPair], rounds: int, from_cache: bool)，
+        或 None (内容过短跳过)。只读共享态 + 按 chunk_id 分键的缓存读写, 不碰全局聚合。
+        """
+        content = chunk.get("content", "")
+        if not content or len(content) < 20:
+            return None
+        content_type = chunk.get("content_type", "text")
+        chunk_id = self._stage_chunk_cache_key(chunk)
+
+        # 命中缓存: 直接反序列化返回
+        cached_doc = self._load_runtime_stage_chunk_cache(
+            "ea_recognition", build_signature, chunk_id
+        )
+        if cached_doc:
+            cached_pairs = self._deserialize_ea_pairs(
+                (cached_doc.get("payload") or {}).get("ea_pairs")
+            )
+            chunk_ea: Dict[str, EAPair] = {}
+            for pair in cached_pairs:
+                canonical = canonicalize(pair.entity_name, pair.entity_type, self.alias_map)
+                chunk_ea[canonical] = pair
+            return chunk_ea, int(cached_doc.get("rounds") or 0), True
+
+        # 未命中: 多轮 LLM 抽取直到收敛
+        chunk_ea = {}
+        round_num = 0
+        while round_num < self.EA_MAX_ROUNDS:
+            round_num += 1
+            prompt = self._build_ea_prompt(
+                content, content_type, schema_types_json, chunk_ea, round_num
+            )
+            result = self.llm.chat_json(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+            )
+            if not isinstance(result, dict):
+                break
+
+            new_entities = result.get("entities", {})
+            new_attributes = result.get("attributes", {})
+            new_count = 0
+
+            for name, info in new_entities.items():
+                etype = info.get("type", "") if isinstance(info, dict) else str(info)
+                canonical = canonicalize(name, etype, self.alias_map)
+                if canonical not in chunk_ea:
+                    new_count += 1
+                    chunk_ea[canonical] = EAPair(
+                        entity_name=name,
+                        entity_type=etype,
+                        description=info.get("description", "") if isinstance(info, dict) else "",
+                        attributes=list(new_attributes.get(name, [])),
+                    )
+                else:
+                    existing = chunk_ea[canonical]
+                    for attr in new_attributes.get(name, []):
+                        if attr not in existing.attributes:
+                            existing.attributes.append(attr)
+                            new_count += 1
+
+            if new_count < self.EA_NEW_THRESHOLD:
+                break
+
+        self._save_runtime_stage_chunk_cache(
+            "ea_recognition",
+            build_signature,
+            chunk_id,
+            round_num,
+            {"ea_pairs": self._serialize_ea_pairs(list(chunk_ea.values()))},
+        )
+        return chunk_ea, round_num, False
+
     def stage1_ea_recognition(
         self,
         chunks: List[Dict[str, Any]],
@@ -544,88 +632,27 @@ class KgModule:
         build_signature = self._active_build_signature or self._build_runtime_signature(chunks)
         schema_types_json = json.dumps(self._get_schema_types(), ensure_ascii=False)
 
-        for idx, chunk in enumerate(chunks):
-            content = chunk.get("content", "")
-            if not content or len(content) < 20:
-                continue
-            content_type = chunk.get("content_type", "text")
-            chunk_id = self._stage_chunk_cache_key(chunk)
+        # 并发处理每个 chunk: 各自读缓存/调 LLM/写缓存, 返回 (局部EA, rounds, 是否命中缓存)。
+        # 这些操作互不依赖且线程安全(LLM 客户端无共享态, 缓存是 MongoDB upsert 按 chunk_id 分键)。
+        # 合并到全局 all_ea_pairs 只在主线程做, 避免竞态。
+        def _process(chunk):
+            return self._process_chunk_ea(chunk, build_signature, schema_types_json)
 
-            cached_doc = self._load_runtime_stage_chunk_cache(
-                "ea_recognition", build_signature, chunk_id
-            )
-            if cached_doc:
+        def _progress(done, _total):
+            if progress_callback:
+                progress_callback("ea_recognition", done, _total, 0)
+
+        results = map_chunks_concurrent(
+            chunks, _process, max_workers=self.max_workers, progress_cb=_progress
+        )
+
+        for res in results:
+            if res is None:
+                continue
+            chunk_ea, rounds, from_cache = res
+            if from_cache:
                 cached_chunks += 1
-                cached_pairs = self._deserialize_ea_pairs(
-                    (cached_doc.get("payload") or {}).get("ea_pairs")
-                )
-                last_round = max(last_round, int(cached_doc.get("rounds") or 0))
-                for pair in cached_pairs:
-                    canonical = canonicalize(pair.entity_name, pair.entity_type, self.alias_map)
-                    if canonical not in all_ea_pairs:
-                        all_ea_pairs[canonical] = pair
-                    else:
-                        existing = all_ea_pairs[canonical]
-                        for attr in pair.attributes:
-                            if attr not in existing.attributes:
-                                existing.attributes.append(attr)
-                        if pair.description and len(pair.description) > len(existing.description):
-                            existing.description = pair.description
-                continue
-
-            chunk_ea: Dict[str, EAPair] = {}
-            round_num = 0
-
-            while round_num < self.EA_MAX_ROUNDS:
-                round_num += 1
-                if progress_callback:
-                    progress_callback("ea_recognition", idx, total, round_num)
-
-                prompt = self._build_ea_prompt(
-                    content, content_type, schema_types_json, chunk_ea, round_num
-                )
-                result = self.llm.chat_json(
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.1,
-                )
-                if not isinstance(result, dict):
-                    break
-
-                new_entities = result.get("entities", {})
-                new_attributes = result.get("attributes", {})
-                new_count = 0
-
-                for name, info in new_entities.items():
-                    etype = info.get("type", "") if isinstance(info, dict) else str(info)
-                    canonical = canonicalize(name, etype, self.alias_map)
-                    if canonical not in chunk_ea:
-                        new_count += 1
-                        chunk_ea[canonical] = EAPair(
-                            entity_name=name,
-                            entity_type=etype,
-                            description=info.get("description", "") if isinstance(info, dict) else "",
-                            attributes=list(new_attributes.get(name, [])),
-                        )
-                    else:
-                        existing = chunk_ea[canonical]
-                        for attr in new_attributes.get(name, []):
-                            if attr not in existing.attributes:
-                                existing.attributes.append(attr)
-                                new_count += 1
-
-                if new_count < self.EA_NEW_THRESHOLD:
-                    break
-
-            last_round = max(last_round, round_num)
-            self._save_runtime_stage_chunk_cache(
-                "ea_recognition",
-                build_signature,
-                chunk_id,
-                round_num,
-                {"ea_pairs": self._serialize_ea_pairs(list(chunk_ea.values()))},
-            )
-
-            # 合并到全局
+            last_round = max(last_round, int(rounds or 0))
             for key, pair in chunk_ea.items():
                 if key not in all_ea_pairs:
                     all_ea_pairs[key] = pair
@@ -701,6 +728,81 @@ class KgModule:
     # Stage 2: 多阶段关系抽取
     # ============================================================
 
+    def _process_chunk_relation(
+        self,
+        chunk: Dict[str, Any],
+        build_signature: Optional[str],
+        ea_pairs: List[EAPair],
+        relation_types_json: str,
+    ):
+        """处理单个 chunk 的关系抽取 (并发安全, 工作线程内运行)。
+
+        返回 (chunk_triplets, rounds, from_cache, doc_id, doc_path), 或 None (跳过)。
+        收敛判据为 chunk 内新增三元组数(不依赖全局聚合), 全局去重/support 合并在主线程做。
+        """
+        content = chunk.get("content", "")
+        chunk_id = self._stage_chunk_cache_key(chunk)
+        if not content or len(content) < 20:
+            return None
+        doc_id = chunk.get("doc_id")
+        doc_path = chunk.get("document_path") or chunk.get("file_path")
+        content_for_prompt = self._truncate_text(content, self.REL_CONTENT_MAX_CHARS)
+        entity_list_json = self._build_chunk_entity_context_json(content_for_prompt, ea_pairs)
+
+        cached_doc = self._load_runtime_stage_chunk_cache(
+            "relation_extraction", build_signature, str(chunk_id)
+        )
+        if cached_doc:
+            cached_triplets = self._deserialize_triplets(
+                (cached_doc.get("payload") or {}).get("triplets")
+            )
+            return cached_triplets, int(cached_doc.get("rounds") or 0), True, doc_id, doc_path
+
+        chunk_triplets: List[Triplet] = []
+        chunk_seen: Set[str] = set()
+        round_num = 0
+
+        while round_num < self.REL_MAX_ROUNDS:
+            round_num += 1
+            prompt = self._build_relation_prompt(
+                content_for_prompt, entity_list_json, relation_types_json,
+                chunk_triplets, round_num,
+            )
+            result = self.llm.chat_json(
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+            )
+            if not isinstance(result, dict):
+                break
+
+            raw_triples = result.get("triples", [])
+            new_count = 0
+            for triple in raw_triples:
+                if not isinstance(triple, (list, tuple)) or len(triple) < 3:
+                    continue
+                subj, rel, obj = str(triple[0]), str(triple[1]), str(triple[2])
+                confidence = float(triple[3]) if len(triple) > 3 else 0.85
+                dedup_key = f"{subj}|{rel}|{obj}".lower()
+                if dedup_key not in chunk_seen:
+                    new_count += 1
+                    chunk_triplets.append(Triplet(
+                        subject=subj, relation=rel, object=obj,
+                        confidence=confidence, source_chunk_id=chunk_id,
+                    ))
+                    chunk_seen.add(dedup_key)
+
+            if new_count < self.REL_NEW_THRESHOLD:
+                break
+
+        self._save_runtime_stage_chunk_cache(
+            "relation_extraction",
+            build_signature,
+            str(chunk_id),
+            round_num,
+            {"triplets": self._serialize_triplets(chunk_triplets)},
+        )
+        return chunk_triplets, round_num, False, doc_id, doc_path
+
     def stage2_relation_extraction(
         self,
         chunks: List[Dict[str, Any]],
@@ -724,72 +826,38 @@ class KgModule:
         cached_chunks = 0
         build_signature = self._active_build_signature or self._build_runtime_signature(chunks)
 
-        for idx, chunk in enumerate(chunks):
-            content = chunk.get("content", "")
-            chunk_id = self._stage_chunk_cache_key(chunk)
-            if not content or len(content) < 20:
-                continue
-            content_for_prompt = self._truncate_text(content, self.REL_CONTENT_MAX_CHARS)
-            entity_list_json = self._build_chunk_entity_context_json(content_for_prompt, ea_pairs)
-
-            cached_doc = self._load_runtime_stage_chunk_cache(
-                "relation_extraction", build_signature, str(chunk_id)
+        # 并发处理每个 chunk -> 返回该 chunk 的三元组列表; 全局聚合(含 support 合并)在主线程做。
+        # 注意: 收敛判据改为 chunk 内新增(与 stage1 一致), 不再依赖全局已聚合状态 ——
+        # 这只影响"提前停止", 结果是同等或更完整的超集, 全局去重在合并阶段仍保证。
+        def _process(chunk):
+            return self._process_chunk_relation(
+                chunk, build_signature, ea_pairs, relation_types_json
             )
-            if cached_doc:
+
+        def _progress(done, _total):
+            if progress_callback:
+                progress_callback("relation_extraction", done, _total, 0)
+
+        results = map_chunks_concurrent(
+            chunks, _process, max_workers=self.max_workers, progress_cb=_progress
+        )
+
+        for res in results:
+            if res is None:
+                continue
+            chunk_triplets, rounds, from_cache, doc_id, doc_path = res
+            if from_cache:
                 cached_chunks += 1
-                cached_triplets = self._deserialize_triplets(
-                    (cached_doc.get("payload") or {}).get("triplets")
-                )
-                last_round = max(last_round, int(cached_doc.get("rounds") or 0))
-                for triplet in cached_triplets:
-                    dedup_key = f"{triplet.subject}|{triplet.relation}|{triplet.object}".lower()
-                    if dedup_key not in aggregated_triplets:
+            last_round = max(last_round, int(rounds or 0))
+            for triplet in chunk_triplets:
+                subj, rel, obj = triplet.subject, triplet.relation, triplet.object
+                confidence = float(triplet.confidence)
+                chunk_id = triplet.source_chunk_id
+                dedup_key = f"{subj}|{rel}|{obj}".lower()
+                if dedup_key not in aggregated_triplets:
+                    if from_cache:
                         aggregated_triplets[dedup_key] = triplet
                     else:
-                        existing = aggregated_triplets[dedup_key]
-                        existing.confidence = max(float(existing.confidence), float(triplet.confidence))
-                continue
-
-            chunk_triplets: List[Triplet] = []
-            chunk_seen: Set[str] = set()
-            round_num = 0
-
-            while round_num < self.REL_MAX_ROUNDS:
-                round_num += 1
-                if progress_callback:
-                    progress_callback("relation_extraction", idx, total, round_num)
-
-                prompt = self._build_relation_prompt(
-                    content_for_prompt, entity_list_json, relation_types_json,
-                    chunk_triplets, round_num,
-                )
-                result = self.llm.chat_json(
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.1,
-                )
-                if not isinstance(result, dict):
-                    break
-
-                raw_triples = result.get("triples", [])
-                new_count = 0
-
-                for triple in raw_triples:
-                    if not isinstance(triple, (list, tuple)) or len(triple) < 3:
-                        continue
-                    subj, rel, obj = str(triple[0]), str(triple[1]), str(triple[2])
-                    confidence = float(triple[3]) if len(triple) > 3 else 0.85
-
-                    dedup_key = f"{subj}|{rel}|{obj}".lower()
-                    if dedup_key not in chunk_seen:
-                        chunk_triplets.append(Triplet(
-                            subject=subj, relation=rel, object=obj,
-                            confidence=confidence, source_chunk_id=chunk_id,
-                        ))
-                        chunk_seen.add(dedup_key)
-                    doc_id = chunk.get("doc_id")
-                    doc_path = chunk.get("document_path") or chunk.get("file_path")
-                    if dedup_key not in aggregated_triplets:
-                        new_count += 1
                         aggregated_triplets[dedup_key] = Triplet(
                             subject=subj, relation=rel, object=obj,
                             confidence=confidence,
@@ -802,32 +870,20 @@ class KgModule:
                                 "support_count": 1,
                             },
                         )
-                    else:
-                        existing = aggregated_triplets[dedup_key]
-                        existing.confidence = max(float(existing.confidence), float(confidence))
-                        support_chunks = list(existing.properties.get("support_chunk_ids") or [])
-                        if chunk_id and chunk_id not in support_chunks:
-                            support_chunks.append(chunk_id)
-                        existing.properties["support_chunk_ids"] = support_chunks
+                else:
+                    existing = aggregated_triplets[dedup_key]
+                    existing.confidence = max(float(existing.confidence), confidence)
+                    support_chunks = list(existing.properties.get("support_chunk_ids") or [])
+                    if chunk_id and chunk_id not in support_chunks:
+                        support_chunks.append(chunk_id)
+                    existing.properties["support_chunk_ids"] = support_chunks
+                    support_docs = list(existing.properties.get("support_doc_ids") or [])
+                    doc_key = str(doc_id).strip() if doc_id is not None else ""
+                    if doc_key and doc_key not in support_docs:
+                        support_docs.append(doc_key)
+                    existing.properties["support_doc_ids"] = support_docs
+                    existing.properties["support_count"] = int(existing.properties.get("support_count", 1) or 1) + 1
 
-                        support_docs = list(existing.properties.get("support_doc_ids") or [])
-                        doc_key = str(doc_id).strip() if doc_id is not None else ""
-                        if doc_key and doc_key not in support_docs:
-                            support_docs.append(doc_key)
-                        existing.properties["support_doc_ids"] = support_docs
-                        existing.properties["support_count"] = int(existing.properties.get("support_count", 1) or 1) + 1
-
-                if new_count < self.REL_NEW_THRESHOLD:
-                    break
-
-            last_round = max(last_round, round_num)
-            self._save_runtime_stage_chunk_cache(
-                "relation_extraction",
-                build_signature,
-                str(chunk_id),
-                round_num,
-                {"triplets": self._serialize_triplets(chunk_triplets)},
-            )
         all_triplets = list(aggregated_triplets.values())
         logger.info("Stage2 relation extraction: %d triplets, %d unique relations",
                      len(all_triplets), len({t.relation for t in all_triplets}))
