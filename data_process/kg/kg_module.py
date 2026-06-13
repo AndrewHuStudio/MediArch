@@ -1816,13 +1816,31 @@ class KgModule:
                                 "semantic_key": semantic_key,
                             })
 
-                    for review_start in range(0, len(llm_review_items), verify_batch_size):
-                        review_batch = llm_review_items[review_start:review_start + verify_batch_size]
-                        review_results = (
+                    # 并发执行各 batch 的 LLM 校验调用 (每 batch 一次 LLM, 批次间独立),
+                    # 然后按原顺序串行应用结果 —— 聚合/计数/checkpoint 逻辑保持不变。
+                    review_starts = list(range(0, len(llm_review_items), verify_batch_size))
+                    review_batches = [
+                        llm_review_items[rs:rs + verify_batch_size] for rs in review_starts
+                    ]
+
+                    def _verify_one(review_batch):
+                        return (
                             builder._llm_verify_relations_batch(review_batch)
                             if hasattr(builder, "_llm_verify_relations_batch")
                             else []
                         )
+
+                    review_results_all = (
+                        map_chunks_concurrent(
+                            review_batches, _verify_one, max_workers=self.max_workers
+                        )
+                        if review_batches
+                        else []
+                    )
+
+                    for batch_pos, review_start in enumerate(review_starts):
+                        review_batch = review_batches[batch_pos]
+                        review_results = review_results_all[batch_pos] or []
                         result_map = {
                             int(item.get("batch_index")): bool(item.get("reasonable"))
                             for item in review_results
