@@ -7,22 +7,22 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import time
 import urllib.request
 from typing import Any
 
 from script import benchmark_pipeline as p
 
-API = "http://localhost:8010/api/v1/chat"
-# 默认目标：6-15 记忆里 evidence_hit=0 的学术/标准题
-TARGETS = {
-    "Q004": "GB 51039",
-    "Q005": "GB",
-    "Q024": "",
-    "Q029": "",
-    "Q033": "",
-    "Q037": "",
-}
+# 可用 R2_PROBE_API 覆盖，避免误打到旧服务器（默认 8011 为新起的当前代码 API）。
+API = os.getenv("R2_PROBE_API", "http://localhost:8011/api/v1/chat")
+# 默认目标：6-15 记忆里 evidence_hit=0 的学术/标准题。gold 从 CSV gold_reference_docs 读取。
+TARGET_IDS = ["Q004", "Q005", "Q024", "Q029", "Q033", "Q037"]
+
+
+def _norm(text: str) -> str:
+    """归一化：去空白 + 小写，使 'GB 51039-2014' 与 'GB51039-2014' 等价匹配。"""
+    return "".join(str(text or "").split()).lower()
 
 
 def _find_worker_recall(resp: dict[str, Any]) -> dict[str, Any]:
@@ -50,13 +50,13 @@ def extract_source_trace(resp: dict[str, Any], gold_keyword: str) -> dict[str, A
     worker_recall: 各 worker top-k 命中的 source 列表（后端 diagnostics 暴露）。
     final: 最终 final_citations / citations 的 source 列表。
     """
-    kw = (gold_keyword or "").strip().lower()
+    kw = _norm(gold_keyword)
     recall_map = _find_worker_recall(resp)
     recalled_sources = [s for sources in recall_map.values() for s in (sources or [])]
     final_sources = [str(c.get("source") or "") for c in (resp.get("citations") or [])]
 
     def _hit(sources: list[str]) -> bool:
-        return any(kw and kw in str(s).lower() for s in sources)
+        return any(kw and kw in _norm(s) for s in sources)
 
     recalled = _hit(recalled_sources)
     in_final = _hit(final_sources)
@@ -95,21 +95,30 @@ def _call(message: str) -> dict:
 
 def main() -> None:
     rows = list(csv.DictReader(open(str(p.QUESTIONS_PATH), encoding="utf-8-sig")))
-    qmap = {r["question_id"]: r["question"] for r in rows}
-    for qid, kw in TARGETS.items():
-        q = qmap.get(qid, "")
-        if not q:
+    by_id = {r["question_id"]: r for r in rows}
+    print(f"[probe] API={API}")
+    summary: dict[str, int] = {}
+    for qid in TARGET_IDS:
+        row = by_id.get(qid)
+        if not row:
             print(f"[SKIP] {qid} not in question table")
             continue
+        gold = row.get("gold_reference_docs") or ""
         try:
-            resp = _call(q)
-            trace = extract_source_trace(resp, kw)
-            print(f"[{qid}] verdict={trace['verdict']} recalled={trace['recalled']} in_final={trace['in_final']}")
-            print(f"       recall={trace['recalled_sources']}")
-            print(f"       final={trace['final_sources']}")
+            resp = _call(row.get("question", ""))
+            trace = extract_source_trace(resp, gold)
+            verdict = trace["verdict"]
+            summary[verdict] = summary.get(verdict, 0) + 1
+            # GBK 安全：只打计数与判定，不打原始文件名（中文经控制台易乱码）。
+            print(
+                f"[{qid}] stype={row.get('source_type','')} verdict={verdict} "
+                f"recalled={trace['recalled']} in_final={trace['in_final']} "
+                f"n_recall={len(trace['recalled_sources'])} n_final={len(trace['final_sources'])}"
+            )
         except Exception as e:  # noqa: BLE001
             print(f"[FAIL] {qid}: {type(e).__name__}: {e}")
         time.sleep(1)
+    print(f"[summary] {summary}")
 
 
 if __name__ == "__main__":
