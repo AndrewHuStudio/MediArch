@@ -349,20 +349,23 @@ def _select_synthesis_mode(evidence_plan: Any, coverage_audit: Any) -> Dict[str,
     missing = list(getattr(coverage_audit, "missing_required_lanes", []) or [])
     weak = list(getattr(coverage_audit, "weak_lanes", []) or [])
     passed = bool(getattr(coverage_audit, "passed", False))
+    # 不再人为压窄进 prompt 的证据量：多部分问题(如"五类科室")需要每条 lane 留足
+    # 可引用证据，否则 per-tier 限流会把名额挤在单一子主题上，导致 completeness 落后。
+    # final_citations 已有 max_citations(默认50) 总闸，这里给宽配额即可。
     if passed:
         return {
             "mode": "full_evidence_grounded",
             "allow_full_generation": True,
-            "max_prompt_documents": 6,
-            "max_citations_per_tier": 5,
+            "max_prompt_documents": 12,
+            "max_citations_per_tier": 12,
             "missing_required_lanes": [],
             "must_state_evidence_gap": False,
         }
     return {
         "mode": "conservative_missing_required_evidence",
         "allow_full_generation": False,
-        "max_prompt_documents": 3,
-        "max_citations_per_tier": 3,
+        "max_prompt_documents": 10,
+        "max_citations_per_tier": 10,
         "missing_required_lanes": missing,
         "weak_lanes": weak,
         "must_state_evidence_gap": True,

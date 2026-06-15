@@ -1000,8 +1000,11 @@ async def chat(http_request: Request, request: ChatRequest):
         max_citations_setting = int(request.max_citations or default_max_citations)
         if request.deep_search and max_citations_setting <= 9:
             max_citations_setting = 15
-        # 深度检索模式：增加 top_k 以获取更多候选结果
-        effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
+        # 深度检索模式：增加 top_k 以获取更多候选结果。
+        # R2 多源/多部分问题需要更宽的召回基数(默认 16)，否则 worker 只取 8 条 chunk，
+        # 多子项问题(如"五类科室")无法覆盖；deep_search 再翻倍。final_citations 有总闸限额。
+        r2_base_top_k = int(request.top_k or 16)
+        effective_top_k = r2_base_top_k * 2 if request.deep_search else r2_base_top_k
         thinking_mode = bool(getattr(request, "thinking_mode", False) or request.deep_search)
         metadata = _build_agent_metadata(
             request,
