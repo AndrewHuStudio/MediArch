@@ -5,6 +5,8 @@ import json
 import logging
 import os
 import re
+import time
+from dataclasses import asdict
 from pathlib import Path
 from urllib.parse import quote
 from collections import defaultdict, deque
@@ -23,6 +25,29 @@ from backend.app.agents.base_agent import (
     AgentRequest,
     WorkerResponsesAnnotated,  # ✅ 使用标准类型
     get_llm_manager,  # ✅ 使用 LLM 管理器
+)
+from backend.app.agents.evidence_orchestration import (
+    EVIDENCE_LANES,
+    audit_claim_support,
+    audit_evidence_coverage,
+    build_authority_evidence_need,
+    build_evidence_ledger,
+    build_evidence_plan_for_query,
+    build_evidence_tiers,
+    build_supplemental_lane_queries,
+    classify_source_role,
+)
+from backend.app.agents.evidence_passing import (
+    EVIDENCE_TIER_KEYS,
+    PROMPT_SNIPPET_CHARS,
+    PROMPT_SNIPPET_CHARS_CODE_SPEC,
+    _build_evidence_tiers,
+    _citation_snippet_budget,
+    _citation_to_dict,
+    _compact_citation_for_prompt,
+    _format_citations_catalog,
+    _limit_evidence_tiers,
+    _serialize_evidence_ledger,
 )
 from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
@@ -97,6 +122,30 @@ def _init_evaluator_llm():
 
 SYNTHESIZER_TIMEOUT = _resolve_optional_timeout_seconds("RESULT_SYNTHESIZER_TIMEOUT", 180)
 EVALUATOR_TIMEOUT = _resolve_optional_timeout_seconds("RESULT_EVALUATOR_TIMEOUT", 30)
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _should_use_llm_quality_evaluator() -> bool:
+    """LLM quality evaluation is expensive; keep it opt-in for normal UX and benchmark runs."""
+    return _env_flag("RESULT_SYNTHESIZER_EVAL_LLM", default=False)
+
+
+def _heuristic_quality_evaluation(final_answer: str, aggregated_items: List[AgentItem]) -> Dict[str, Any]:
+    citation_count = sum(len(item.citations or []) for item in aggregated_items)
+    has_answer = bool((final_answer or "").strip())
+    has_support = bool(aggregated_items) or citation_count > 0
+    is_quality_good = bool(has_answer and has_support)
+    return {
+        "quality_score": 0.75 if is_quality_good else 0.45,
+        "is_quality_good": is_quality_good,
+        "feedback_message": "" if is_quality_good else "需要更多相关信息",
+    }
 
 
 async def _call_llm_with_retry(
@@ -208,6 +257,118 @@ async def _call_llm_with_retry(
     raise last_error
 
 
+def _llm_retry_budget_for_request(request: Optional[AgentRequest], llm_name: str) -> int:
+    if llm_name != "synthesizer":
+        return 5
+    if _is_benchmark_or_qa_mode(request):
+        return int(os.getenv("RESULT_SYNTHESIZER_QA_MAX_ATTEMPTS", "2"))
+    return int(os.getenv("RESULT_SYNTHESIZER_MAX_ATTEMPTS", "5"))
+
+
+def _filter_citable_evidence(citations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove KG/unknown/inference-only contexts from final numbered citations."""
+    filtered: List[Dict[str, Any]] = []
+    for citation in citations or []:
+        data = _citation_to_dict(citation)
+        if not data:
+            continue
+        role = classify_source_role(data)
+        if role == "inference_context":
+            continue
+        if not (data.get("source") and (data.get("snippet") or data.get("chunk_id") or data.get("location"))):
+            continue
+        filtered.append(data)
+    return filtered
+
+
+def _citation_identity(citation: Dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(citation.get("source") or citation.get("doc_title") or ""),
+        str(citation.get("page_number") or ""),
+        str(citation.get("chunk_id") or ""),
+        str(citation.get("snippet") or "")[:80],
+    )
+
+
+def _ensure_required_lane_citations(
+    selected_citations: List[Dict[str, Any]],
+    candidate_citations: List[Dict[str, Any]],
+    evidence_plan: Any,
+    *,
+    max_citations: int,
+) -> List[Dict[str, Any]]:
+    """Ensure final citations keep at least one usable card for each required evidence lane."""
+    required_lanes = list(getattr(evidence_plan, "required_lanes", []) or [])
+    if not required_lanes or max_citations <= 0:
+        return selected_citations[:max_citations]
+
+    selected = _filter_citable_evidence(selected_citations)[:max_citations]
+    candidates = _filter_citable_evidence(candidate_citations)
+    if not candidates:
+        return selected
+
+    def covered_lanes(citations: List[Dict[str, Any]]) -> set[str]:
+        tiers = build_evidence_tiers(citations)
+        return {lane for lane in required_lanes if tiers.get(lane)}
+
+    covered = covered_lanes(selected)
+    missing = [lane for lane in required_lanes if lane not in covered]
+    if not missing:
+        return selected
+
+    selected_ids = {_citation_identity(citation) for citation in selected}
+    for lane in missing:
+        lane_candidates = build_evidence_tiers(candidates).get(lane) or []
+        if not lane_candidates:
+            continue
+        wanted = lane_candidates[0].get("citation") or lane_candidates[0]
+        wanted_id = _citation_identity(wanted)
+        if wanted_id in selected_ids:
+            continue
+
+        if len(selected) < max_citations:
+            selected.append(wanted)
+            selected_ids.add(wanted_id)
+            continue
+
+        replace_index = None
+        for index in range(len(selected) - 1, -1, -1):
+            role = classify_source_role(selected[index])
+            if role not in required_lanes:
+                replace_index = index
+                break
+        if replace_index is None:
+            replace_index = len(selected) - 1
+        selected[replace_index] = wanted
+        selected_ids = {_citation_identity(citation) for citation in selected}
+
+    return selected[:max_citations]
+
+
+def _select_synthesis_mode(evidence_plan: Any, coverage_audit: Any) -> Dict[str, Any]:
+    missing = list(getattr(coverage_audit, "missing_required_lanes", []) or [])
+    weak = list(getattr(coverage_audit, "weak_lanes", []) or [])
+    passed = bool(getattr(coverage_audit, "passed", False))
+    if passed:
+        return {
+            "mode": "full_evidence_grounded",
+            "allow_full_generation": True,
+            "max_prompt_documents": 6,
+            "max_citations_per_tier": 5,
+            "missing_required_lanes": [],
+            "must_state_evidence_gap": False,
+        }
+    return {
+        "mode": "conservative_missing_required_evidence",
+        "allow_full_generation": False,
+        "max_prompt_documents": 3,
+        "max_citations_per_tier": 3,
+        "missing_required_lanes": missing,
+        "weak_lanes": weak,
+        "must_state_evidence_gap": True,
+    }
+
+
 def _normalize_doc_name(candidate: Optional[str]) -> str:
     """清洗资料名称，去掉多余空格和全角空格。"""
     if not candidate:
@@ -245,10 +406,290 @@ def _classify_document_role(doc_name: str) -> tuple[str, int]:
     # 🔧 [FIX] 资料集降低到第四优先级，避免长期占主导
     if ("资料" in name) or ("资料集" in name):
         return "macro_atlas", 3
+    if ("论文" in name) or ("研究" in name) or ("paper" in lower) or ("journal" in lower):
+        return "academic_paper", 5
     return "other", 4
 
 
-def _build_document_views(items: List[AgentItem]) -> List[Dict[str, Any]]:
+# EVIDENCE_TIER_KEYS / PROMPT_SNIPPET_CHARS* 已迁移至 evidence_passing 模块（import 见顶部）。
+
+# 当文档正文证据充足时，图谱三元组/属性这类辅助通道在 prompt 中的最大条数。
+# 它们会与正文平铺、挤占 LLM 的"读正文"预算，正文够用时压到小配额即可。
+PROMPT_AUX_CHANNEL_CAP = 3
+
+# prompt context 中纯编排元数据键：系统提示从不引用它们，却被 JSON dump 进 prompt
+# 与正文争夺注意力。VRAG 的 prompt 只有干净的 chunk 列表，R2 不该多背这些包袱。
+_PROMPT_NOISE_KEYS = (
+    "total_results",
+    "items_summary",
+    "key_takeaways",
+    "question_profile",
+    "evidence_context",
+    "supplemental_lane_queries",
+    "doc_distribution",
+    "documents_total",
+    "strict_citations_candidate_count",
+)
+
+# 文档正文证据通道：判断"正文是否充足"以决定是否压缩辅助通道，并据此排序。
+_PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "documents_view", "evidence_ledger")
+
+# 图谱/属性辅助通道：正文充足时压到 PROMPT_AUX_CHANNEL_CAP。
+_PROMPT_AUX_KEYS = ("knowledge_graph_citations", "attribute_citations", "knowledge_graph")
+
+
+def _has_body_evidence(context: Dict[str, Any]) -> bool:
+    tiers = context.get("evidence_tiers") or {}
+    if any(tiers.get(lane) for lane in tiers):
+        return True
+    if str(context.get("citations_catalog") or "").strip():
+        return True
+    if context.get("documents_view"):
+        return True
+    return False
+
+
+def _denoise_prompt_context(context: Dict[str, Any]) -> Dict[str, Any]:
+    """构造喂给 LLM 的去噪 prompt 视图。
+
+    1. 丢弃系统提示从不引用的纯编排元数据；
+    2. 正文证据充足时，把图谱三元组/属性等辅助通道压到小配额，避免稀释正文；
+    3. 正文证据通道排在辅助通道之前（位置优先），正文缺失时保留辅助通道兜底。
+
+    不修改入参；只影响 prompt，不影响节点返回的前端引用/诊断字段。
+    """
+    body_present = _has_body_evidence(context)
+
+    ordered: Dict[str, Any] = {}
+    # query 永远第一。
+    if "query" in context:
+        ordered["query"] = context["query"]
+
+    # 正文证据通道优先铺陈。
+    for key in _PROMPT_BODY_KEYS:
+        if key in context and key not in ordered:
+            ordered[key] = context[key]
+
+    # 其余非噪声、非辅助、非正文键，保持原相对顺序。
+    handled = set(ordered) | set(_PROMPT_NOISE_KEYS) | set(_PROMPT_AUX_KEYS)
+    for key, value in context.items():
+        if key in handled:
+            continue
+        ordered[key] = value
+
+    # 辅助通道最后，正文充足时压配额。
+    for key in _PROMPT_AUX_KEYS:
+        if key not in context:
+            continue
+        value = context[key]
+        if body_present and isinstance(value, list):
+            value = value[:PROMPT_AUX_CHANNEL_CAP]
+        ordered[key] = value
+
+    return ordered
+
+
+def _compact_document_view_for_prompt(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep document role context, but drop heavy attrs/citations already represented elsewhere."""
+    highlights = []
+    for highlight in (doc.get("highlights") or [])[:3]:
+        snippet = re.sub(r"\s+", " ", str(highlight.get("snippet") or "")).strip()
+        if len(snippet) > 240:
+            snippet = snippet[:240] + "…"
+        highlights.append(
+            {
+                "title": highlight.get("title"),
+                "label": highlight.get("label"),
+                "snippet": snippet,
+                "source": highlight.get("source"),
+                "location": highlight.get("location"),
+            }
+        )
+
+    return {
+        "doc_name": doc.get("doc_name"),
+        "role": doc.get("role"),
+        "role_priority": doc.get("role_priority"),
+        "pages": list(doc.get("pages") or [])[:6],
+        "locations": list(doc.get("locations") or [])[:6],
+        "item_count": doc.get("item_count", 0),
+        "page_span": doc.get("page_span"),
+        "page_count": doc.get("page_count", 0),
+        "images_count": len(doc.get("images") or []),
+        "highlights": highlights,
+    }
+
+
+def _is_normative_query(query: str) -> bool:
+    q = (query or "").strip().lower()
+    if not q:
+        return False
+    return any(
+        token in q
+        for token in (
+            "gb",
+            "规范",
+            "标准",
+            "条",
+            "表",
+            "依据",
+            "根据《",
+            "30米",
+            "30m",
+            "服务半径",
+            "护士站",
+            "护理单元",
+            "通视",
+            "最远病房",
+            "standard",
+            "code",
+        )
+    )
+
+
+def _is_recommendation_or_spatial_query(query: str) -> bool:
+    """判断是否应当使用约束-证据-回应式骨架。"""
+    q = (query or "").strip().lower()
+    if not q:
+        return False
+
+    return any(
+        token in q
+        for token in (
+            "怎么设计",
+            "如何设计",
+            "布置",
+            "布局",
+            "配置",
+            "设置",
+            "建议",
+            "推荐",
+            "空间",
+            "流线",
+            "通道",
+            "动线",
+            "相邻",
+            "距离",
+            "间距",
+            "分区",
+            "洁污",
+            "recommend",
+            "recommendation",
+            "spatial",
+        )
+    )
+
+
+def _should_include_online_supplements(query: str) -> bool:
+    """默认不把在线补充带入规范/设计题，除非明确需要最新信息或对比资料。"""
+    q = (query or "").strip().lower()
+    if not q:
+        return False
+
+    if _is_normative_query(q):
+        return False
+
+    return any(
+        token in q
+        for token in (
+            "最新",
+            "recent",
+            "online",
+            "网上",
+            "对比",
+            "趋势",
+            "动态",
+            "更新",
+            "最新规范",
+        )
+    )
+
+
+def _role_priority_for_query(role: str, base_priority: int, query: str) -> int:
+    if not _is_normative_query(query):
+        return base_priority
+    normative_priority = {
+        "code_spec": 0,
+        "guide": 1,
+        "detail_atlas": 2,
+        "macro_atlas": 3,
+        "other": 4,
+        "academic_paper": 5,
+    }
+    return normative_priority.get(role, base_priority)
+
+
+def _format_answer_skeleton(query: str, source_type: str = "") -> str:
+    """为不同题型提供最小必要的答案骨架，避免泛化空话。
+
+    优先按 source_type 选骨架（编排层已知，可靠）；source_type 缺失时回落到
+    query 关键词判断（向后兼容）。这避免把 policy/academic/book 题套进建筑设计
+    的"空间约束->设计回应"骨架——那是 R2 在政策/书籍题上答非所问的根因。
+    """
+    st = (source_type or "").strip().lower()
+
+    if st == "policy_document":
+        return (
+            "建议采用“政策依据 -> 权责与程序 -> 落实要点”的结构：\n"
+            "- 政策依据：先给出最直接的政策条款或规划原则，关键结论后必须带引用。\n"
+            "- 权责与程序：说明涉及的层级权限、主体职责、制定/更新/衔接程序。\n"
+            "- 落实要点：补充执行中的衔接点、监测评估或时限等必要边界。\n"
+            "- 不要把问题转写成建筑空间或工艺设计题；紧扣政策与管理本身作答。\n"
+        )
+
+    if st == "academic_paper":
+        return (
+            "建议采用“研究结论 -> 证据与方法 -> 适用边界”的结构：\n"
+            "- 研究结论：先直接回答问题，关键结论后带引用。\n"
+            "- 证据与方法：给出研究/实证依据、数据或推理逻辑。\n"
+            "- 适用边界：标明结论的前提、范围与不确定性。\n"
+        )
+
+    if st == "technical_standard":
+        return (
+            "建议采用“条文依据 -> 设计含义 -> 注意事项”的结构：\n"
+            "- 先给出最直接的规范条文或等价证据。\n"
+            "- 再说明该条文对当前问题的设计含义。\n"
+            "- 最后补充必要的边界条件或例外情况。\n"
+            "- 每个关键结论都尽量绑定至少 1 条引用。\n"
+        )
+
+    if st == "book_report":
+        return (
+            "建议采用“资料依据 -> 要点解释 -> 适用提示”的结构：\n"
+            "- 资料依据：先引用资料中的直接表述，关键结论后带引用。\n"
+            "- 要点解释：按资料原意解释概念、分类或方法，不要替换为规范条文。\n"
+            "- 适用提示：补充必要的范围或边界说明。\n"
+        )
+
+    # source_type 缺失：回落到旧的 query 关键词判断（向后兼容）。
+    if _is_normative_query(query):
+        return (
+            "建议采用“条文依据 -> 设计回应 -> 注意事项”的结构：\n"
+            "- 先给出最直接的规范条文或等价证据。\n"
+            "- 再说明该条文对当前问题的设计含义。\n"
+            "- 最后补充必要的边界条件或例外情况。\n"
+            "- 每个关键结论都尽量绑定至少 1 条引用。\n"
+        )
+
+    if _is_recommendation_or_spatial_query(query):
+        return (
+            "建议采用“证据依据 -> 空间约束 -> 设计回应 -> 推论边界”的结构：\n"
+            "- 证据依据：列出可引用的规范、条文、图示或等价资料，关键证据后必须带引用。\n"
+            "- 空间约束：把证据转译为流线、分区、邻接、距离、可视性、安全或运维约束。\n"
+            "- 设计回应：给出可执行的布置、尺度、分区或组织建议，说明它回应了哪些约束。\n"
+            "- 推论边界：保留设计推论，但必须标明它是基于证据的设计判断，而不是规范原文。\n"
+        )
+
+    return (
+        "建议采用“结论 -> 依据 -> 补充说明”的结构：\n"
+        "- 先直接回答问题。\n"
+        "- 再给出最相关的证据支持。\n"
+        "- 最后补充必要的限制条件。\n"
+    )
+
+
+def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[str, Any]]:
     """
     将多Agent的结果按资料聚合，方便LLM生成“资料链路”叙述。
 
@@ -400,7 +841,8 @@ def _build_document_views(items: List[AgentItem]) -> List[Dict[str, Any]]:
             if len(images) >= 6:
                 break
 
-        role, role_priority = _classify_document_role(entry["doc_name"])
+        role, base_role_priority = _classify_document_role(entry["doc_name"])
+        role_priority = _role_priority_for_query(role, base_role_priority, query)
 
         # 基于页码生成范围提示（如 P181-P186）
         page_span = ""
@@ -486,6 +928,18 @@ def _build_document_views(items: List[AgentItem]) -> List[Dict[str, Any]]:
             bucket = role_buckets[role]
             if bucket:
                 final_views.append(bucket.popleft())
+
+    if _is_normative_query(query):
+        def _normative_view_priority(doc: Dict[str, Any]) -> tuple[int, int, int, str]:
+            role_priority = int(doc.get("role_priority", 4) or 4)
+            doc_name = str(doc.get("doc_name") or "").lower()
+            alias_text = " ".join(str(alias).lower() for alias in (doc.get("aliases") or []))
+            combined = f"{doc_name} {alias_text}"
+            is_code_spec = 0 if ("gb" in combined or "规范" in combined or "标准" in combined) else 1
+            is_text_heavy = 0 if not doc.get("images") else 1
+            return (is_code_spec, role_priority, is_text_heavy, str(doc.get("doc_name") or ""))
+
+        final_views = sorted(final_views, key=_normative_view_priority)
 
     return final_views
 
@@ -633,6 +1087,178 @@ def _build_rule_based_answer(
     }
 
 
+def _is_benchmark_or_qa_mode(request: Optional[AgentRequest]) -> bool:
+    if not request or not getattr(request, "metadata", None):
+        return False
+    mode = str((request.metadata or {}).get("retrieval_mode") or "").upper()
+    return mode in {"R0", "R1", "R2", "BM25", "VRAG"}
+
+
+def _should_apply_claim_support_gate(request: Optional[AgentRequest]) -> bool:
+    if not request or not getattr(request, "metadata", None):
+        return False
+    mode = str((request.metadata or {}).get("retrieval_mode") or "").upper()
+    return mode == "R2"
+
+
+def build_structured_fallback_answer(
+    query: str,
+    evidence_tiers: Dict[str, List[Dict[str, Any]]],
+    coverage_audit: Dict[str, Any],
+) -> str:
+    missing = coverage_audit.get("missing_required_lanes") or []
+    notes = coverage_audit.get("notes") or []
+    coverage_passed = bool(coverage_audit.get("passed"))
+    missing_text = "、".join(str(lane) for lane in missing) if missing else "关键证据"
+    code_count = len(evidence_tiers.get("code_spec") or [])
+    guide_count = len(evidence_tiers.get("guide") or [])
+    atlas_count = len(evidence_tiers.get("atlas_or_image") or [])
+    paper_count = len(evidence_tiers.get("paper_or_report") or [])
+
+    if coverage_passed and not missing:
+        evidence_status = "当前证据覆盖审计通过，但原回答中仍有主张超出了引用可支撑范围，因此不返回完整结论。"
+    else:
+        evidence_status = f"当前检索结果证据不足，无法支持完整规范性回答：缺少 {missing_text} 证据。"
+
+    evidence_lines: list[str] = []
+    ordered_lanes = (
+        ("policy_document", "政策依据"),
+        ("code_spec", "规范依据"),
+        ("guide", "设计转译依据"),
+        ("book_report", "书籍/报告依据"),
+        ("atlas_or_image", "图示/空间依据"),
+        ("paper_or_report", "研究/案例依据"),
+    )
+    citation_index = 1
+    for lane, label in ordered_lanes:
+        for card in list(evidence_tiers.get(lane) or [])[:2]:
+            snippet = re.sub(r"\s+", " ", str(card.get("snippet") or "")).strip()
+            if not snippet:
+                continue
+            if len(snippet) > 140:
+                snippet = snippet[:140].rstrip() + "..."
+            source = str(card.get("source") or label).strip()
+            location = str(card.get("location") or card.get("anchor") or "").strip()
+            location_text = f"（{location}）" if location else ""
+            evidence_lines.append(f"- {label}：{source}{location_text}显示，{snippet} [{citation_index}]")
+            citation_index += 1
+
+    if coverage_passed and not missing and evidence_lines:
+        lines = [
+            "### 有限证据结论",
+            "原回答中存在引用支撑不足的表述，以下仅保留当前证据可直接支持的内容：",
+            *evidence_lines,
+            "",
+            "### 回答边界",
+            "未在上述证据中直接出现的数值、配置、合规或设计推论已被排除；需要补充相应证据后才能扩展为完整答案。",
+        ]
+        if missing:
+            lines.append(f"当前仍缺少必需证据角色：{missing_text}。")
+        if notes:
+            lines.append("")
+            lines.append("检索诊断：" + "；".join(str(note) for note in notes[:3]))
+        return "\n".join(lines)
+
+    lines = [
+        "### 证据依据",
+        evidence_status,
+        f"已检索到的角色证据概况：code_spec={code_count}，guide={guide_count}，atlas_or_image={atlas_count}，paper_or_report={paper_count}。",
+        "",
+        "### 空间约束",
+        "无法确认具体强制条文、数值边界或分区流线要求，因此不能把下列内容作为合规结论。",
+        "",
+        "### 设计回应",
+        f"针对「{query}」，只能给出非规范性的检查方向：先补充标准/条文证据，再用指南、图集或研究资料解释空间排布、分区和流线组织。",
+        "",
+        "### 推论边界",
+        "以上不是规范结论，需补充标准/条文证据后才能作为合规依据。",
+    ]
+    if notes:
+        lines.append("")
+        lines.append("检索诊断：" + "；".join(str(note) for note in notes[:3]))
+    return "\n".join(lines)
+
+
+def _asdict_if_dataclass(value: Any) -> Dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    try:
+        return asdict(value)
+    except TypeError:
+        return {}
+
+
+def _select_final_answer_after_claim_audit(
+    *,
+    query: str,
+    generated_answer: str,
+    final_citations: list[dict[str, Any]],
+    evidence_tiers: dict[str, list[dict[str, Any]]],
+    coverage_audit: dict[str, Any],
+    claim_support_audit: Any,
+    benchmark_or_qa_mode: bool,
+) -> tuple[str, dict[str, Any]]:
+    audit_dict = _asdict_if_dataclass(claim_support_audit)
+    unsupported_count = int(audit_dict.get("unsupported_claim_count") or 0)
+    diagnostics: dict[str, Any] = {
+        "claim_support_gate_applied": False,
+        "claim_support_gate_reason": None,
+        "original_unsupported_claim_count": unsupported_count,
+        "pre_gate_claim_support_audit": audit_dict,
+        "final_citations": list(final_citations or []),
+        "final_citation_count": len(final_citations or []),
+    }
+
+    if bool(audit_dict.get("passed")):
+        diagnostics["claim_support_audit"] = audit_dict
+        return generated_answer, diagnostics
+
+    if not benchmark_or_qa_mode:
+        diagnostics["claim_support_gate_reason"] = "claim_support_failed_gate_disabled"
+        diagnostics["claim_support_audit"] = audit_dict
+        return generated_answer, diagnostics
+
+    coverage_dict = _asdict_if_dataclass(coverage_audit)
+
+    # [2026-06-14] Non-destructive grounding. The audit MEASURES unsupported
+    # claims (recorded in diagnostics to drive the unsupported_claim metric and
+    # give per-claim visibility) without DELETING the model's prose. Deleting
+    # the unsupported sentences produced fragmented, lower-scoring answers
+    # (broken list numbering, a trailing "已删除…" disclaimer) and, perversely,
+    # raised the unsupported_claim metric it was meant to lower. As long as the
+    # retrieved evidence yields at least one usable citation card, the model's
+    # full answer is kept verbatim. Only a true zero-evidence answer (no usable
+    # cards at all) falls back to the structured evidence-status answer, which
+    # is a legitimate refusal rather than a destructive rewrite.
+    ledger = build_evidence_ledger(final_citations or [])
+    has_usable_evidence = bool(ledger.cards)
+
+    if has_usable_evidence:
+        diagnostics.update(
+            {
+                "claim_support_gate_applied": False,
+                "claim_support_gate_reason": "non_destructive_measured_only",
+                "claim_support_audit": audit_dict,
+                "original_answer_chars": len(generated_answer or ""),
+            }
+        )
+        return generated_answer, diagnostics
+
+    # True zero-evidence: fall back to the structured evidence-status answer.
+    gated_answer = build_structured_fallback_answer(query, evidence_tiers, coverage_dict)
+    final_audit = audit_claim_support(gated_answer, final_citations)
+    diagnostics.update(
+        {
+            "claim_support_gate_applied": True,
+            "claim_support_gate_reason": "zero_usable_evidence_fallback",
+            "claim_support_audit": asdict(final_audit),
+            "gated_answer_chars": len(gated_answer),
+            "original_answer_chars": len(generated_answer or ""),
+        }
+    )
+    return gated_answer, diagnostics
+
+
 # ============================================================================
 # 状态定义（使用标准类型）
 # ============================================================================
@@ -668,6 +1294,12 @@ class SynthesizerState(TypedDict, total=False):
     # 输出
     final_answer: str
     recommended_questions: List[str]
+    image_references: List[Dict[str, Any]]
+    final_citations: List[Dict[str, Any]]
+    strict_cross_doc: bool
+    strict_citations_candidate_count: int
+    document_citations: Dict[str, List[Dict[str, Any]]]
+    synthesizer_diagnostics: Dict[str, Any]
 
 
 # ============================================================================
@@ -785,8 +1417,9 @@ _IMAGE_QUERY_TRIGGERS = (
     "image",
     "figure",
     "diagram",
-    "plan",
-    "section",
+    "floor plan",
+    "site plan",
+    "section drawing",
 )
 
 _IMAGE_QUERY_NEGATIONS = (
@@ -801,10 +1434,10 @@ _IMAGE_QUERY_NEGATIONS = (
 def _wants_images(query: str) -> bool:
     q = (query or "").strip().lower()
     if not q:
-        return True
+        return False
     if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
         return False
-    return True
+    return any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS)
 
 
 def _is_image_item(item: AgentItem) -> bool:
@@ -875,29 +1508,24 @@ def _is_strict_cross_doc_request(query: str, request: Optional[AgentRequest]) ->
     return bool((len(doc_ids) + len(source_documents) >= 2) or ("不要引用" in q) or ("仅基于" in q) or wants_strict)
 
 
-def _citation_to_dict(cite: Any) -> Dict[str, Any]:
-    if cite is None:
-        return {}
-    if isinstance(cite, dict):
-        return {k: v for k, v in cite.items()}
-    if hasattr(cite, "model_dump"):
-        try:
-            return cite.model_dump()
-        except Exception:
-            pass
-    return {
-        "source": getattr(cite, "source", ""),
-        "location": getattr(cite, "location", ""),
-        "snippet": getattr(cite, "snippet", ""),
-        "chunk_id": getattr(cite, "chunk_id", None),
-        "page_number": getattr(cite, "page_number", None),
-        "section": getattr(cite, "section", None),
-        "metadata": getattr(cite, "metadata", None),
-        "positions": getattr(cite, "positions", None),
-        "image_url": getattr(cite, "image_url", None),
-        "content_type": getattr(cite, "content_type", None),
-        "doc_id": getattr(cite, "doc_id", None),
-    }
+def _citation_priority_for_query(citation: Dict[str, Any], query: str) -> int:
+    if not _is_normative_query(query):
+        return 0
+
+    source = str(citation.get("source") or citation.get("document_title") or "").lower()
+    category = str(citation.get("doc_category") or "").lower()
+    file_path = str(citation.get("file_path") or citation.get("document_path") or "").lower()
+    text = f"{source} {category} {file_path}"
+
+    if "gb" in text or "规范" in text or "标准" in text or "標準" in text:
+        return 0
+    if "指南" in text or "手册" in text or "guide" in text:
+        return 1
+    if "详图" in text or "图集" in text or "详解" in text:
+        return 2
+    if "论文" in text or "研究" in text or "journal" in text or "paper" in text:
+        return 5
+    return 3
 
 
 def _build_balanced_citations_for_strict_cross_doc(
@@ -972,21 +1600,6 @@ def _build_balanced_citations_for_strict_cross_doc(
             break
 
     return normalize_citations(selected)
-
-
-def _format_citations_catalog(citations: List[Dict[str, Any]], max_snippet_chars: int = 220) -> str:
-    lines: List[str] = []
-    for idx, c in enumerate(citations, start=1):
-        source = str(c.get("source") or "").strip() or "未知来源"
-        location = str(c.get("location") or "").strip()
-        snippet = str(c.get("snippet") or "").strip()
-        snippet = re.sub(r"\s+", " ", snippet)
-        if len(snippet) > max_snippet_chars:
-            snippet = snippet[: max_snippet_chars - 1] + "…"
-        loc_part = f" | {location}" if location else ""
-        snip_part = f" | {snippet}" if snippet else ""
-        lines.append(f"[{idx}] {source}{loc_part}{snip_part}")
-    return "\n".join(lines)
 
 
 def _validate_strict_cross_doc_answer(answer: str, citations_count: int) -> List[str]:
@@ -1537,6 +2150,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     - ✅ 生成结构化输出（章节分明）
     """
     query = state.get("query", "")
+    synthesize_started = time.time()
     aggregated_items = state.get("aggregated_items", [])
     worker_responses = state.get("worker_responses", [])
     notes = state.get("notes", [])
@@ -1546,7 +2160,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     wants_images = _wants_images(query)
     text_items = _filter_text_items(aggregated_items, query)
     image_items_count = sum(1 for item in aggregated_items if _is_image_item(item))
-    document_views = _build_document_views(text_items)
+    document_views = _build_document_views(text_items, query=query)
 
     # ✅ [2025-11-25] 从 state 获取 Knowledge Fusion 输出
     answer_graph_data = state.get("answer_graph_data", {})
@@ -1558,6 +2172,8 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         unified_hints = request.metadata.get("unified_hints", {})
 
     strict_cross_doc = _is_strict_cross_doc_request(query, request)
+    metadata = request.metadata if request else {}
+    question_profile, evidence_context, evidence_plan = build_evidence_plan_for_query(query, metadata)
 
     logger.info(
         "[Synthesizer→Synthesize] 合成答案，共 %d 条结果（文本=%d，图片=%d，retry=%d）",
@@ -1574,7 +2190,20 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     # 无数据时返回兜底答案
     if not aggregated_items:
         logger.info("[Synthesizer→Synthesize] 无数据可用，返回默认提示")
-        fallback = _build_rule_based_answer(query, text_items, notes, document_views)
+        empty_tiers = build_evidence_tiers([])
+        empty_ledger = _serialize_evidence_ledger([])
+        coverage_audit = audit_evidence_coverage(evidence_plan, empty_tiers)
+        if _is_benchmark_or_qa_mode(request):
+            final_answer = build_structured_fallback_answer(query, empty_tiers, asdict(coverage_audit))
+            fallback = {
+                "final_answer": final_answer,
+                "recommended_questions": [],
+                "notes": notes,
+                "image_references": [],
+                "final_citations": [],
+            }
+        else:
+            fallback = _build_rule_based_answer(query, text_items, notes, document_views)
         if not wants_images:
             fallback["image_references"] = []
         fallback.setdefault("final_citations", [])
@@ -1582,6 +2211,26 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         fallback.setdefault("unified_hints", unified_hints)
         fallback.setdefault("strict_cross_doc", strict_cross_doc)
         fallback.setdefault("strict_citations_candidate_count", 0)
+        fallback["synthesizer_diagnostics"] = {
+            "prompt_chars": 0,
+            "synthesize_node_took_ms": int((time.time() - synthesize_started) * 1000),
+            "documents_total": 0,
+            "citations_count": 0,
+            "fallback_used": True,
+            "fallback_reason": "no_aggregated_items",
+            "question_profile": asdict(question_profile),
+            "evidence_context": asdict(evidence_context),
+            "evidence_plan": asdict(evidence_plan),
+            "coverage_audit": asdict(coverage_audit),
+            "supplemental_lane_queries": build_supplemental_lane_queries(query, question_profile, coverage_audit),
+            "evidence_ledger": empty_ledger,
+            "claim_support_audit": {
+                "passed": False,
+                "bindings": [],
+                "unsupported_claim_count": 0,
+                "notes": ["synthesis fallback"],
+            },
+        }
         return fallback
 
     # ============================================================================
@@ -1692,7 +2341,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                 reverse=True
             )[:10]
 
-    documents_payload = document_views[:6]
+    documents_payload = [_compact_document_view_for_prompt(doc) for doc in document_views[:6]]
     top_documents = documents_payload[:4]  # 保证后续使用时已定义，避免未赋值错误
 
     document_images: List[Dict[str, Any]] = []
@@ -1787,6 +2436,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         # 4. 目标：保留10+条有效引用
         citation_best: Dict[tuple, Dict[str, Any]] = {}
         citation_order: List[tuple] = []
+        all_candidate_citations: List[Dict[str, Any]] = []
 
         # 统计：有多少个item有citations
         items_with_citations = 0
@@ -1808,6 +2458,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                 if data.get("image_url") or str(data.get("content_type") or "").lower() == "image":
                     skipped_image += 1
                     continue
+                all_candidate_citations.append(data)
 
                 # Composite key: 优化策略
                 doc_id = str(data.get("doc_id") or data.get("source") or "").strip()
@@ -1850,7 +2501,28 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             f"去重后 {len(citation_best)} 条"
         )
 
-        final_citations = normalize_citations([citation_best[k] for k in citation_order][:max_citations])
+        ordered_citation_keys = list(enumerate(citation_order))
+        if _is_normative_query(query):
+            ordered_citation_keys.sort(
+                key=lambda pair: (
+                    _citation_priority_for_query(citation_best[pair[1]], query),
+                    pair[0],
+                )
+            )
+
+        final_citations = normalize_citations(
+            [citation_best[k] for _, k in ordered_citation_keys][:max_citations]
+        )
+
+    final_citations = normalize_citations(_filter_citable_evidence(final_citations))
+    final_citations = normalize_citations(
+        _ensure_required_lane_citations(
+            final_citations,
+            locals().get("all_candidate_citations", final_citations),
+            evidence_plan,
+            max_citations=max_citations,
+        )
+    )
 
     # [FIX 2026-01-14] 验证final_citations的PDF URL完整性
     citations_with_pdf = sum(1 for c in final_citations if c.get("pdf_url") or c.get("file_path") or c.get("document_path"))
@@ -1871,25 +2543,30 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     # 3. 如果 final_citations 少于10条，记录警告
 
     citations_count = len(final_citations)
-    citations_catalog = _format_citations_catalog(final_citations, max_snippet_chars=180) if final_citations else ""
+    citations_catalog = _format_citations_catalog(final_citations) if final_citations else ""
+    evidence_tiers = _build_evidence_tiers(final_citations)
+    evidence_ledger = _serialize_evidence_ledger(final_citations)
+    authority_need = build_authority_evidence_need(query, question_profile, evidence_plan)
+    coverage_audit = audit_evidence_coverage(evidence_plan, evidence_tiers, need=authority_need)
+    supplemental_lane_queries = build_supplemental_lane_queries(query, question_profile, coverage_audit)
+    synthesis_mode = _select_synthesis_mode(evidence_plan, coverage_audit)
+    hard_constraints_available = bool(evidence_tiers.get("code_spec"))
 
-    # 警告：如果引用数量不足
-    if citations_count < 10:
-        logger.warning(
-            f"[Synthesizer→Citations] 引用数量不足：只有 {citations_count} 条引用，"
-            f"但用户期望10+条。可能原因：去重过度、检索结果不足、或citations字段缺失"
-        )
+    logger.info(
+        "[Synthesizer→Citations] 可用引用数=%s；引用数量不设固定目标，以证据覆盖和正确性为准",
+        citations_count,
+    )
 
     enhanced_context = {
         "query": query,
         "total_results": len(aggregated_items),
         "knowledge_graph": neo4j_query_path,  # 知识图谱路径
-        "document_citations": mongodb_citations[:10],  # MongoDB引用（增加到10个）
-        "attribute_citations": milvus_citations[:10],  # Milvus引用（增加到10个）
-        "online_supplements": online_search_results,  # 在线补充（5-10条，已排序）
+        "document_citations": [_compact_citation_for_prompt(c) for c in mongodb_citations[:10]],
+        "attribute_citations": [_compact_citation_for_prompt(c) for c in milvus_citations[:10]],
+        "online_supplements": online_search_results if _should_include_online_supplements(query) else [],
         "related_images": image_citations[:10] if wants_images else [],  # ✅ [NEW] 相关图片（增加到10个）
-        "knowledge_graph_citations": neo4j_citations[:10],  # ✅ [NEW] Neo4j来源引用
-        "documents_view": top_documents,
+        "knowledge_graph_citations": [_compact_citation_for_prompt(c) for c in neo4j_citations[:10]],
+        "documents_view": top_documents[: int(synthesis_mode["max_prompt_documents"])],
         "doc_roles": doc_roles,
         "doc_distribution": doc_distribution,
         "documents_total": len(document_views),
@@ -1898,7 +2575,46 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         "unified_hints": unified_hints if unified_hints else None,
         "citations_catalog": citations_catalog,
         "citations_count": citations_count,  # [FIX] 使用实际数量
+        "question_profile": asdict(question_profile),
+        "evidence_context": asdict(evidence_context),
+        "evidence_plan": asdict(evidence_plan),
+        "coverage_audit": asdict(coverage_audit),
+        "supplemental_lane_queries": supplemental_lane_queries,
+        "synthesis_mode": synthesis_mode,
+        "answer_evidence_policy": {
+            "must_include_hard_constraints_when_available": True,
+            "hard_constraints_available": hard_constraints_available,
+            "allow_design_inference": True,
+            "inference_must_be_labeled": True,
+            "do_not_present_inference_as_code": True,
+            "preferred_answer_flow": "证据依据 -> 空间约束 -> 设计回应 -> 推论边界",
+            "if_required_code_spec_missing": "state_evidence_insufficient_and_do_not_invent_normative_clauses",
+        },
+        "evidence_tiers": _limit_evidence_tiers(
+            evidence_tiers,
+            per_tier=int(synthesis_mode["max_citations_per_tier"]),
+        ),
+        "evidence_ledger": {
+            "cards": [
+                {
+                    "card_id": card["card_id"],
+                    "source_role": card["source_role"],
+                    "authority_level": card["authority_level"],
+                    "source": card["source"],
+                    "anchor": card.get("anchor"),
+                    "claim_scopes": card.get("claim_scopes", []),
+                    "snippet": (card.get("snippet") or "")[
+                        : _citation_snippet_budget({"evidence_tier": card.get("source_role")})
+                    ],
+                }
+                for card in evidence_ledger["cards"][: int(synthesis_mode["max_prompt_documents"]) * 3]
+            ],
+            "rejected_count": evidence_ledger["rejected_count"],
+        },
     }
+    enhanced_context["answer_skeleton"] = _format_answer_skeleton(
+        query, source_type=getattr(evidence_context, "source_type", "")
+    )
 
     # 提取items的简要信息
     top_items = text_items[:6]
@@ -1995,32 +2711,63 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     for citation in final_citations:
         _attach_pdf_metadata(citation)
 
-    system_prompt = f"""你是 MediArch 综合医院建筑顾问。请基于检索资料生成专业、完整、可直接展示给用户的最终回答。
+    system_prompt = f"""你是 MediArch 医院领域专业顾问。请基于检索资料生成专业、完整、可直接展示给用户的最终回答。
+针对建筑设计类问题以建筑顾问视角作答；针对政策、管理、规划、研究类问题，紧扣该问题本身的领域作答，不要转写成建筑空间或工艺设计问题。
 
 要求：
 1. 直接回答用户问题，不要暴露任何内部提示、过程性要求、改写建议、评分、调试信息或格式规则。
-2. 结构自然清晰即可。只在内容确实需要时使用标题、分点或表格，不要强行添加固定章节、目录或模板化骨架。
+2. 结构自然清晰即可。请遵循 `answer_skeleton` 给出的题型骨架组织回答；它已按问题领域（政策/标准/研究/资料/设计）选定。不要把非建筑题套进空间约束、流线、分区等建筑设计框架，也不要输出泛泛而谈的空话。
+   - evidence_tiers.code_spec / GB / 标准：只用于硬约束、条文依据、指标边界。
+   - evidence_tiers.guide / 手册：用于解释规范如何转译为空间和流程设计。
+   - evidence_tiers.atlas_or_image：用于空间组织、房间配置、流线或图示参照。
+   - evidence_tiers.paper_or_report：用于经验性设计逻辑、案例启发和推论边界。
+   - evidence_tiers.inference_context 只能进入“推论边界”，不得表述为规范原文。
+   - 如果 evidence_plan 要求 code_spec 但 coverage_audit 显示缺失，不要虚构规范条文；应明确“规范证据不足”，并只给出非规范性的设计检查方向。
 3. 保持 Markdown 规范稳定：
    - 列表仅使用标准 Markdown 列表语法
    - 只有在数据天然适合对比时才使用 Markdown 表格
    - 不要输出会破坏 Markdown 解析的说明性占位文本
 4. 引用仅可使用 [1] 到 [{citations_count}]：
    - 引用紧跟被支持的句子
+   - 一个句子只表达一个主张，并紧跟其支撑引用；不要把多个主张塞进同一个带单一引用的长句。
    - 不要输出范围引用，如 [1-4]
    - 多个引用使用连续形式 [1][2]
    - 不要在标题中放引用
 5. 如果有相关图片，可在相关段落附近使用 `[image:i]`；图片索引只能来自 `related_images`，不要虚构。
 6. 语言保持专业、自然、完整，避免“引言-合规检查-优化建议”等僵硬套话，除非用户问题本身明确要求这种结构。
+7. 每个关键主张都应绑定证据；无法作为规范原文或事实证据支撑的设计性内容，不要删除，放入“推论边界”并明确它是基于证据的设计判断。
+   - “推论边界”段落里的设计判断句（如“因此应……”“通常更适合……”“可提升……”）不要附带 [n] 引用标记，以表明它们是推断而非被直接证据支撑的结论。
+   - 事实与规范类结论（带 [n] 引用）和设计推论（不带引用，置于推论边界）必须分开书写，不要混在同一句中。
+8. 引用必须遵守 evidence_ledger 中每张 evidence card 的 claim_scopes：
+   - normative_requirement 只能由 code_spec 支撑。
+   - numeric_parameter 只能用于数值、尺寸、距离、面积、比例等结论。
+   - quantity_configuration 必须由包含数量、规模或测算依据的证据支撑，不能仅由“平面净尺寸/面积/尺寸表”支撑。
+   - atlas_or_image 只能支撑空间组织、图示、房间配置参照，不能表述为规范条文。
+   - guide/paper/report 只能支撑设计转译、经验判断或推论边界，不能替代规范。
+"""
+    if not synthesis_mode.get("allow_full_generation", True):
+        missing_lanes = "、".join(synthesis_mode.get("missing_required_lanes") or [])
+        system_prompt += f"""
+
+当前证据覆盖审计未通过，缺失必需证据角色：{missing_lanes or "关键证据"}。
+请采用保守回答：
+1. 先说明证据不足和缺失角色。
+2. 仅基于已有可引用证据给出有限结论。
+3. 不要把指南、图集、论文或知识图谱推论表述为规范条文。
+4. 对缺少 code_spec 的规范性问题，不要给出强制性合规结论。
 """
 
     if feedback_message:
         system_prompt = system_prompt + f"\n补充改进方向：{feedback_message}\n"
 
     # ✅ [2025-12-03] 简化 user_prompt，移除冗余指令
+    # ✅ [2026-06-14] 步骤3：去噪 prompt 视图——正文证据优先、抑制图谱/属性噪声稀释。
+    prompt_context = _denoise_prompt_context(enhanced_context)
     user_prompt = f"""用户问题：{query}
 
 请基于以下检索结果生成回答：
-{json.dumps(enhanced_context, ensure_ascii=False, indent=2)}"""
+{json.dumps(prompt_context, ensure_ascii=False, indent=2)}"""
+    prompt_chars = len(system_prompt) + len(user_prompt)
 
     try:
         # ✅ 使用 LLMManager
@@ -2031,6 +2778,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                 HumanMessage(content=user_prompt),
             ],
             purpose="synthesize",
+            max_attempts=_llm_retry_budget_for_request(request, "synthesizer"),
         )
 
         final_answer = response.content.strip()
@@ -2143,6 +2891,19 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                     after_count,
                 )
 
+        claim_support_audit = audit_claim_support(final_answer, final_citations)
+        final_answer, claim_support_gate_diagnostics = _select_final_answer_after_claim_audit(
+            query=query,
+            generated_answer=final_answer,
+            final_citations=final_citations,
+            evidence_tiers=evidence_tiers,
+            coverage_audit=asdict(coverage_audit),
+            claim_support_audit=claim_support_audit,
+            benchmark_or_qa_mode=_should_apply_claim_support_gate(request),
+        )
+        claim_support_audit = audit_claim_support(final_answer, final_citations)
+        claim_support_gate_diagnostics["claim_support_audit"] = asdict(claim_support_audit)
+
         recommended_questions = []
 
         # 策略1: 基于知识图谱扩展的实体生成深入问题（优先级最高）
@@ -2176,7 +2937,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                     recommended_questions.append(f"在{domain}方面还有哪些相关的设计规范和最佳实践？")
 
         # 策略4: 基于在线搜索结果生成补充问题
-        if online_search_results and len(online_search_results) >= 2:
+        if _should_include_online_supplements(query) and online_search_results and len(online_search_results) >= 2:
             # 如果有在线搜索结果，说明本地知识可能不足，引导用户探索新方向
             recommended_questions.append(f"关于「{query}」的最新行业趋势和前沿技术应用有哪些？")
 
@@ -2217,15 +2978,70 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                 "milvus": milvus_citations[:10],
                 "neo4j": neo4j_citations[:10],
             },
+            "synthesizer_diagnostics": {
+                "prompt_chars": prompt_chars,
+                "synthesize_node_took_ms": int((time.time() - synthesize_started) * 1000),
+                "documents_total": len(document_views),
+                "citations_count": citations_count,
+                "fallback_used": False,
+                "fallback_reason": None,
+                "question_profile": asdict(question_profile),
+                "evidence_context": asdict(evidence_context),
+                "evidence_plan": asdict(evidence_plan),
+                "coverage_audit": asdict(coverage_audit),
+                "supplemental_lane_queries": supplemental_lane_queries,
+                "synthesis_mode": synthesis_mode,
+                "evidence_ledger": evidence_ledger,
+                "claim_support_audit": asdict(claim_support_audit),
+                **claim_support_gate_diagnostics,
+            },
+            "question_profile": asdict(question_profile),
+            "evidence_context": asdict(evidence_context),
+            "evidence_plan": asdict(evidence_plan),
+            "evidence_tiers": _limit_evidence_tiers(
+                evidence_tiers,
+                per_tier=int(synthesis_mode["max_citations_per_tier"]),
+            ),
+            "coverage_audit": asdict(coverage_audit),
+            "synthesis_mode": synthesis_mode,
         }
 
     except Exception as err:
         logger.error(f"[Synthesizer→Synthesize] LLM 合成失败: {err}，使用规则兜底")
-        fallback = _build_rule_based_answer(query, text_items, notes, document_views)
+        if _is_benchmark_or_qa_mode(request):
+            fallback = {
+                "final_answer": build_structured_fallback_answer(query, evidence_tiers, asdict(coverage_audit)),
+                "recommended_questions": [],
+                "image_references": [],
+            }
+        else:
+            fallback = _build_rule_based_answer(query, text_items, notes, document_views)
         fallback["notes"] = notes
         fallback["final_citations"] = final_citations
         fallback["strict_cross_doc"] = strict_cross_doc
         fallback["strict_citations_candidate_count"] = strict_citations_candidate_count
+        fallback["question_profile"] = asdict(question_profile)
+        fallback["evidence_context"] = asdict(evidence_context)
+        fallback["evidence_plan"] = asdict(evidence_plan)
+        fallback["evidence_tiers"] = _limit_evidence_tiers(evidence_tiers)
+        fallback["coverage_audit"] = asdict(coverage_audit)
+        fallback_claim_support_audit = audit_claim_support(fallback.get("final_answer") or "", final_citations)
+        fallback["synthesizer_diagnostics"] = {
+            "prompt_chars": prompt_chars,
+            "synthesize_node_took_ms": int((time.time() - synthesize_started) * 1000),
+            "documents_total": len(document_views),
+            "citations_count": len(final_citations),
+            "fallback_used": True,
+            "fallback_reason": str(err)[:240],
+            "question_profile": asdict(question_profile),
+            "evidence_context": asdict(evidence_context),
+            "evidence_plan": asdict(evidence_plan),
+            "coverage_audit": asdict(coverage_audit),
+            "supplemental_lane_queries": supplemental_lane_queries,
+            "synthesis_mode": synthesis_mode,
+            "evidence_ledger": evidence_ledger,
+            "claim_support_audit": asdict(fallback_claim_support_audit),
+        }
         if not wants_images:
             fallback["image_references"] = []
         return fallback
@@ -2247,6 +3063,15 @@ async def node_evaluate_quality(state: SynthesizerState) -> Dict[str, Any]:
     
     citation_count = sum(len(item.citations or []) for item in aggregated_items)
     sources = list({item.source for item in aggregated_items if item.source})
+
+    if not _should_use_llm_quality_evaluator():
+        result = _heuristic_quality_evaluation(final_answer, aggregated_items)
+        logger.info(
+            "[Synthesizer→Evaluate] 跳过 LLM 质量评估，使用启发式结果: score=%.2f, good=%s",
+            result["quality_score"],
+            result["is_quality_good"],
+        )
+        return result
     
     system_prompt = (
         "你是医院建筑设计领域的质量评估专家。\n\n"
