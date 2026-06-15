@@ -455,8 +455,11 @@ _PROMPT_AUX_KEYS = ()
 # 仅保留引用格式与最低防编造约束。{citations_count} 在调用处 format 填入。
 SYNTHESIZER_SYSTEM_PROMPT = (
     "你是专业的医院领域问答助手。基于下面检索到的资料，准确、完整地回答用户问题。\n"
-    "- 依据证据自然组织内容，不套用固定章节模板或人设。\n"
-    "- 紧扣问题本身的领域作答（政策题答政策、研究题答研究），不要转写成其他领域。\n"
+    "- 先看 answer_domain_anchor：它指明本题属于哪个领域，请严格锚定该领域作答，"
+    "不要漂移到建筑空间、医疗工艺或设计等与问题无关的旁路领域（即使证据里含这类资料）。\n"
+    "- 依据证据自然组织内容，不套用固定章节模板或人设；但要充分展开，覆盖问题涉及的"
+    "各个要点，不要只给一两句结论就收尾。\n"
+    "- 优先使用与问题领域直接匹配的证据；与问题领域无关的旁路证据不要作为主线展开。\n"
     "- 引用只用 [1] 到 [{citations_count}]，紧跟被支持的句子；多引用写 [1][2]，"
     "不要用 [1-4] 范围式，标题里不放引用。\n"
     "- 有相关图片时可用 [image:i]，图片索引只能来自 related_images，不要虚构。\n"
@@ -576,6 +579,29 @@ def _is_normative_query(query: str) -> bool:
 def _is_recommendation_or_spatial_query(query: str) -> bool:
     """[removed] 答案骨架脚手架已删除（去框架化）。"""
     return False
+
+
+# 6-15 已验证：按 source_type 把回答锚定到问题本身的领域，是 R2 不答非所问的关键。
+# 这里只做"领域锚定 + 紧扣问题"的轻提示，不再强加固定章节模板/建筑人设。
+_ANSWER_DOMAIN_ANCHOR = {
+    "policy_document": "本题是政策/管理题。请紧扣政策权限、主体职责、制定/更新/衔接程序与落实要点作答，不要转写成建筑空间、医疗工艺或设计问题。",
+    "academic_paper": "本题是研究题。请紧扣研究结论、证据与方法、适用边界作答，不要转写成规范条文或建筑设计问题。",
+    "technical_standard": "本题是规范/标准题。请紧扣条文依据、指标与适用条件作答，关键结论尽量绑定引用。",
+    "book_report": "本题是资料/书籍题。请按资料原意解释概念、分类或方法，不要替换为规范条文或设计建议。",
+}
+
+
+def _format_answer_skeleton(query: str, source_type: str = "") -> str:
+    """按 source_type 给出轻量领域锚定提示，避免多源证据把回答带偏到旁路领域。
+
+    仅锚定"答哪个领域、紧扣问题"，不强加章节骨架或人设——这是对 6-15 根因修复
+    （source_type 锚定有效）与本次去框架需求（去模板/人设）的折中。
+    """
+    st = (source_type or "").strip().lower()
+    anchor = _ANSWER_DOMAIN_ANCHOR.get(st)
+    if anchor:
+        return anchor
+    return "请紧扣用户问题本身的领域作答，依据证据自然组织内容，不要漂移到与问题无关的领域。"
 
 
 def _should_include_online_supplements(query: str) -> bool:
@@ -2535,6 +2561,10 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "rejected_count": evidence_ledger["rejected_count"],
         },
     }
+    # 按 source_type 锚定回答领域（6-15 已验证：防止多源证据把回答带偏）。
+    enhanced_context["answer_domain_anchor"] = _format_answer_skeleton(
+        query, source_type=getattr(evidence_context, "source_type", "")
+    )
 
     # 提取items的简要信息
     top_items = text_items[:6]

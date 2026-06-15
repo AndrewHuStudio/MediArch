@@ -86,14 +86,21 @@ def test_enhanced_context_prompt_is_minimal():
         assert noise_key not in out, f"{noise_key} 不应进 prompt"
 
 
-def test_no_answer_skeleton_function():
-    """答案骨架脚手架已删除（去框架化）。"""
-    assert not hasattr(synthesizer_agent, "_format_answer_skeleton")
+def test_answer_domain_anchor_keys_on_source_type():
+    """按 source_type 锚定领域（6-15 已验证根因修复），但不强加章节模板/人设。"""
+    policy = synthesizer_agent._format_answer_skeleton("任意", source_type="policy_document")
+    paper = synthesizer_agent._format_answer_skeleton("任意", source_type="academic_paper")
+    assert "政策" in policy and "建筑" in policy  # 锚定政策、显式禁止漂移到建筑
+    assert "研究" in paper
+    # 不再是固定章节骨架（无"空间约束 -> 设计回应"这类强制结构）
+    assert "空间约束 -> 设计回应" not in policy
 
 
-def test_system_prompt_is_minimal_without_persona_or_skeleton():
-    """极简 system prompt：无建筑顾问人设、无骨架引用，保留防编造约束。"""
+def test_system_prompt_anchors_domain_without_persona_or_template():
+    """system prompt：保留领域锚定+充分展开+防编造，但无建筑顾问人设、无固定章节模板。"""
     src = synthesizer_agent.SYNTHESIZER_SYSTEM_PROMPT
-    assert "建筑顾问" not in src
-    assert "answer_skeleton" not in src
-    assert "证据不足" in src or "不要虚构" in src  # 保留防编造
+    assert "建筑顾问" not in src  # 无人设
+    assert "answer_domain_anchor" in src  # 指向领域锚定
+    assert "充分展开" in src  # 恢复完整性引导（修复过度精简导致的答案过短）
+    assert "证据不足" in src or "不要虚构" in src  # 防编造
+
