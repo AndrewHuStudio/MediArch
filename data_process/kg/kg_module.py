@@ -1863,6 +1863,32 @@ class KgModule:
                         review_items_done += len(review_batch)
                         review_batches_done += 1
 
+                    # 并发预热 _refine_relation 缓存: 写图循环本身保持串行(线程安全),
+                    # 但其中慢的 LLM refine 调用(关系为 RELATED_TO/UNKNOWN 时触发)可先
+                    # 并发算好填进 builder._refine_relation_cache, 写图时直接命中, 不再串行干等。
+                    if getattr(builder, "relation_refine_with_llm", True):
+                        from backend.databases.graph.builders.relation_mapping import normalize_relation as _norm
+                        _need_refine = []
+                        _seen_rk = set()
+                        for _tp in batch_triplets:
+                            _rn = _norm(_tp.relation)
+                            if _rn in {"RELATED_TO", "UNKNOWN", ""}:
+                                _st = entity_types.get(_tp.subject)
+                                _ot = entity_types.get(_tp.object)
+                                _rk = (str(_tp.subject), str(_st), str(_tp.object), str(_ot))
+                                if _rk not in _seen_rk:
+                                    _seen_rk.add(_rk)
+                                    _need_refine.append((_tp.subject, _st, _tp.object, _ot))
+                        if _need_refine:
+                            def _warm(item):
+                                s, st, o, ot = item
+                                # 调用即填充 builder._refine_relation_cache (线程安全: dict 按 key 写)
+                                builder._refine_relation(s, st, o, ot, "", "")
+                                return None
+                            map_chunks_concurrent(
+                                _need_refine, _warm, max_workers=self.max_workers
+                            )
+
                     for offset, triplet in enumerate(batch_triplets):
                         index = batch_start + offset
                         override = batch_overrides.get(index)

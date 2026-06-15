@@ -235,6 +235,8 @@ class MedicalKGBuilder:
         # 关系验证 LLM 兜底开关
         self.relation_llm_fallback = self._env_flag("KG_RELATION_LLM_FALLBACK", "0")
         self._relation_verification_cache: Dict[Tuple[str, str, str, str, str, str], bool] = {}
+        # 预初始化, 避免并发预热时 lazy-init 竞态(多线程同时建 dict)
+        self._refine_relation_cache: Dict[Tuple[str, str, str, str, str], Tuple[str, float, Dict[str, Any]]] = {}
         
         # 构建选项
         self.enable_cooccurrence_aug = self._env_flag("KG_RELATION_COOC_AUG", "1")
@@ -3560,12 +3562,30 @@ class MedicalKGBuilder:
             return "CO_OCCUR", 0.5, {"inferred": True, "refined_by": "llm_error"}
 
     def _refine_relation(self, subj: str, subj_type: str, obj: str, obj_type: str, original: str, context: str = "") -> Tuple[str, float, Dict[str, Any]]:
-        """综合规则和LLM对模糊关系进行细化。"""
+        """综合规则和LLM对模糊关系进行细化。
+
+        结果按 (subj, subj_type, obj, obj_type, context) 缓存 —— 这是纯函数,
+        相同输入只需算一次。缓存让"写图前并发预热 refine"成为可能:
+        先并发把 batch 内所有 refine 算好填进缓存, 再串行写图时直接命中。
+        """
         relation, confidence, extra = self._refine_relation_rule(subj_type, obj_type, context)
         if relation != "CO_OCCUR":
             return relation, confidence, extra
         if getattr(self, "relation_refine_with_llm", self._env_flag("KG_RELATION_REFINE_LLM", "1")):
-            relation, confidence, extra_llm = self._refine_relation_llm(subj, subj_type, obj, obj_type, context)
+            cache = getattr(self, "_refine_relation_cache", None)
+            if cache is None:
+                cache = {}
+                self._refine_relation_cache = cache
+            ckey = (
+                str(subj or ""), str(subj_type or ""),
+                str(obj or ""), str(obj_type or ""),
+                str(context or ""),
+            )
+            if ckey in cache:
+                relation, confidence, extra_llm = cache[ckey]
+            else:
+                relation, confidence, extra_llm = self._refine_relation_llm(subj, subj_type, obj, obj_type, context)
+                cache[ckey] = (relation, confidence, extra_llm)
             extra = {**extra, **extra_llm}
         return relation, confidence, extra
 

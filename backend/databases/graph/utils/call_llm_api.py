@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from backend.env_loader import load_dotenv
 from backend.llm_env import get_api_key, get_kg_base_url, get_kg_model, get_kg_timeout
 from openai import OpenAI
+import httpx
 
 load_dotenv()
 
@@ -35,7 +36,31 @@ class LLMClient:
             request_timeout
             or get_kg_timeout(120.0)
         )
-        self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
+        # 硬超时: 用 httpx.Timeout 分别控制 connect/read/write/pool。
+        # 关键是 read timeout —— 半开连接(TCP 活着但服务端不回数据)下, SDK 的
+        # 标量 timeout 常常不触发, 进程会在 socket read 上无限挂起。read 硬超时
+        # 强制中断这种卡死, 让上层 retry 生效。env KG_HTTP_READ_TIMEOUT 可调。
+        try:
+            read_timeout = float(os.getenv("KG_HTTP_READ_TIMEOUT", "45"))
+        except (TypeError, ValueError):
+            read_timeout = 45.0
+        try:
+            connect_timeout = float(os.getenv("KG_HTTP_CONNECT_TIMEOUT", "10"))
+        except (TypeError, ValueError):
+            connect_timeout = 10.0
+        http_timeout = httpx.Timeout(
+            timeout=self.request_timeout,
+            connect=connect_timeout,
+            read=read_timeout,
+            write=read_timeout,
+            pool=connect_timeout,
+        )
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=http_timeout,
+            max_retries=0,  # 重试由 chat_json 自己控制, 避免双重重试
+        )
 
     @staticmethod
     def _iter_json_candidates(text: str):
@@ -113,6 +138,15 @@ class LLMClient:
         trace = trace_id or str(uuid.uuid4())[:8]
         last_err: Optional[Exception] = None
         timeout = request_timeout or self.request_timeout
+        # 把每次调用的 timeout 也包成 httpx.Timeout, 保留 read 硬超时 ——
+        # 否则传标量会覆盖 client 上的 httpx.Timeout, 又退回不可靠的总超时。
+        try:
+            _read_t = float(os.getenv("KG_HTTP_READ_TIMEOUT", "45"))
+        except (TypeError, ValueError):
+            _read_t = 45.0
+        per_call_timeout = httpx.Timeout(
+            timeout=timeout, connect=10.0, read=_read_t, write=_read_t, pool=10.0
+        )
         for attempt in range(max_retries):
             try:
                 # Some OpenAI-compatible providers ignore `response_format`. Add a system
@@ -126,7 +160,7 @@ class LLMClient:
                     messages=final_messages,
                     temperature=temperature,
                     response_format={"type": "json_object"},
-                    timeout=timeout,
+                    timeout=per_call_timeout,
                 )
                 txt = resp.choices[0].message.content or ""
                 parsed = self._parse_json_object(txt)
