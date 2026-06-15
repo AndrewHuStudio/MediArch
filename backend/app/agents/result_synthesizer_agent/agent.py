@@ -425,9 +425,17 @@ _PROMPT_NOISE_KEYS = (
     "key_takeaways",
     "question_profile",
     "evidence_context",
+    "evidence_plan",
+    "coverage_audit",
+    "synthesis_mode",
+    "answer_evidence_policy",
     "supplemental_lane_queries",
     "doc_distribution",
+    "doc_roles",
     "documents_total",
+    "documents_view",
+    "knowledge_graph",
+    "unified_hints",
     "strict_citations_candidate_count",
     # 次要引用通道：与主通道(evidence_tiers/citations_catalog)重复、按 agent_name
     # 硬分发 + 100 字截断，稀释正文，不再进 prompt（节点仍返回给前端，见 node return）。
@@ -437,10 +445,11 @@ _PROMPT_NOISE_KEYS = (
 )
 
 # 文档正文证据通道：判断"正文是否充足"以决定是否压缩辅助通道，并据此排序。
-_PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "documents_view", "evidence_ledger")
+# 主通道 evidence_tiers/citations_catalog 已承载正文；documents_view 归入噪声。
+_PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "evidence_ledger")
 
-# 图谱/属性辅助通道已并入次要引用通道(噪声)，此处留空占位以兼容 _denoise 逻辑。
-_PROMPT_AUX_KEYS = ("knowledge_graph",)
+# 辅助通道已并入噪声键，此处留空占位以兼容 _denoise 逻辑。
+_PROMPT_AUX_KEYS = ()
 
 
 def _has_body_evidence(context: Dict[str, Any]) -> bool:
@@ -2600,11 +2609,9 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "cards": [
                 {
                     "card_id": card["card_id"],
-                    "source_role": card["source_role"],
-                    "authority_level": card["authority_level"],
                     "source": card["source"],
+                    "source_role": card["source_role"],
                     "anchor": card.get("anchor"),
-                    "claim_scopes": card.get("claim_scopes", []),
                     "snippet": (card.get("snippet") or "")[
                         : _citation_snippet_budget({"evidence_tier": card.get("source_role")})
                     ],

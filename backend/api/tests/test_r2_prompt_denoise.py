@@ -58,3 +58,29 @@ def test_secondary_citation_channels_not_in_prompt():
     assert "knowledge_graph_citations" not in out
     assert "attribute_citations" not in out
     assert "document_citations" not in out
+
+
+def test_enhanced_context_prompt_is_minimal():
+    """精简后 prompt context 不应含编排元数据。"""
+    noisy = {
+        "query": "q",
+        "evidence_tiers": {"code_spec": []},
+        "citations_catalog": "[1] x",
+        "question_profile": {"a": 1},
+        "evidence_plan": {"b": 2},
+        "coverage_audit": {"c": 3},
+        "synthesis_mode": {"d": 4},
+        "answer_evidence_policy": {"e": 5},
+        "items_summary": [1, 2],
+        "documents_view": [1],
+        "doc_roles": {"x": 1},
+        "unified_hints": {"y": 2},
+        "knowledge_graph": {"z": 3},
+    }
+    out = synthesizer_agent._denoise_prompt_context(noisy)
+    for noise_key in (
+        "question_profile", "evidence_plan", "coverage_audit",
+        "synthesis_mode", "answer_evidence_policy", "items_summary",
+        "documents_view", "doc_roles", "unified_hints", "knowledge_graph",
+    ):
+        assert noise_key not in out, f"{noise_key} 不应进 prompt"
