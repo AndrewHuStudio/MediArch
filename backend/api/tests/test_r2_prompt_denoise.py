@@ -84,3 +84,16 @@ def test_enhanced_context_prompt_is_minimal():
         "documents_view", "doc_roles", "unified_hints", "knowledge_graph",
     ):
         assert noise_key not in out, f"{noise_key} 不应进 prompt"
+
+
+def test_no_answer_skeleton_function():
+    """答案骨架脚手架已删除（去框架化）。"""
+    assert not hasattr(synthesizer_agent, "_format_answer_skeleton")
+
+
+def test_system_prompt_is_minimal_without_persona_or_skeleton():
+    """极简 system prompt：无建筑顾问人设、无骨架引用，保留防编造约束。"""
+    src = synthesizer_agent.SYNTHESIZER_SYSTEM_PROMPT
+    assert "建筑顾问" not in src
+    assert "answer_skeleton" not in src
+    assert "证据不足" in src or "不要虚构" in src  # 保留防编造

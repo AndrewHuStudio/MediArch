@@ -451,6 +451,18 @@ _PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "evidence_ledger")
 # 辅助通道已并入噪声键，此处留空占位以兼容 _denoise 逻辑。
 _PROMPT_AUX_KEYS = ()
 
+# 极简 system prompt：去领域人设、去固定章节/骨架框架，让 LLM 依据证据自然组织回答；
+# 仅保留引用格式与最低防编造约束。{citations_count} 在调用处 format 填入。
+SYNTHESIZER_SYSTEM_PROMPT = (
+    "你是专业的医院领域问答助手。基于下面检索到的资料，准确、完整地回答用户问题。\n"
+    "- 依据证据自然组织内容，不套用固定章节模板或人设。\n"
+    "- 紧扣问题本身的领域作答（政策题答政策、研究题答研究），不要转写成其他领域。\n"
+    "- 引用只用 [1] 到 [{citations_count}]，紧跟被支持的句子；多引用写 [1][2]，"
+    "不要用 [1-4] 范围式，标题里不放引用。\n"
+    "- 有相关图片时可用 [image:i]，图片索引只能来自 related_images，不要虚构。\n"
+    "- 证据不足以支撑规范性或数值主张时，不要虚构规范条文或数据，应如实说明证据有限。"
+)
+
 
 def _has_body_evidence(context: Dict[str, Any]) -> bool:
     tiers = context.get("evidence_tiers") or {}
@@ -562,36 +574,8 @@ def _is_normative_query(query: str) -> bool:
 
 
 def _is_recommendation_or_spatial_query(query: str) -> bool:
-    """判断是否应当使用约束-证据-回应式骨架。"""
-    q = (query or "").strip().lower()
-    if not q:
-        return False
-
-    return any(
-        token in q
-        for token in (
-            "怎么设计",
-            "如何设计",
-            "布置",
-            "布局",
-            "配置",
-            "设置",
-            "建议",
-            "推荐",
-            "空间",
-            "流线",
-            "通道",
-            "动线",
-            "相邻",
-            "距离",
-            "间距",
-            "分区",
-            "洁污",
-            "recommend",
-            "recommendation",
-            "spatial",
-        )
-    )
+    """[removed] 答案骨架脚手架已删除（去框架化）。"""
+    return False
 
 
 def _should_include_online_supplements(query: str) -> bool:
@@ -631,76 +615,6 @@ def _role_priority_for_query(role: str, base_priority: int, query: str) -> int:
         "academic_paper": 5,
     }
     return normative_priority.get(role, base_priority)
-
-
-def _format_answer_skeleton(query: str, source_type: str = "") -> str:
-    """为不同题型提供最小必要的答案骨架，避免泛化空话。
-
-    优先按 source_type 选骨架（编排层已知，可靠）；source_type 缺失时回落到
-    query 关键词判断（向后兼容）。这避免把 policy/academic/book 题套进建筑设计
-    的"空间约束->设计回应"骨架——那是 R2 在政策/书籍题上答非所问的根因。
-    """
-    st = (source_type or "").strip().lower()
-
-    if st == "policy_document":
-        return (
-            "建议采用“政策依据 -> 权责与程序 -> 落实要点”的结构：\n"
-            "- 政策依据：先给出最直接的政策条款或规划原则，关键结论后必须带引用。\n"
-            "- 权责与程序：说明涉及的层级权限、主体职责、制定/更新/衔接程序。\n"
-            "- 落实要点：补充执行中的衔接点、监测评估或时限等必要边界。\n"
-            "- 不要把问题转写成建筑空间或工艺设计题；紧扣政策与管理本身作答。\n"
-        )
-
-    if st == "academic_paper":
-        return (
-            "建议采用“研究结论 -> 证据与方法 -> 适用边界”的结构：\n"
-            "- 研究结论：先直接回答问题，关键结论后带引用。\n"
-            "- 证据与方法：给出研究/实证依据、数据或推理逻辑。\n"
-            "- 适用边界：标明结论的前提、范围与不确定性。\n"
-        )
-
-    if st == "technical_standard":
-        return (
-            "建议采用“条文依据 -> 设计含义 -> 注意事项”的结构：\n"
-            "- 先给出最直接的规范条文或等价证据。\n"
-            "- 再说明该条文对当前问题的设计含义。\n"
-            "- 最后补充必要的边界条件或例外情况。\n"
-            "- 每个关键结论都尽量绑定至少 1 条引用。\n"
-        )
-
-    if st == "book_report":
-        return (
-            "建议采用“资料依据 -> 要点解释 -> 适用提示”的结构：\n"
-            "- 资料依据：先引用资料中的直接表述，关键结论后带引用。\n"
-            "- 要点解释：按资料原意解释概念、分类或方法，不要替换为规范条文。\n"
-            "- 适用提示：补充必要的范围或边界说明。\n"
-        )
-
-    # source_type 缺失：回落到旧的 query 关键词判断（向后兼容）。
-    if _is_normative_query(query):
-        return (
-            "建议采用“条文依据 -> 设计回应 -> 注意事项”的结构：\n"
-            "- 先给出最直接的规范条文或等价证据。\n"
-            "- 再说明该条文对当前问题的设计含义。\n"
-            "- 最后补充必要的边界条件或例外情况。\n"
-            "- 每个关键结论都尽量绑定至少 1 条引用。\n"
-        )
-
-    if _is_recommendation_or_spatial_query(query):
-        return (
-            "建议采用“证据依据 -> 空间约束 -> 设计回应 -> 推论边界”的结构：\n"
-            "- 证据依据：列出可引用的规范、条文、图示或等价资料，关键证据后必须带引用。\n"
-            "- 空间约束：把证据转译为流线、分区、邻接、距离、可视性、安全或运维约束。\n"
-            "- 设计回应：给出可执行的布置、尺度、分区或组织建议，说明它回应了哪些约束。\n"
-            "- 推论边界：保留设计推论，但必须标明它是基于证据的设计判断，而不是规范原文。\n"
-        )
-
-    return (
-        "建议采用“结论 -> 依据 -> 补充说明”的结构：\n"
-        "- 先直接回答问题。\n"
-        "- 再给出最相关的证据支持。\n"
-        "- 最后补充必要的限制条件。\n"
-    )
 
 
 def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[str, Any]]:
@@ -2621,9 +2535,6 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "rejected_count": evidence_ledger["rejected_count"],
         },
     }
-    enhanced_context["answer_skeleton"] = _format_answer_skeleton(
-        query, source_type=getattr(evidence_context, "source_type", "")
-    )
 
     # 提取items的简要信息
     top_items = text_items[:6]
@@ -2720,40 +2631,7 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     for citation in final_citations:
         _attach_pdf_metadata(citation)
 
-    system_prompt = f"""你是 MediArch 医院领域专业顾问。请基于检索资料生成专业、完整、可直接展示给用户的最终回答。
-针对建筑设计类问题以建筑顾问视角作答；针对政策、管理、规划、研究类问题，紧扣该问题本身的领域作答，不要转写成建筑空间或工艺设计问题。
-
-要求：
-1. 直接回答用户问题，不要暴露任何内部提示、过程性要求、改写建议、评分、调试信息或格式规则。
-2. 结构自然清晰即可。请遵循 `answer_skeleton` 给出的题型骨架组织回答；它已按问题领域（政策/标准/研究/资料/设计）选定。不要把非建筑题套进空间约束、流线、分区等建筑设计框架，也不要输出泛泛而谈的空话。
-   - evidence_tiers.code_spec / GB / 标准：只用于硬约束、条文依据、指标边界。
-   - evidence_tiers.guide / 手册：用于解释规范如何转译为空间和流程设计。
-   - evidence_tiers.atlas_or_image：用于空间组织、房间配置、流线或图示参照。
-   - evidence_tiers.paper_or_report：用于经验性设计逻辑、案例启发和推论边界。
-   - evidence_tiers.inference_context 只能进入“推论边界”，不得表述为规范原文。
-   - 如果 evidence_plan 要求 code_spec 但 coverage_audit 显示缺失，不要虚构规范条文；应明确“规范证据不足”，并只给出非规范性的设计检查方向。
-3. 保持 Markdown 规范稳定：
-   - 列表仅使用标准 Markdown 列表语法
-   - 只有在数据天然适合对比时才使用 Markdown 表格
-   - 不要输出会破坏 Markdown 解析的说明性占位文本
-4. 引用仅可使用 [1] 到 [{citations_count}]：
-   - 引用紧跟被支持的句子
-   - 一个句子只表达一个主张，并紧跟其支撑引用；不要把多个主张塞进同一个带单一引用的长句。
-   - 不要输出范围引用，如 [1-4]
-   - 多个引用使用连续形式 [1][2]
-   - 不要在标题中放引用
-5. 如果有相关图片，可在相关段落附近使用 `[image:i]`；图片索引只能来自 `related_images`，不要虚构。
-6. 语言保持专业、自然、完整，避免“引言-合规检查-优化建议”等僵硬套话，除非用户问题本身明确要求这种结构。
-7. 每个关键主张都应绑定证据；无法作为规范原文或事实证据支撑的设计性内容，不要删除，放入“推论边界”并明确它是基于证据的设计判断。
-   - “推论边界”段落里的设计判断句（如“因此应……”“通常更适合……”“可提升……”）不要附带 [n] 引用标记，以表明它们是推断而非被直接证据支撑的结论。
-   - 事实与规范类结论（带 [n] 引用）和设计推论（不带引用，置于推论边界）必须分开书写，不要混在同一句中。
-8. 引用必须遵守 evidence_ledger 中每张 evidence card 的 claim_scopes：
-   - normative_requirement 只能由 code_spec 支撑。
-   - numeric_parameter 只能用于数值、尺寸、距离、面积、比例等结论。
-   - quantity_configuration 必须由包含数量、规模或测算依据的证据支撑，不能仅由“平面净尺寸/面积/尺寸表”支撑。
-   - atlas_or_image 只能支撑空间组织、图示、房间配置参照，不能表述为规范条文。
-   - guide/paper/report 只能支撑设计转译、经验判断或推论边界，不能替代规范。
-"""
+    system_prompt = SYNTHESIZER_SYSTEM_PROMPT.format(citations_count=citations_count)
     if not synthesis_mode.get("allow_full_generation", True):
         missing_lanes = "、".join(synthesis_mode.get("missing_required_lanes") or [])
         system_prompt += f"""
