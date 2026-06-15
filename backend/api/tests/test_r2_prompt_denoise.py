@@ -81,9 +81,11 @@ def test_enhanced_context_prompt_is_minimal():
     for noise_key in (
         "question_profile", "evidence_plan", "coverage_audit",
         "synthesis_mode", "answer_evidence_policy", "items_summary",
-        "documents_view", "doc_roles", "unified_hints", "knowledge_graph",
+        "doc_roles", "unified_hints", "knowledge_graph",
     ):
         assert noise_key not in out, f"{noise_key} 不应进 prompt"
+    # documents_view 是宽口径正文通道，多部分问题需要它提供广度，必须保留。
+    assert "documents_view" in out, "documents_view 应作为正文广度通道保留"
 
 
 def test_answer_domain_anchor_keys_on_source_type():

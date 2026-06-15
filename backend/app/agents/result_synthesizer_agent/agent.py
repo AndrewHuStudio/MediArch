@@ -433,7 +433,6 @@ _PROMPT_NOISE_KEYS = (
     "doc_distribution",
     "doc_roles",
     "documents_total",
-    "documents_view",
     "knowledge_graph",
     "unified_hints",
     "strict_citations_candidate_count",
@@ -445,8 +444,9 @@ _PROMPT_NOISE_KEYS = (
 )
 
 # 文档正文证据通道：判断"正文是否充足"以决定是否压缩辅助通道，并据此排序。
-# 主通道 evidence_tiers/citations_catalog 已承载正文；documents_view 归入噪声。
-_PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "evidence_ledger")
+# documents_view 是宽口径文档正文：多部分问题(如"五类科室")需要它提供跨子主题的广度，
+# 否则 per-tier 限流后的 evidence_tiers 会过窄，导致 completeness 落后于 VRAG。
+_PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "evidence_ledger", "documents_view")
 
 # 辅助通道已并入噪声键，此处留空占位以兼容 _denoise 逻辑。
 _PROMPT_AUX_KEYS = ()
