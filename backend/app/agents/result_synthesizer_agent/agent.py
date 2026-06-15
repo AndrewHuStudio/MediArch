@@ -429,13 +429,18 @@ _PROMPT_NOISE_KEYS = (
     "doc_distribution",
     "documents_total",
     "strict_citations_candidate_count",
+    # 次要引用通道：与主通道(evidence_tiers/citations_catalog)重复、按 agent_name
+    # 硬分发 + 100 字截断，稀释正文，不再进 prompt（节点仍返回给前端，见 node return）。
+    "document_citations",
+    "attribute_citations",
+    "knowledge_graph_citations",
 )
 
 # 文档正文证据通道：判断"正文是否充足"以决定是否压缩辅助通道，并据此排序。
 _PROMPT_BODY_KEYS = ("evidence_tiers", "citations_catalog", "documents_view", "evidence_ledger")
 
-# 图谱/属性辅助通道：正文充足时压到 PROMPT_AUX_CHANNEL_CAP。
-_PROMPT_AUX_KEYS = ("knowledge_graph_citations", "attribute_citations", "knowledge_graph")
+# 图谱/属性辅助通道已并入次要引用通道(噪声)，此处留空占位以兼容 _denoise 逻辑。
+_PROMPT_AUX_KEYS = ("knowledge_graph",)
 
 
 def _has_body_evidence(context: Dict[str, Any]) -> bool:
@@ -2561,11 +2566,8 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         "query": query,
         "total_results": len(aggregated_items),
         "knowledge_graph": neo4j_query_path,  # 知识图谱路径
-        "document_citations": [_compact_citation_for_prompt(c) for c in mongodb_citations[:10]],
-        "attribute_citations": [_compact_citation_for_prompt(c) for c in milvus_citations[:10]],
         "online_supplements": online_search_results if _should_include_online_supplements(query) else [],
         "related_images": image_citations[:10] if wants_images else [],  # ✅ [NEW] 相关图片（增加到10个）
-        "knowledge_graph_citations": [_compact_citation_for_prompt(c) for c in neo4j_citations[:10]],
         "documents_view": top_documents[: int(synthesis_mode["max_prompt_documents"])],
         "doc_roles": doc_roles,
         "doc_distribution": doc_distribution,
