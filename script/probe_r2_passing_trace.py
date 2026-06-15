@@ -25,15 +25,33 @@ TARGETS = {
 }
 
 
+def _find_worker_recall(resp: dict[str, Any]) -> dict[str, Any]:
+    """定位 worker_recall，无论它在 diagnostics(dict) 还是 diagnostics[0].additional_info。
+
+    live 响应里 diagnostics 是 list（[diagnostics_list]），worker_recall 落在
+    additional_info 下；单测里可能直接给 dict。两种都要兼容。
+    """
+    diag = resp.get("diagnostics")
+    if isinstance(diag, list):
+        diag = diag[0] if diag else {}
+    if not isinstance(diag, dict):
+        return {}
+    if isinstance(diag.get("worker_recall"), dict):
+        return diag["worker_recall"]
+    info = diag.get("additional_info")
+    if isinstance(info, dict) and isinstance(info.get("worker_recall"), dict):
+        return info["worker_recall"]
+    return {}
+
+
 def extract_source_trace(resp: dict[str, Any], gold_keyword: str) -> dict[str, Any]:
     """从 live 响应抽三段 source，判定金标准是召回缺失还是传递丢失。
 
-    worker_recall: 各 worker top-k 命中的 source 列表（需后端在 diagnostics 暴露）。
+    worker_recall: 各 worker top-k 命中的 source 列表（后端 diagnostics 暴露）。
     final: 最终 final_citations / citations 的 source 列表。
     """
     kw = (gold_keyword or "").strip().lower()
-    diag = resp.get("diagnostics") or {}
-    recall_map = diag.get("worker_recall") or {}
+    recall_map = _find_worker_recall(resp)
     recalled_sources = [s for sources in recall_map.values() for s in (sources or [])]
     final_sources = [str(c.get("source") or "") for c in (resp.get("citations") or [])]
 

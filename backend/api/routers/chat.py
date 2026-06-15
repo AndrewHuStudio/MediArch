@@ -44,7 +44,7 @@ from backend.api.session_store import (
 # 导入 LangGraph MediArch Graph
 from backend.app.agents.mediarch_graph import graph as mediarch_graph
 from backend.app.agents.result_synthesizer_agent.agent import graph as result_synthesizer_graph
-from backend.app.agents.base_agent import AgentRequest, AgentResponse, get_llm_manager
+from backend.app.agents.base_agent import AgentRequest, AgentResponse, get_llm_manager, summarize_worker_responses
 from backend.app.services.baseline_rag import get_baseline_rag_service
 from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
@@ -74,6 +74,32 @@ def _describe_chat_stream_error(exc: BaseException) -> str:
         return message
 
     return f"{exc.__class__.__name__}: 未提供详细错误信息"
+
+
+def _build_agent_metadata(
+    request: ChatRequest,
+    session_id: str,
+    *,
+    max_citations_setting: int,
+    thinking_mode: bool,
+) -> Dict[str, Any]:
+    client_metadata = dict(request.metadata or {})
+    metadata = {
+        **client_metadata,
+        "session_id": session_id,
+        "include_online_search": request.include_online_search,
+        "original_query": request.message,
+        "max_citations": max_citations_setting,
+        "include_citations": request.include_citations,
+        "deep_search": request.deep_search,
+        "thinking_mode": thinking_mode,
+        "retrieval_mode": (request.retrieval_mode or "R2").upper(),
+    }
+    if thinking_mode:
+        metadata.setdefault("neo4j_depth", 4)
+        metadata.setdefault("neo4j_k_edges", 400)
+        metadata.setdefault("neo4j_max_retries", 2)
+    return metadata
 
 
 def _get_or_create_session(session_id: str | None = None) -> str:
@@ -293,9 +319,33 @@ def _query_path_to_graph(query_path: Dict[str, Any]) -> Optional[Dict[str, Any]]
     }
 
 
+def build_worker_recall(worker_responses: List[Dict]) -> Dict[str, List[str]]:
+    """从 worker_responses 提取各 worker 召回的 source 文档列表（按 agent_name 分组）。
+
+    用于链路取证：判定金标准证据是召回阶段缺失，还是召回到了却在传递阶段丢失。
+    每个 source 在同一 worker 内去重保序；无召回 source 的 worker 不建空键。
+    """
+    recall: Dict[str, List[str]] = {}
+    for resp in worker_responses or []:
+        agent_name = str(resp.get("agent_name") or "").strip()
+        if not agent_name:
+            continue
+        seen: List[str] = []
+        for item in resp.get("items") or []:
+            citations = getattr(item, "citations", None)
+            if citations is None and isinstance(item, dict):
+                citations = item.get("citations")
+            for citation in citations or []:
+                source = str((citation or {}).get("source") or "").strip()
+                if source and source not in seen:
+                    seen.append(source)
+        if seen:
+            recall[agent_name] = seen
+    return recall
+
+
 def _extract_knowledge_graph(worker_responses: List[Dict], result: Dict) -> Optional[Dict]:
     """提取知识图谱数据"""
-    # 优先从 answer_graph_data 获取（Synthesizer 生成）
     if "answer_graph_data" in result and result["answer_graph_data"]:
         return result["answer_graph_data"]
 
@@ -386,8 +436,9 @@ _IMAGE_QUERY_TRIGGERS = (
     "image",
     "figure",
     "diagram",
-    "plan",
-    "section",
+    "floor plan",
+    "site plan",
+    "section drawing",
 )
 
 _IMAGE_QUERY_NEGATIONS = (
@@ -402,10 +453,10 @@ _IMAGE_QUERY_NEGATIONS = (
 def _wants_images_in_answer(query: str) -> bool:
     q = (query or "").strip().lower()
     if not q:
-        return True
+        return False
     if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
         return False
-    return True
+    return any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS)
 
 
 def _build_image_caption(cite: Dict[str, Any]) -> str:
@@ -952,20 +1003,12 @@ async def chat(http_request: Request, request: ChatRequest):
         # 深度检索模式：增加 top_k 以获取更多候选结果
         effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
         thinking_mode = bool(getattr(request, "thinking_mode", False) or request.deep_search)
-        metadata = {
-            "session_id": session_id,
-            "include_online_search": request.include_online_search,
-            "original_query": request.message,
-            "max_citations": max_citations_setting,
-            "include_citations": request.include_citations,
-            "deep_search": request.deep_search,
-            "thinking_mode": thinking_mode,
-            "retrieval_mode": (request.retrieval_mode or "R2").upper(),
-        }
-        if thinking_mode:
-            metadata.setdefault("neo4j_depth", 4)
-            metadata.setdefault("neo4j_k_edges", 400)
-            metadata.setdefault("neo4j_max_retries", 2)
+        metadata = _build_agent_metadata(
+            request,
+            session_id,
+            max_citations_setting=max_citations_setting,
+            thinking_mode=thinking_mode,
+        )
 
         agent_request = AgentRequest(
             query=request.message,
@@ -1014,11 +1057,19 @@ async def chat(http_request: Request, request: ChatRequest):
                     "strict_citations_candidate_count" in result
                 )
                 try:
-                    diagnostics_list["additional_info"]["agents_used"] = [
-                        resp.get("agent_name") for resp in (worker_responses or []) if isinstance(resp, dict)
-                    ]
+                    worker_summary = summarize_worker_responses(worker_responses or [])
+                    diagnostics_list["additional_info"]["agents_used"] = worker_summary["agents_used"]
+                    diagnostics_list["additional_info"]["worker_timings"] = worker_summary["worker_timings"]
                 except Exception:
                     diagnostics_list["additional_info"]["agents_used"] = []
+                    diagnostics_list["additional_info"]["worker_timings"] = []
+                try:
+                    # 链路取证：各 worker 召回的 source 列表（召回 vs 传递丢失判定）。
+                    diagnostics_list["additional_info"]["worker_recall"] = build_worker_recall(
+                        worker_responses or []
+                    )
+                except Exception:
+                    diagnostics_list["additional_info"]["worker_recall"] = {}
                 if isinstance(diagnostics_list.get("phase1_retrieval_mode"), dict):
                     diagnostics_list["additional_info"]["phase1_retrieval_mode"] = diagnostics_list["phase1_retrieval_mode"]
                 if isinstance(diagnostics_list.get("checkpointer_runtime"), dict):
@@ -1028,6 +1079,8 @@ async def chat(http_request: Request, request: ChatRequest):
                 if isinstance(diagnostics_list.get("query_expansion_runtime"), dict):
                     diagnostics_list["additional_info"]["query_expansion_runtime"] = diagnostics_list["query_expansion_runtime"]
                 diagnostics_list["additional_info"]["strict_cross_doc"] = strict_cross_doc_mode
+                if isinstance(result.get("synthesizer_diagnostics"), dict):
+                    diagnostics_list["additional_info"]["synthesizer_diagnostics"] = result["synthesizer_diagnostics"]
                 fc = result.get("final_citations")
                 diagnostics_list["additional_info"]["final_citations_count"] = len(fc) if isinstance(fc, list) else 0
                 try:
@@ -1104,6 +1157,7 @@ async def chat(http_request: Request, request: ChatRequest):
 
         # 计算总耗时
         took_ms = int((time.time() - start_time) * 1000)
+        worker_summary = summarize_worker_responses(worker_responses or [])
 
         # 构建响应
         response = ChatResponse(
@@ -1114,7 +1168,7 @@ async def chat(http_request: Request, request: ChatRequest):
             recommended_questions=recommended_questions,
             diagnostics=[] if not request.include_diagnostics else [diagnostics_list],
             took_ms=took_ms,
-            agents_used=[resp.get("agent_name") for resp in worker_responses],
+            agents_used=worker_summary["agents_used"],
             images=images,
         )
 
@@ -1182,20 +1236,12 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             # 深度检索模式：增加 top_k 以获取更多候选结果
             effective_top_k = (request.top_k or 8) * 2 if request.deep_search else (request.top_k or 8)
             thinking_mode = bool(getattr(request, "thinking_mode", False) or request.deep_search)
-            metadata = {
-                "session_id": session_id,
-                "include_online_search": request.include_online_search,
-                "original_query": request.message,
-                "max_citations": max_citations_setting,
-                "include_citations": request.include_citations,
-                "deep_search": request.deep_search,
-                "thinking_mode": thinking_mode,
-                "retrieval_mode": (request.retrieval_mode or "R2").upper(),
-            }
-            if thinking_mode:
-                metadata.setdefault("neo4j_depth", 4)
-                metadata.setdefault("neo4j_k_edges", 400)
-                metadata.setdefault("neo4j_max_retries", 2)
+            metadata = _build_agent_metadata(
+                request,
+                session_id,
+                max_citations_setting=max_citations_setting,
+                thinking_mode=thinking_mode,
+            )
 
             agent_request = AgentRequest(
                 query=request.message,

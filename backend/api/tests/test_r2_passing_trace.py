@@ -38,3 +38,17 @@ def test_extract_trace_present_throughout():
     assert trace["recalled"] is True
     assert trace["in_final"] is True
     assert trace["verdict"] == "ok"
+
+
+def test_extract_trace_reads_live_list_diagnostics_shape():
+    # live 响应：diagnostics 是 list，worker_recall 落在 additional_info 下
+    resp = {
+        "diagnostics": [
+            {"additional_info": {"worker_recall": {"mongodb_agent": ["GB 51039-2014.pdf"]}}}
+        ],
+        "citations": [{"source": "noise.pdf"}],
+    }
+    trace = extract_source_trace(resp, gold_keyword="GB 51039")
+    assert trace["recalled"] is True
+    assert trace["in_final"] is False
+    assert trace["verdict"] == "passing_loss"
