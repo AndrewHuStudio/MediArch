@@ -449,38 +449,52 @@ _IMAGE_QUERY_NEGATIONS = (
     "不需要图片",
 )
 
+_IMAGE_SPATIAL_QUERY_TRIGGERS = (
+    "空间推理",
+    "空间排布",
+    "空间布局",
+    "平面组织",
+    "流线",
+    "通视",
+    "隐私",
+    "邻接",
+    "洁污",
+    "分区",
+    "布置关系",
+    "位置关系",
+)
+
 
 def _wants_images_in_answer(query: str) -> bool:
     q = (query or "").strip().lower()
-    if not q:
-        return False
     if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
         return False
-    return any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS)
+    if any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS):
+        return True
+    return any(trigger in q for trigger in _IMAGE_SPATIAL_QUERY_TRIGGERS)
 
 
 def _build_image_caption(cite: Dict[str, Any]) -> str:
     import re
 
-    source = str(cite.get("doc_name") or cite.get("source") or "").strip()
-    page = cite.get("page_number")
-    location = str(cite.get("location") or "").strip()
     snippet = str(cite.get("snippet") or "").strip()
 
-    # 优先用 snippet 的“图片说明/标题”部分
     desc = snippet
-    desc = desc.replace("[图片:", "").replace("[图片：", "").replace("[图片", "").replace("]", "").strip()
+    desc = re.sub(r"\[?图片[：:]?", "", desc).replace("]", "").strip()
+    desc = re.split(r"根据所提供|现从|专业分析|如下|——|---|\*\*图片类型", desc, maxsplit=1)[0]
+    desc = re.sub(r"^\d+\s*", "", desc)
     desc = re.sub(r"\s+", " ", desc)
-    if len(desc) > 70:
-        desc = desc[:69] + "…"
+    desc = desc.strip(" ：:，,。.;；-*")
+    desc = re.sub(r"(需求分析|根据.*)$", "", desc).strip(" ：:，,。.;；-*")
+    if len(desc) > 10:
+        desc = desc[:10].rstrip()
 
     if not desc:
-        desc = location or "相关配图"
+        desc = "相关"
 
-    head = source or "资料配图"
-    if isinstance(page, int) and page > 0:
-        head = f"{head}（第{page}页）"
-    return f"{head}：{desc}"
+    if not desc.endswith(("图", "图示", "平面", "流程")):
+        desc = f"{desc}图"
+    return desc
 
 
 def _order_image_refs_for_injection(image_refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -533,11 +547,16 @@ def _extract_image_refs(
         seen.add(url)
 
         caption = _build_image_caption(cite)
+        match_text = " ".join(
+            str(cite.get(key) or "")
+            for key in ("snippet", "source", "doc_name", "location", "chapter", "chapter_title")
+        )
         out.append(
             {
                 "url": url,
                 "caption": caption,
                 "role": _infer_image_role(caption),
+                "match_text": match_text,
                 "source": cite.get("source") or cite.get("doc_name"),
                 "page_number": cite.get("page_number"),
             }
@@ -578,13 +597,10 @@ def _image_placeholder_block_for_entries(
         return ""
 
     lines: List[str] = []
-    relation = _build_image_relation_summary([ref for _, ref in entries])
-    if relation:
-        lines.append("\n\n【图示关系】" + relation)
 
     for display_index, (image_index, ref) in enumerate(entries, start=start_number):
         caption = str(ref.get("caption") or "").strip() or "相关配图"
-        lines.append(f"\n\n（图{display_index}：{caption}）\n[image:{image_index}]")
+        lines.append(f"\n\n[image:{image_index}]\n图{display_index} {caption}")
 
     return "".join(lines)
 
@@ -615,11 +631,52 @@ def _append_image_placeholders(answer: str, image_refs: List[Dict[str, Any]]) ->
 
 _IMAGE_TOKEN_LINE_RE = re.compile(r"^\s*\[image:(\d+)\]\s*$")
 _IMAGE_TOKEN_RE = re.compile(r"\[image:(\d+)\]")
-_IMAGE_CAPTION_LINE_RE = re.compile(r"^\s*(?:\*+)?[（(]?\s*图\s*\d+\s*[：:].*$")
+_IMAGE_CAPTION_LINE_RE = re.compile(r"^\s*(?:\*+)?(?:[（(]\s*)?图\s*\d+\s*(?:[：:]|\s).*$")
+_MIN_BACKEND_IMAGE_MATCH_SCORE = 6
+_IMAGE_MATCH_STOP_TERMS = {
+    "相关配图",
+    "source",
+    "image",
+    "figure",
+    "documents",
+    "图片",
+    "图示",
+    "相关",
+    "医院",
+    "建筑",
+    "设计",
+    "门诊",
+    "门诊部",
+}
+_IMAGE_DOMAIN_MATCH_TERMS = (
+    "公共空间",
+    "门诊大厅",
+    "候诊区",
+    "交通组织",
+    "导引",
+    "排队",
+    "服务台",
+    "诊室",
+    "单人诊室",
+    "诊疗",
+    "私密性",
+    "医生",
+    "患者",
+    "平面",
+    "布局",
+    "布置",
+    "详图",
+    "节点",
+    "剖面",
+    "设备",
+    "机电",
+    "洁污",
+    "流线",
+)
 
 
 def _renumber_image_caption_line(line: str, number: int) -> str:
-    return re.sub(r"(图\s*)\d+(\s*[：:])", rf"\g<1>{number}\g<2>", line, count=1)
+    return re.sub(r"(图\s*)\d+(\s*[：:]?\s*)", rf"\g<1>{number} ", line, count=1)
 
 
 def _align_answer_images(answer: str, image_refs: List[Dict[str, Any]]) -> tuple[str, List[Dict[str, Any]]]:
@@ -688,17 +745,122 @@ def _align_answer_images(answer: str, image_refs: List[Dict[str, Any]]) -> tuple
     return aligned_answer, aligned_refs
 
 
-def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, Any]]) -> str:
+def _strip_existing_image_blocks(text: str) -> str:
+    if not text:
+        return text
+    lines = text.splitlines()
+    drop: set[int] = set()
+    for idx, line in enumerate(lines):
+        if _IMAGE_TOKEN_LINE_RE.match(line) or _IMAGE_TOKEN_RE.search(line):
+            drop.add(idx)
+            prev = idx - 1
+            while prev >= 0 and not lines[prev].strip():
+                drop.add(prev)
+                prev -= 1
+            if prev >= 0 and _IMAGE_CAPTION_LINE_RE.match(lines[prev]):
+                drop.add(prev)
+        elif _IMAGE_CAPTION_LINE_RE.match(line):
+            next_idx = idx + 1
+            while next_idx < len(lines) and not lines[next_idx].strip():
+                next_idx += 1
+            if next_idx < len(lines) and (_IMAGE_TOKEN_LINE_RE.match(lines[next_idx]) or _IMAGE_TOKEN_RE.search(lines[next_idx])):
+                drop.add(idx)
+    cleaned = "\n".join(line for idx, line in enumerate(lines) if idx not in drop)
+    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
+def _image_match_terms(ref: Dict[str, Any]) -> set[str]:
+    text = " ".join(
+        str(ref.get(key) or "")
+        for key in ("match_text", "caption", "source", "role")
+    ).lower()
+    terms: set[str] = set()
+    for token in re.findall(r"[\u4e00-\u9fff]{2,8}|[a-z0-9]{3,}", text):
+        if token in _IMAGE_MATCH_STOP_TERMS:
+            continue
+        terms.add(token)
+    for term in _IMAGE_DOMAIN_MATCH_TERMS:
+        if term in text and term not in _IMAGE_MATCH_STOP_TERMS:
+            terms.add(term)
+    return terms
+
+
+def _paragraph_match_score(paragraph: str, terms: set[str]) -> int:
+    if not terms:
+        return 0
+    text = (paragraph or "").lower()
+    score = 0
+    for term in terms:
+        if term in text:
+            score += 3 + min(len(term), 6)
+        elif len(term) >= 4 and any(term[i : i + 2] in text for i in range(0, len(term) - 1)):
+            score += 1
+    return score
+
+
+def _filter_image_refs_for_answer(
+    image_refs: List[Dict[str, Any]],
+    *,
+    query: str,
+    answer: str,
+    max_images: int = 6,
+) -> List[Dict[str, Any]]:
+    if not image_refs:
+        return []
+    context = f"{query or ''}\n{answer or ''}"
+    scored: List[tuple[int, int, Dict[str, Any]]] = []
+    for index, ref in enumerate(image_refs):
+        terms = _image_match_terms(ref)
+        score = _paragraph_match_score(context, terms)
+        if score >= _MIN_BACKEND_IMAGE_MATCH_SCORE:
+            scored.append((score, -index, ref))
+    scored.sort(reverse=True)
+    return [ref for _, _, ref in scored[:max_images]]
+
+
+def _best_paragraph_index_for_image(paragraphs: List[str], ref: Dict[str, Any], fallback_index: int) -> int:
+    best_idx, best_score = _best_paragraph_match_for_image(paragraphs, ref, fallback_index)
+    if best_score <= 0:
+        return min(fallback_index, len(paragraphs) - 1) if paragraphs else 0
+    return best_idx
+
+
+def _best_paragraph_match_for_image(
+    paragraphs: List[str],
+    ref: Dict[str, Any],
+    fallback_index: int,
+) -> tuple[int, int]:
+    if not paragraphs:
+        return 0, 0
+    terms = _image_match_terms(ref)
+    best_idx = min(fallback_index, len(paragraphs) - 1)
+    best_score = -1
+    for idx, paragraph in enumerate(paragraphs):
+        score = _paragraph_match_score(paragraph, terms)
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+    return best_idx, max(best_score, 0)
+
+
+def _inject_image_placeholders_inline(
+    answer: str,
+    image_refs: List[Dict[str, Any]],
+    *,
+    force_reposition: bool = False,
+) -> str:
     """Try to interleave images into the main body instead of appending a block at the end.
 
-    - If answer already contains `[image:` tokens, keep it as-is (do NOT reorder images).
-    - Otherwise, inject captioned `[image:i]` after paragraphs in the most relevant section (prefer `### 资料印证`).
+    When force_reposition is true, model-emitted image tokens are removed and
+    rebuilt from backend image metadata so placement is deterministic.
     """
     if not image_refs:
         return answer
     text = (answer or "").rstrip()
-    if "[image:" in text:
+    if "[image:" in text and not force_reposition:
         return text
+    if force_reposition:
+        text = _strip_existing_image_blocks(text)
 
     import re
 
@@ -710,8 +872,8 @@ def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, An
         head = text[: m_ref.start()].rstrip()
         tail = "\n\n" + text[m_ref.start() :].lstrip()
 
-    # Prefer inserting images into "资料印证" section, then "关键洞察", then "开场概览".
-    preferred_headers = ("资料印证", "关键洞察", "开场概览")
+    # Prefer broad evidence/body sections, but fall back to all body paragraphs.
+    preferred_headers = ("资料印证", "门诊单元设计要点总结", "功能分区与公共空间设计", "关键洞察", "开场概览")
     insert_at = 0
     section_end = len(head)
 
@@ -726,14 +888,17 @@ def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, An
         body_start = (nl + 1) if nl != -1 and nl < end else start
         return body_start, end
 
-    for name in preferred_headers:
-        sec = _find_section(name)
-        if sec:
-            insert_at, section_end = sec
-            break
+    if not force_reposition:
+        for name in preferred_headers:
+            sec = _find_section(name)
+            if sec:
+                insert_at, section_end = sec
+                break
 
     # Fallback 1: if the answer already has sections, inject only into the first section body.
-    if insert_at == 0 and section_end == len(head):
+    # In backend-controlled placement, keep the whole body as the target so each
+    # image can match its own best section.
+    if (not force_reposition) and insert_at == 0 and section_end == len(head):
         first_heading = re.search(r"(?m)^###\s+.+$", head)
         if first_heading:
             first_heading_end = first_heading.end()
@@ -743,7 +908,7 @@ def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, An
             insert_at = (first_newline + 1) if first_newline != -1 and first_newline < section_end else first_heading_end
 
     # Fallback 2: plain text answer without sections, insert after the first paragraph.
-    if insert_at == 0 and section_end == len(head):
+    if (not force_reposition) and insert_at == 0 and section_end == len(head):
         first_break = head.find("\n\n")
         insert_at = (first_break + 2) if first_break != -1 else len(head)
         section_end = len(head)
@@ -756,15 +921,17 @@ def _inject_image_placeholders_inline(answer: str, image_refs: List[Dict[str, An
     if not paragraphs:
         return (prefix.rstrip() + _image_placeholder_block(image_refs) + "\n\n" + (target + suffix).lstrip()).rstrip() + tail
 
-    relation = _build_image_relation_summary(image_refs)
-
+    used_counts: Dict[int, int] = {}
     for i in range(len(image_refs)):
-        idx = min(i, len(paragraphs) - 1)
+        idx, match_score = _best_paragraph_match_for_image(paragraphs, image_refs[i], i)
+        if force_reposition and match_score < _MIN_BACKEND_IMAGE_MATCH_SCORE:
+            continue
         caption = str(image_refs[i].get("caption") or "").strip() or "相关配图"
-        token = f"\n\n（图{i+1}：{caption}）\n[image:{i}]"
-        if i == 0 and relation:
-            token = f"\n\n【图示关系】{relation}" + token
+        token = f"\n\n[image:{i}]\n图{i+1} {caption}"
+        if used_counts.get(idx, 0):
+            token = "\n" + token.lstrip()
         paragraphs[idx] = paragraphs[idx].rstrip() + token
+        used_counts[idx] = used_counts.get(idx, 0) + 1
 
     rebuilt = "\n\n".join(paragraphs)
     return (prefix + rebuilt + suffix).rstrip() + tail
@@ -1134,6 +1301,11 @@ async def chat(http_request: Request, request: ChatRequest):
             image_refs = _extract_image_refs(citations_full, api_base)
 
         final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+        image_refs = _filter_image_refs_for_answer(
+            image_refs,
+            query=request.message,
+            answer=final_answer,
+        )
         answer_has_image_tokens = "[image:" in (final_answer or "")
         if image_refs and (not answer_has_image_tokens):
             image_refs = _order_image_refs_for_injection(image_refs)
@@ -1141,8 +1313,7 @@ async def chat(http_request: Request, request: ChatRequest):
         # 让前端能渲染图片：优先尝试将图片插入正文附近；必要时再回退到末尾占位符。
         # 严格交叉验证模式下，为避免破坏格式，不做任何占位符注入。
         if not strict_cross_doc_mode and wants_images:
-            final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
-            final_answer = _append_image_placeholders(final_answer, image_refs)
+            final_answer = _inject_image_placeholders_inline(final_answer, image_refs, force_reposition=True)
             final_answer, image_refs = _align_answer_images(final_answer, image_refs)
 
         images = [ref.get("url") for ref in image_refs if ref.get("url")]
@@ -1554,6 +1725,11 @@ async def chat_stream(http_request: Request, request: ChatRequest):
                 image_refs = _extract_image_refs(all_citations_full, api_base)
 
             final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+            image_refs = _filter_image_refs_for_answer(
+                image_refs,
+                query=request.message,
+                answer=final_answer,
+            )
             answer_has_image_tokens = "[image:" in (final_answer or "")
             if image_refs and (not answer_has_image_tokens):
                 image_refs = _order_image_refs_for_injection(image_refs)
@@ -1561,8 +1737,7 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             # 让前端能渲染图片：优先尝试插入正文附近；必要时回退到末尾占位符块。
             # 严格交叉验证模式下，为避免破坏固定输出格式，不注入占位符。
             if image_refs and not strict_cross_doc_mode and wants_images:
-                final_answer = _inject_image_placeholders_inline(final_answer, image_refs)
-                final_answer = _append_image_placeholders(final_answer, image_refs)
+                final_answer = _inject_image_placeholders_inline(final_answer, image_refs, force_reposition=True)
                 final_answer, image_refs = _align_answer_images(final_answer, image_refs)
 
             images = [ref.get("url") for ref in image_refs if ref.get("url")]

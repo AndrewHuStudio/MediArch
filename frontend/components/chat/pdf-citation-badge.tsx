@@ -18,7 +18,7 @@ export function PDFCitationBadge({ source, citationNumber, onClick, style }: PDF
   return (
     <button
       type="button"
-      className="absolute pointer-events-auto rounded-md border border-[#0e7490]/30 bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-[#0e7490] shadow-sm hover:bg-[#e6f4f6] transition-colors"
+      className="absolute pointer-events-auto rounded-md border border-[#0891b2] bg-[#e8f8fc] px-2 py-0.5 text-[11px] font-bold text-[#034b63] shadow-sm hover:bg-[#c7edf7] transition-colors"
       style={style}
       onClick={onClick}
       title={`${source.title} · ${t('pdf.page', { n: source.pageNumber })}`}

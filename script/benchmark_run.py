@@ -51,24 +51,59 @@ def _unique_join(values: list[str]) -> str:
     return "; ".join(output)
 
 
-def call_chat_api(api_base: str, question: str, mode: str, timeout: int = 180) -> dict:
+def normalize_timeout(timeout: int | float | None) -> int | float | None:
+    if timeout is None:
+        return None
+    try:
+        value = float(timeout)
+    except (TypeError, ValueError):
+        return timeout
+    if value <= 0:
+        return None
+    if value.is_integer():
+        return int(value)
+    return value
+
+
+def build_chat_payload(question: str, mode: str, question_meta: dict | None = None) -> dict:
+    payload = {
+        "message": question,
+        "retrieval_mode": mode,
+        "stream": False,
+        "include_citations": True,
+        "include_diagnostics": True,
+        "include_online_search": False,
+        "max_citations": 30,
+    }
+    if question_meta:
+        metadata = {
+            key: str(question_meta.get(key) or "")
+            for key in ("question_id", "source_type", "task_type", "difficulty")
+            if question_meta.get(key)
+        }
+        if metadata:
+            payload["metadata"] = metadata
+    return payload
+
+
+def call_chat_api(
+    api_base: str,
+    question: str,
+    mode: str,
+    timeout: int = 180,
+    *,
+    question_meta: dict | None = None,
+) -> dict:
     """Call the non-streaming Chat API and return the raw JSON response or an error payload."""
     url = f"{api_base.rstrip('/')}/api/v1/chat"
     payload = json.dumps(
-        {
-            "message": question,
-            "retrieval_mode": mode,
-            "stream": False,
-            "include_citations": True,
-            "include_diagnostics": True,
-            "include_online_search": False,
-            "max_citations": 30,
-        }
+        build_chat_payload(question, mode, question_meta=question_meta),
+        ensure_ascii=False,
     ).encode("utf-8")
 
     req = Request(url, data=payload, headers={"Content-Type": "application/json"})
     try:
-        with urlopen(req, timeout=timeout) as resp:
+        with urlopen(req, timeout=normalize_timeout(timeout)) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except HTTPError as exc:
         return {
@@ -104,12 +139,21 @@ def extract_response_payload(payload: dict) -> dict[str, str]:
         "retrieved_doc_ids": _unique_join(doc_ids),
         "retrieved_chunk_ids": _unique_join(chunk_ids),
         "response_took_ms": str(payload.get("took_ms") or ""),
+        "diagnostics": json.dumps(payload.get("diagnostics") or [], ensure_ascii=False),
         "error": str(payload.get("error") or ""),
     }
 
 
 def update_run_row(row: dict[str, str], parsed: dict[str, str], *, latency_s: float) -> None:
-    for key in ("answer", "citations", "retrieved_doc_ids", "retrieved_chunk_ids", "response_took_ms", "error"):
+    for key in (
+        "answer",
+        "citations",
+        "retrieved_doc_ids",
+        "retrieved_chunk_ids",
+        "response_took_ms",
+        "diagnostics",
+        "error",
+    ):
         row[key] = parsed.get(key, "")
     row["latency_s"] = f"{latency_s:.2f}"
     row["run_status"] = "error" if parsed.get("error") else "done"
@@ -178,7 +222,8 @@ def main() -> None:
     print(f"Modes:     {sorted(modes)}")
     print(f"Questions: {sorted(target_ids) if target_ids else 'ALL (54)'}")
     print(f"Tasks:     {len(targets)}")
-    print(f"Timeout:   {args.timeout}s per request")
+    display_timeout = normalize_timeout(args.timeout)
+    print(f"Timeout:   {display_timeout if display_timeout is not None else 'unlimited'} per request")
     print("=" * 60)
 
     if not targets:
@@ -190,11 +235,24 @@ def main() -> None:
     for index, row in enumerate(targets, start=1):
         qid = _normalize_id(row.get("question_id", ""))
         mode = row.get("system_id", "").upper()
-        question = questions_by_id[qid]["question"]
+        question_row = questions_by_id[qid]
+        question = question_row["question"]
+        question_meta = {
+            "question_id": qid,
+            "source_type": question_row.get("source_type", ""),
+            "task_type": question_row.get("task_type", ""),
+            "difficulty": question_row.get("difficulty", ""),
+        }
         print(f"[{index}/{len(targets)}] {qid} ({mode}) ...", end=" ", flush=True)
 
         started = time.time()
-        response = call_chat_api(args.api, question, mode, timeout=args.timeout)
+        response = call_chat_api(
+            args.api,
+            question,
+            mode,
+            timeout=args.timeout,
+            question_meta=question_meta,
+        )
         elapsed = time.time() - started
         parsed = extract_response_payload(response)
         update_run_row(row, parsed, latency_s=elapsed)

@@ -227,6 +227,34 @@ DiagnosticsAnnotated = Annotated[Dict[str, Any], merge_diagnostics]
 WorkerResponsesAnnotated = Annotated[List[Dict[str, Any]], add]  # 追加，不去重
 
 
+def summarize_worker_responses(worker_responses: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Deduplicate worker responses for diagnostics while preserving first-seen order."""
+    agents_used: List[str] = []
+    worker_timings: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for response in worker_responses or []:
+        if not isinstance(response, dict):
+            continue
+        agent_name = str(response.get("agent_name") or "").strip()
+        if not agent_name or agent_name in seen:
+            continue
+        seen.add(agent_name)
+        agents_used.append(agent_name)
+        worker_timings.append(
+            {
+                "agent_name": agent_name,
+                "took_ms": response.get("took_ms"),
+                "item_count": response.get("item_count", 0),
+            }
+        )
+
+    return {
+        "agents_used": agents_used,
+        "worker_timings": worker_timings,
+    }
+
+
 class BaseWorkerState(TypedDict, total=False):
     """
     Worker Agent 的标准状态基类
@@ -711,18 +739,24 @@ def create_worker_adapter(worker_name: str, worker_graph: Any) -> Callable:
 
         try:
             # 调用 Worker 子图
+            start_time = time.time()
             result = await worker_graph.ainvoke(worker_input)
+            wall_took_ms = int((time.time() - start_time) * 1000)
 
             # 提取 items（用于去重合并）
             items = result.get("items") or result.get("merged_items") or []
+            diagnostics = result.get("diagnostics", {}) or {}
+            if isinstance(diagnostics, dict):
+                diagnostics = dict(diagnostics)
+                diagnostics.setdefault("adapter_took_ms", wall_took_ms)
 
             # 构建 worker_response（用于 Synthesizer）
             worker_response = {
                 "agent_name": worker_name,
                 "items": items,
-                "diagnostics": result.get("diagnostics", {}),
+                "diagnostics": diagnostics,
                 "used_query": result.get("used_query") or state.get("query"),
-                "took_ms": result.get("took_ms"),
+                "took_ms": result.get("took_ms") or wall_took_ms,
                 "item_count": len(items),
             }
 
@@ -768,6 +802,7 @@ __all__ = [
     "keep_latest_request",
     "add_items_with_dedup",
     "merge_diagnostics",
+    "summarize_worker_responses",
     # LLM 管理
     "LLMManager",
     "get_llm_manager",

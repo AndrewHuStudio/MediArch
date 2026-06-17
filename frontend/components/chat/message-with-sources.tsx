@@ -35,11 +35,7 @@ const getImageRenderState = (imageIndex: number, images?: string[], sources?: PD
     ? `${imageSource.title} · 第 ${imageSource.pageNumber} 页${imageSource.section ? ` · ${imageSource.section}` : ""}`
     : `图 ${imageIndex + 1}: 来自数据库的相关资料`
 
-  const meta = imageSource
-    ? `来源：${imageSource.title} · 第 ${imageSource.pageNumber} 页${imageSource.section ? ` · ${imageSource.section}` : ""}`
-    : null
-
-  return { src, alt, meta }
+  return { src, alt }
 }
 
 const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Components => ({
@@ -151,11 +147,6 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
             图片加载中
           </div>
         )}
-        {imageState.meta && (
-          <div className="mt-2 text-[11px] text-[#6c858c] leading-snug pl-2 border-l-2 border-[#cfe2e7] bg-[#f8fcfd] rounded">
-            {imageState.meta}
-          </div>
-        )}
       </motion.div>
     )
   },
@@ -220,7 +211,11 @@ export function MarkdownContent({ content, images, sources, onCitationPositions,
   }, [content, sources, onCitationPositions, positionAnchorRef])
 
   const maxCitation = sources?.length ?? 0
-  const displayContent = useMemo(() => buildMarkdownDisplayContent(content, maxCitation), [content, maxCitation])
+  const availableImageCount = images?.length ?? 0
+  const displayContent = useMemo(
+    () => buildMarkdownDisplayContent(content, maxCitation, availableImageCount),
+    [content, maxCitation, availableImageCount]
+  )
   const markdownComponents = useMemo(() => createMarkdownComponents(images, sources), [images, sources])
 
   return (

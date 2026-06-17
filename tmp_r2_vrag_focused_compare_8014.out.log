@@ -1,0 +1,21 @@
+============================================================
+MediArch Benchmark Runner
+============================================================
+API:       http://localhost:8014
+Questions: E:\MyPrograms\MediArch_System\docs\实验部分\54题实验补强\benchmark_questions_54.csv
+Runs:      docs\实验部分\54题实验补强\r2_vrag_focused_compare_q004_q005_q012_current_2026-06-08.csv
+Modes:     ['R2', 'VRAG']
+Questions: ['Q004', 'Q005', 'Q012']
+Tasks:     6
+Timeout:   7200s per request
+============================================================
+[1/6] Q004 (VRAG) ... OK (60.3s, 1911 chars)
+[2/6] Q004 (R2) ... OK (99.2s, 1227 chars)
+[3/6] Q005 (VRAG) ... OK (68.2s, 2133 chars)
+[4/6] Q005 (R2) ... OK (100.1s, 2174 chars)
+[5/6] Q012 (VRAG) ... OK (50.9s, 1942 chars)
+[6/6] Q012 (R2) ... OK (78.8s, 1630 chars)
+============================================================
+Done! success=6, failed=0
+Results saved to: docs\实验部分\54题实验补强\r2_vrag_focused_compare_q004_q005_q012_current_2026-06-08.csv
+============================================================

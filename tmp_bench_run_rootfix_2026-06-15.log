@@ -1,0 +1,47 @@
+============================================================
+MediArch Benchmark Runner
+============================================================
+API:       http://localhost:8013
+Questions: E:\MyPrograms\MediArch_System\docs\实验部分\54题实验补强\benchmark_questions_54.csv
+Runs:      docs\实验部分\benchmark_runs_stratified16_rootfix_2026-06-15.csv
+Modes:     ['R2', 'VRAG']
+Questions: ['Q004', 'Q005', 'Q012', 'Q016', 'Q019', 'Q020', 'Q021', 'Q022', 'Q024', 'Q029', 'Q033', 'Q037', 'Q041', 'Q045', 'Q050', 'Q054']
+Tasks:     32
+Timeout:   360 per request
+============================================================
+[1/32] Q004 (VRAG) ... OK (48.0s, 1844 chars)
+[2/32] Q004 (R2) ... OK (73.5s, 1151 chars)
+[3/32] Q005 (VRAG) ... OK (34.7s, 1145 chars)
+[4/32] Q005 (R2) ... OK (45.9s, 960 chars)
+[5/32] Q012 (VRAG) ... OK (56.8s, 1686 chars)
+[6/32] Q012 (R2) ... OK (73.0s, 1336 chars)
+[7/32] Q016 (VRAG) ... OK (51.8s, 2088 chars)
+[8/32] Q016 (R2) ... OK (62.6s, 1744 chars)
+[9/32] Q019 (VRAG) ... OK (22.8s, 670 chars)
+[10/32] Q019 (R2) ... OK (42.4s, 714 chars)
+[11/32] Q020 (VRAG) ... OK (35.8s, 1350 chars)
+[12/32] Q020 (R2) ... OK (54.8s, 1030 chars)
+[13/32] Q021 (VRAG) ... OK (36.0s, 1348 chars)
+[14/32] Q021 (R2) ... OK (66.0s, 1458 chars)
+[15/32] Q022 (VRAG) ... OK (30.6s, 1130 chars)
+[16/32] Q022 (R2) ... OK (56.1s, 1412 chars)
+[17/32] Q024 (VRAG) ... OK (43.5s, 1532 chars)
+[18/32] Q024 (R2) ... OK (74.0s, 1911 chars)
+[19/32] Q029 (VRAG) ... OK (21.7s, 688 chars)
+[20/32] Q029 (R2) ... OK (46.7s, 373 chars)
+[21/32] Q033 (VRAG) ... OK (33.5s, 1261 chars)
+[22/32] Q033 (R2) ... OK (57.9s, 1235 chars)
+[23/32] Q037 (VRAG) ... OK (39.0s, 1428 chars)
+[24/32] Q037 (R2) ... OK (79.9s, 1909 chars)
+[25/32] Q041 (VRAG) ... OK (50.2s, 1916 chars)
+[26/32] Q041 (R2) ... OK (82.5s, 2253 chars)
+[27/32] Q045 (VRAG) ... OK (25.9s, 947 chars)
+[28/32] Q045 (R2) ... OK (46.2s, 799 chars)
+[29/32] Q050 (VRAG) ... OK (34.4s, 1146 chars)
+[30/32] Q050 (R2) ... OK (70.4s, 1752 chars)
+[31/32] Q054 (VRAG) ... OK (48.6s, 1802 chars)
+[32/32] Q054 (R2) ... OK (79.2s, 1989 chars)
+============================================================
+Done! success=32, failed=0
+Results saved to: docs\实验部分\benchmark_runs_stratified16_rootfix_2026-06-15.csv
+============================================================

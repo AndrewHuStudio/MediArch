@@ -1,0 +1,62 @@
+[2026-06-08 21:48:17] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-08 21:48:17] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-08 21:48:17] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-08 21:48:17] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-08 21:48:17] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-08 21:48:21] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1780926501933
+[2026-06-08 21:48:21] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.004s | Request-ID: req-1780926501933
+INFO:     127.0.0.1:55549 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-08 21:48:50] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1780926530564
+[2026-06-08 21:48:50] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.001s | Request-ID: req-1780926530564
+INFO:     127.0.0.1:55579 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-08 21:49:14] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780926554419
+[2026-06-08 21:49:14] INFO - mediarch_api - [Chat] 收到消息: 《医疗机构设置规划指导原则（2021-2025年）》明确了医疗机构设置应坚持哪些基本原则？... | Session: session-e3648c77abfd4fbb
+[OK] 检测到 MongoDB 文本索引: content_text_idx
+[OK] MongoDB连接成功: mediarch.mediarch_chunks
+[MongoDB] 开始搜索，关键词=['医疗机构设置规划指导原则', '医疗机构设置', '基本原则', '2021-2025年', '医疗机构规划', '医疗资源配置', '设置原则', '指导原则', '医疗机构布局', '规划原则', 'GB51039-2014综合医院建筑设计标准.pdf', '分区规划', '功能', '功能规划', '医疗功能房间详图集3.pdf', '医疗机构', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '原则', '国家医学中心和国家区域医疗中心设置实施方案.pdf'], 正则模式=医疗机构设置规划指导原则|医疗机构设置|基本原则|2021\-2025年|医疗机构规划|医疗资源配置|设置原则|指导原则|医疗机构布局|规划原则|GB51039\-2014综合医院建筑设计标准\.pd...
+[MongoDB] 搜索完成：找到 4 个匹配的chunks（策略：text_index）
+[2026-06-08 21:50:13] INFO - mediarch_api - [Chat] 回复成功 | Session: session-e3648c77abfd4fbb | Time: 59336ms
+[2026-06-08 21:50:13] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 59.343s | Request-ID: req-1780926554419
+[2026-06-08 21:50:13] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 59.344s | This is a slow request!
+INFO:     127.0.0.1:55591 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-08 21:50:15] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780926615807
+[2026-06-08 21:50:15] INFO - mediarch_api - [Chat] 收到消息: 如何打破“床位决定论”，建立以“核心任务量”为驱动的医技规模模型... | Session: session-fb88e365d78a46cc
+[MongoDB] 开始搜索，关键词=['床位决定论', '核心任务量', '医技规模模型', '医疗技术规模', '医院规模规划', '医院容量模型', '医疗资源分配', '医院建筑设计', '医疗流程优化', 'Hospital Capacity Planning', '住院床位', '医疗功能房间详图集3.pdf', '医疗机构设置规划指导原则（2021-2025）.pdf', '医疗资源', '医院建筑设计指南 → 古鲁·马尼亚', '医院建筑设计指南.pdf', '古鲁·马尼亚 → 产能利用', '古鲁·马尼亚 → 医疗流程', '古鲁·马尼亚 → 医院', '古鲁·马尼亚 → 策划与建筑布局'], 正则模式=床位决定论|核心任务量|医技规模模型|医疗技术规模|医院规模规划|医院容量模型|医疗资源分配|医院建筑设计|医疗流程优化|Hospital\ Capacity\ Planning|住院床位|医疗功能房...
+[MongoDB] 搜索完成：找到 35 个匹配的chunks（策略：regex_or）
+[2026-06-08 21:51:48] INFO - mediarch_api - [Chat] 回复成功 | Session: session-fb88e365d78a46cc | Time: 92824ms
+[2026-06-08 21:51:48] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 92.826s | Request-ID: req-1780926615807
+[2026-06-08 21:51:48] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 92.828s | This is a slow request!
+INFO:     127.0.0.1:55648 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-08 21:51:50] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780926710670
+[2026-06-08 21:51:50] INFO - mediarch_api - [Chat] 收到消息: 在“平急结合”需求下，如何通过流线重构解决急诊部的“空间冗余”与“效率瓶颈”？
+问题背景... | Session: session-823a32e7ed534953
+[MongoDB] 开始搜索，关键词=['平急结合', '流线重构', '急诊部', '空间冗余', '效率瓶颈', '急诊流程', '应急转换', '医疗流程', '急诊科', 'Emergency Department', '医疗体系', '医疗体系 → 建筑设计', '医疗功能房间详图集3.pdf', '医疗服务 → 床位数', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '外科医疗中心 → 床位数', '建筑设计 → 床位数', '母婴护理 → 床位数', '流线'], 正则模式=平急结合|流线重构|急诊部|空间冗余|效率瓶颈|急诊流程|应急转换|医疗流程|急诊科|Emergency\ Department|医疗体系|医疗体系\ →\ 建筑设计|医疗功能房间详图集3\.pdf|...
+[MongoDB] 搜索完成：找到 78 个匹配的chunks（策略：regex_or）
+[2026-06-08 21:53:54] INFO - mediarch_api - [Chat] 回复成功 | Session: session-823a32e7ed534953 | Time: 123850ms
+[2026-06-08 21:53:54] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 123.853s | Request-ID: req-1780926710670
+[2026-06-08 21:53:54] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 123.853s | This is a slow request!
+INFO:     127.0.0.1:55694 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-08 21:53:56] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780926836574
+[2026-06-08 21:53:56] INFO - mediarch_api - [Chat] 收到消息: 在现代手术部设计中，如何通过流线模式的优化（如“洁净走廊中核式”对比“双廊模式”），在提升手术周转效... | Session: session-c660d91ef91a43bd
+[MongoDB] 开始搜索，关键词=['手术部设计', '流线模式', '洁净走廊中核式', '双廊模式', '手术周转效率', '术后感染风险', '手术室设计', '洁净走廊', '中核式', '双廊', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '双廊布局', '布局', '感染', '感染风险', '无菌走廊', '既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf', '流线', '综合医院医疗功能规模循证设计_崔怡卓.pdf'], 正则模式=手术部设计|流线模式|洁净走廊中核式|双廊模式|手术周转效率|术后感染风险|手术室设计|洁净走廊|中核式|双廊|医疗功能房间详图集3\.pdf|医院建筑设计指南\.pdf|双廊布局|布局|感染|感染风...
+[MongoDB] 搜索完成：找到 10 个匹配的chunks（策略：text_index）
+[2026-06-08 21:55:34] INFO - mediarch_api - [Chat] 回复成功 | Session: session-c660d91ef91a43bd | Time: 97874ms
+[2026-06-08 21:55:34] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 97.877s | Request-ID: req-1780926836574
+[2026-06-08 21:55:34] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 97.878s | This is a slow request!
+INFO:     127.0.0.1:55718 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-08 21:55:36] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780926936508
+[2026-06-08 21:55:36] INFO - mediarch_api - [Chat] 收到消息: 根据《医院建筑设计指南》“分区和交通系统”一节，医院建筑通常可分为哪四个功能区？技术区域在总体布局中... | Session: session-818798906af34df3
+[MongoDB] 开始搜索，关键词=['分区和交通系统', '功能区', '医院建筑', '总体布局', '技术区域', '医院建筑设计指南', '功能分区', '交通系统', '医疗区', '后勤保障区', '交通流线', '功能', '医疗功能房间详图集3.pdf', '医院', '医院建筑设计指南 → 医院', '医院建筑设计指南.pdf', '布局', '技术', '既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf', '流线'], 正则模式=分区和交通系统|功能区|医院建筑|总体布局|技术区域|医院建筑设计指南|功能分区|交通系统|医疗区|后勤保障区|交通流线|功能|医疗功能房间详图集3\.pdf|医院|医院建筑设计指南\ →\ 医院|医...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-08 21:57:05] INFO - mediarch_api - [Chat] 回复成功 | Session: session-818798906af34df3 | Time: 89116ms
+[2026-06-08 21:57:05] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 89.119s | Request-ID: req-1780926936508
+[2026-06-08 21:57:05] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 89.120s | This is a slow request!
+INFO:     127.0.0.1:55773 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-08 21:57:07] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780927027687
+[2026-06-08 21:57:07] INFO - mediarch_api - [Chat] 收到消息: 在手术室数量有限的医院中，如果既要降低交叉感染风险、缩短手术周转时间，又要减轻患者在转运、等待和麻醉... | Session: session-2780658ad9344d0b
+[MongoDB] 开始搜索，关键词=['手术室', '恢复区', '流线', '交叉感染', '手术周转时间', '患者转运', '患者等待', '麻醉', '分区', '手术室数量有限', 'DesignMethod社区', 'Space社区', '分区规划', '医疗功能房间详图集3.pdf', '医院建筑设计指南 → 医院', '医院建筑设计指南.pdf', '患者恢复区', '手术室流程', '手术室门', '手术室预测'], 正则模式=手术室|恢复区|流线|交叉感染|手术周转时间|患者转运|患者等待|麻醉|分区|手术室数量有限|DesignMethod社区|Space社区|分区规划|医疗功能房间详图集3\.pdf|医院建筑设计指南\...
+[MongoDB] 搜索完成：找到 114 个匹配的chunks（策略：regex_or）
+[2026-06-08 21:59:31] INFO - mediarch_api - [Chat] 回复成功 | Session: session-2780658ad9344d0b | Time: 143396ms
+[2026-06-08 21:59:31] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 143.399s | Request-ID: req-1780927027687
+[2026-06-08 21:59:31] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 143.399s | This is a slow request!
+INFO:     127.0.0.1:55817 - "POST /api/v1/chat HTTP/1.1" 200 OK

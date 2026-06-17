@@ -26,6 +26,7 @@ class ChatRequest(BaseModel):
 
     # 过滤器（可选）：用于限定检索范围（如指定资料/类别/内容类型等）
     filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="检索过滤器（可选）")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="请求元数据（实验/诊断用）")
 
     # 检索参数
     top_k: Optional[int] = Field(default=12, ge=1, le=50, description="返回结果数量")

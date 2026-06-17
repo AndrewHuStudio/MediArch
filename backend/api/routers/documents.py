@@ -51,6 +51,18 @@ def _resolve_image_candidate(requested_path: str) -> Path | None:
     direct = (OCR_OUTPUT_DIR / Path(*parts)).resolve()
     candidates.append(direct)
 
+    # Legacy index format: <doc>/<full|images>/... without leading category.
+    # Try matching any category folder under OCR_OUTPUT_DIR.
+    if len(parts) >= 3:
+        for category_dir in OCR_OUTPUT_DIR.iterdir() if OCR_OUTPUT_DIR.exists() else []:
+            if not category_dir.is_dir():
+                continue
+            with_category = (category_dir / Path(*parts)).resolve()
+            candidates.append(with_category)
+            if len(parts) >= 3 and parts[1] == "full" and parts[2] == "images":
+                alt = (category_dir / parts[0] / "full" / "images" / parts[-1]).resolve()
+                candidates.append(alt)
+
     if len(parts) >= 4 and parts[2] == "images":
         with_full = (OCR_OUTPUT_DIR / Path(parts[0], parts[1], "full", *parts[2:])).resolve()
         candidates.append(with_full)

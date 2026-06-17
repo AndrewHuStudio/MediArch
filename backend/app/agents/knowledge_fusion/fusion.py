@@ -56,6 +56,9 @@ class UnifiedHints:
     # 搜索词
     search_terms: List[str] = field(default_factory=list)
 
+    # KG/Milvus 中出现的资料源名称，供 MongoDB 按资料源补查正文 chunk。
+    source_documents: List[str] = field(default_factory=list)
+
     # 元信息
     neo4j_entity_count: int = 0
     milvus_chunk_count: int = 0
@@ -411,6 +414,7 @@ def build_unified_hints(
     chunk_ids_set: Set[str] = set()
     sections_set: Set[str] = set()
     search_terms_set: Set[str] = set()
+    source_documents_set: Set[str] = set()
 
     # 添加原始查询作为搜索词
     if query:
@@ -440,18 +444,26 @@ def build_unified_hints(
 
         # 关系信息
         for edge in (item.edges or []):
+            target_name = edge.get("target", "")
+            relation_type = edge.get("type", "RELATED_TO")
+            target_label = edge.get("target_label", "")
             relation = {
                 "source": item.name or "",
-                "relation": edge.get("type", "RELATED_TO"),
-                "target": edge.get("target", ""),
+                "relation": relation_type,
+                "target": target_name,
             }
             if relation["source"] and relation["target"]:
                 hints.relations.append(relation)
                 # 目标实体也作为搜索词
-                target_name = edge.get("target", "")
                 if target_name:
                     entity_names_set.add(target_name)
                     search_terms_set.add(target_name)
+                    if (
+                        relation_type == "MENTIONED_IN"
+                        or target_label == "Source"
+                        or _looks_like_source_document(target_name)
+                    ):
+                        source_documents_set.add(str(target_name))
 
     # ========== 处理 Milvus 结果 ==========
     for item in milvus_items:
@@ -488,6 +500,14 @@ def build_unified_hints(
             entity_names_set.add(item.name)
             search_terms_set.add(item.name)
 
+        source_doc = attrs.get("source_document") or attrs.get("doc_title")
+        if source_doc:
+            source_documents_set.add(str(source_doc))
+        for citation in item.citations or []:
+            source = citation.get("source") if isinstance(citation, dict) else None
+            if source:
+                source_documents_set.add(str(source))
+
     # ========== 合并去重 & 稳定排序 ==========
     def _sorted_limited(values: Set[str], limit: Optional[int] = None) -> List[str]:
         items = sorted(values)
@@ -498,6 +518,7 @@ def build_unified_hints(
     hints.chunk_ids = _sorted_limited(chunk_ids_set, max_chunks)
     hints.sections = _sorted_limited(sections_set)
     hints.search_terms = _sorted_limited(search_terms_set, 30)  # 限制搜索词数量
+    hints.source_documents = _sorted_limited(source_documents_set, 12)
 
     if hints.page_ranges:
         hints.page_ranges = sorted(set(hints.page_ranges), key=lambda r: (r[0], r[1]))

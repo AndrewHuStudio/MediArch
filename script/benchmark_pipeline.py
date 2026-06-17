@@ -46,6 +46,7 @@ RUN_FIELDS = [
     "retrieved_doc_ids",
     "retrieved_chunk_ids",
     "response_took_ms",
+    "diagnostics",
     "error",
 ]
 

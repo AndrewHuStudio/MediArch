@@ -92,7 +92,7 @@ def _init_synthesizer_llm():
         model_provider=model_provider,
         api_key=api_key,
         base_url=base_url,
-        temperature=0.3,
+        temperature=0.0,  # 评测需确定性：消除生成随机性这一最大噪声源，使 A/B 结果可复现
         max_tokens=8000,
         timeout=timeout_s,
     )
@@ -651,6 +651,33 @@ def _role_priority_for_query(role: str, base_priority: int, query: str) -> int:
     return normative_priority.get(role, base_priority)
 
 
+def _best_body_text_for_item(item: AgentItem) -> str:
+    """Choose the richest retrieved body text available for prompt document views."""
+    candidates: List[str] = []
+
+    def add_candidate(value: Any) -> None:
+        text = str(value or "").strip()
+        if text:
+            candidates.append(text)
+
+    attrs = item.attrs or {}
+    add_candidate(attrs.get("chunk_text"))
+    add_candidate(attrs.get("text"))
+    add_candidate(attrs.get("content"))
+    add_candidate(attrs.get("body"))
+    add_candidate(item.snippet)
+
+    for citation in item.citations or []:
+        if not isinstance(citation, dict):
+            continue
+        add_candidate(citation.get("highlight_text"))
+        add_candidate(citation.get("snippet"))
+
+    if not candidates:
+        return ""
+    return max(candidates, key=len)
+
+
 def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[str, Any]]:
     """
     将多Agent的结果按资料聚合，方便LLM生成“资料链路”叙述。
@@ -728,10 +755,11 @@ def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[
         entry["agents"].add(item.source or "unknown")
         entry["item_count"] += 1
 
+        highlight_text = _best_body_text_for_item(item)
         highlight = {
             "title": item.name or item.label or doc_name,
             "label": item.label or "",
-            "snippet": (item.snippet or "")[:500],
+            "snippet": highlight_text[:500],
             "score": item.score,
             "source": item.source,
             "location": attrs.get("location"),
@@ -756,10 +784,20 @@ def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[
 
             image_url = citation.get("image_url")
             if image_url:
+                match_text = " ".join(
+                    str(part or "")
+                    for part in (
+                        citation.get("snippet"),
+                        citation.get("highlight_text"),
+                        citation.get("source"),
+                        location,
+                    )
+                )
                 entry["images"].append(
                     {
                         "image_url": image_url,
                         "caption": citation.get("snippet") or highlight["snippet"],
+                        "match_text": match_text,
                         "location": location,
                         "page_number": page,
                         "source": citation.get("source") or doc_name,
@@ -776,10 +814,15 @@ def _build_document_views(items: List[AgentItem], query: str = "") -> List[Dict[
 
         attr_image = attrs.get("image_url")
         if attr_image:
+            match_text = " ".join(
+                str(part or "")
+                for part in (highlight["snippet"], doc_name, attrs.get("location"))
+            )
             entry["images"].append(
                 {
                     "image_url": attr_image,
                     "caption": highlight["snippet"],
+                    "match_text": match_text,
                     "location": attrs.get("location"),
                     "page_number": None,
                     "source": doc_name,
@@ -1071,16 +1114,42 @@ def build_structured_fallback_answer(
     missing = coverage_audit.get("missing_required_lanes") or []
     notes = coverage_audit.get("notes") or []
     coverage_passed = bool(coverage_audit.get("passed"))
-    missing_text = "、".join(str(lane) for lane in missing) if missing else "关键证据"
+    lane_labels = {
+        "policy_document": "政策/规划依据",
+        "code_spec": "规范/标准依据",
+        "guide": "设计指南/手册依据",
+        "book_report": "书籍/报告依据",
+        "atlas_or_image": "图示/详图依据",
+        "paper_or_report": "研究/案例依据",
+    }
+    missing_text = "、".join(lane_labels.get(str(lane), str(lane)) for lane in missing)
     code_count = len(evidence_tiers.get("code_spec") or [])
     guide_count = len(evidence_tiers.get("guide") or [])
     atlas_count = len(evidence_tiers.get("atlas_or_image") or [])
     paper_count = len(evidence_tiers.get("paper_or_report") or [])
 
+    def public_notes(raw_notes: list[Any]) -> list[str]:
+        cleaned: list[str] = []
+        for note in raw_notes or []:
+            text = str(note or "").strip()
+            if not text:
+                continue
+            if text.startswith("missing required evidence lane"):
+                continue
+            if "does not hit question terms" in text:
+                continue
+            cleaned.append(text)
+            if len(cleaned) >= 3:
+                break
+        return cleaned
+
     if coverage_passed and not missing:
         evidence_status = "当前证据覆盖审计通过，但原回答中仍有主张超出了引用可支撑范围，因此不返回完整结论。"
     else:
-        evidence_status = f"当前检索结果证据不足，无法支持完整规范性回答：缺少 {missing_text} 证据。"
+        if missing_text:
+            evidence_status = f"当前证据不足：检索结果仍缺少这些资料类型：{missing_text}。因此不直接给出强制性尺寸或规范结论。"
+        else:
+            evidence_status = "当前证据不足以支撑完整规范性回答，因此不直接给出强制性尺寸或规范结论。"
 
     evidence_lines: list[str] = []
     ordered_lanes = (
@@ -1116,15 +1185,16 @@ def build_structured_fallback_answer(
         ]
         if missing:
             lines.append(f"当前仍缺少必需证据角色：{missing_text}。")
-        if notes:
+        visible_notes = public_notes(notes)
+        if visible_notes:
             lines.append("")
-            lines.append("检索诊断：" + "；".join(str(note) for note in notes[:3]))
+            lines.append("检索诊断：" + "；".join(visible_notes))
         return "\n".join(lines)
 
     lines = [
         "### 证据依据",
         evidence_status,
-        f"已检索到的角色证据概况：code_spec={code_count}，guide={guide_count}，atlas_or_image={atlas_count}，paper_or_report={paper_count}。",
+        f"已检索到的资料类型概况：规范/标准依据={code_count}，设计指南/手册依据={guide_count}，图示/详图依据={atlas_count}，研究/案例依据={paper_count}。",
         "",
         "### 空间约束",
         "无法确认具体强制条文、数值边界或分区流线要求，因此不能把下列内容作为合规结论。",
@@ -1135,9 +1205,10 @@ def build_structured_fallback_answer(
         "### 推论边界",
         "以上不是规范结论，需补充标准/条文证据后才能作为合规依据。",
     ]
-    if notes:
+    visible_notes = public_notes(notes)
+    if visible_notes:
         lines.append("")
-        lines.append("检索诊断：" + "；".join(str(note) for note in notes[:3]))
+        lines.append("检索诊断：" + "；".join(visible_notes))
     return "\n".join(lines)
 
 
@@ -1392,14 +1463,29 @@ _IMAGE_QUERY_NEGATIONS = (
     "不需要图片",
 )
 
+_IMAGE_SPATIAL_QUERY_TRIGGERS = (
+    "空间推理",
+    "空间排布",
+    "空间布局",
+    "平面组织",
+    "流线",
+    "通视",
+    "隐私",
+    "邻接",
+    "洁污",
+    "分区",
+    "布置关系",
+    "位置关系",
+)
+
 
 def _wants_images(query: str) -> bool:
     q = (query or "").strip().lower()
-    if not q:
-        return False
     if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
         return False
-    return any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS)
+    if any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS):
+        return True
+    return any(trigger in q for trigger in _IMAGE_SPATIAL_QUERY_TRIGGERS)
 
 
 def _is_image_item(item: AgentItem) -> bool:
@@ -1423,6 +1509,47 @@ def _is_image_item(item: AgentItem) -> bool:
             return True
 
     return False
+
+
+def _image_reference_from_citation(citation: Dict[str, Any], item: AgentItem | None = None) -> Dict[str, Any] | None:
+    image_url = citation.get("image_url")
+    if not image_url:
+        return None
+    attrs = item.attrs if item is not None and item.attrs else {}
+    snippet = citation.get("snippet")
+    if not snippet and item is not None:
+        snippet = item.snippet
+    return {
+        "image_url": image_url,
+        "location": citation.get("location") or attrs.get("location") or "",
+        "source": citation.get("source") or attrs.get("source_document") or (item.name if item else ""),
+        "snippet": str(snippet or "")[:100],
+        "positions": citation.get("positions", []),
+        "pdf_url": citation.get("pdf_url") or attrs.get("pdf_url"),
+        "file_path": citation.get("file_path") or attrs.get("file_path"),
+        "document_path": citation.get("document_path") or attrs.get("document_path"),
+        "page_number": citation.get("page_number"),
+        "page_range": citation.get("page_range"),
+        "chapter": citation.get("chapter"),
+        "chapter_title": citation.get("chapter_title"),
+        "sub_section": citation.get("sub_section"),
+        "content_type": citation.get("content_type", "image"),
+        "chunk_id": citation.get("chunk_id") or (item.entity_id if item else None),
+        "doc_id": citation.get("doc_id"),
+        "highlight_text": citation.get("highlight_text", ""),
+    }
+
+
+def _dedupe_image_references(images: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen_urls: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for image in images:
+        url = str(image.get("image_url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        out.append(image)
+    return out
 
 
 def _filter_text_items(items: List[AgentItem], query: str) -> List[AgentItem]:
@@ -1516,9 +1643,9 @@ def _build_balanced_citations_for_strict_cross_doc(
     def is_image(c: Dict[str, Any]) -> bool:
         return bool(c.get("image_url")) or (c.get("content_type") == "image")
 
-    # 严格交叉验证：默认过滤图片 citations（除非用户明确要图）
+    # 严格交叉验证：默认保留图片 citations；仅在用户明确否定图片时过滤。
     query = (request.query if isinstance(request, AgentRequest) else "") or ""
-    wants_images = any(k in query for k in ("带图", "配图", "平面图", "剖面图", "流程图", "示意图", "图示"))
+    wants_images = _wants_images(query)
     filtered = [c for c in all_citations if wants_images or (not is_image(c))]
 
     # 去重：同一 doc_id + chunk/image + page/loc 只保留 1 条
@@ -1919,6 +2046,277 @@ def _ensure_all_citations_mentioned(text: str, citations_count: int) -> str:
     return "".join(p["value"] for p in parts)
 
 
+def _append_missing_source_evidence_summary(
+    text: str,
+    citations: List[Dict[str, Any]],
+    *,
+    max_sources: int = 4,
+) -> str:
+    """
+    Add concise retrieved evidence from source documents not used in the answer.
+
+    This is a deterministic evidence-transfer guard: retrieved citable snippets
+    remain part of the final answer even if the LLM under-cites during synthesis.
+    The later citation remapper can then keep frontend references aligned.
+    """
+    if not text or not citations or max_sources <= 1:
+        return text
+
+    source_to_entry: Dict[str, tuple[int, str]] = {}
+    for idx, citation in enumerate(citations, start=1):
+        source = str(
+            citation.get("source")
+            or citation.get("document_title")
+            or citation.get("doc_title")
+            or ""
+        ).strip()
+        if not source or source in source_to_entry:
+            continue
+        snippet = str(
+            citation.get("highlight_text")
+            or citation.get("snippet")
+            or citation.get("content")
+            or ""
+        ).strip()
+        if not snippet:
+            continue
+        if not _citation_related_to_answer(text, source, snippet):
+            continue
+        snippet = _clean_evidence_snippet_for_answer(snippet)
+        if not snippet:
+            continue
+        source_to_entry[source] = (idx, snippet)
+        if len(source_to_entry) >= max_sources:
+            break
+
+    if len(source_to_entry) <= 1:
+        return text
+
+    used: set[int] = set()
+    for match in re.finditer(r"\[(\d+)\]", text):
+        idx = int(match.group(1))
+        if 1 <= idx <= len(citations):
+            used.add(idx)
+
+    missing = [(source, idx, snippet) for source, (idx, snippet) in source_to_entry.items() if idx not in used]
+    if not missing:
+        return text
+
+    lines = ["", "", "补充设计要点："]
+    for source, idx, snippet in missing:
+        line = _format_missing_evidence_line(snippet, idx)
+        if line:
+            lines.append(line)
+    if len(lines) <= 3:
+        return text
+    support_block = "\n".join(lines)
+
+    parts = _split_fenced_code_blocks(text)
+    if not parts:
+        return f"{text.rstrip()}{support_block}"
+
+    for part in reversed(parts):
+        if part["type"] == "text":
+            part["value"] = f"{part['value'].rstrip()}{support_block}"
+            return "".join(p["value"] for p in parts)
+
+    return f"{text.rstrip()}{support_block}"
+
+
+def _clean_evidence_snippet_for_answer(snippet: str, max_len: int = 110) -> str:
+    text = re.sub(r"\s+", " ", str(snippet or "")).strip(" ：:，,。；;")
+    text = re.sub(r"^(根据|依据|资料显示|检索到|相关资料指出)[，,:：\s]*", "", text)
+    if len(text) > max_len:
+        text = text[:max_len].rstrip(" ，,；;、") + "..."
+    return text
+
+
+def _source_title_without_extension(source: str) -> str:
+    name = re.sub(r"\.(pdf|docx?|xlsx?|txt)$", "", str(source or ""), flags=re.I).strip()
+    return re.sub(r"[_\-\s]+", " ", name).strip()
+
+
+def _evidence_terms(text: str) -> set[str]:
+    raw = str(text or "").lower()
+    terms = set(re.findall(r"[\u4e00-\u9fff]{2,8}|[a-z0-9]{3,}", raw))
+    return {term for term in terms if term not in {"相关资料", "资料", "医院", "建筑", "设计"}}
+
+
+def _citation_related_to_answer(answer_text: str, source: str, snippet: str) -> bool:
+    answer_terms = _evidence_terms(answer_text)
+    if not answer_terms:
+        return True
+    evidence_terms = _evidence_terms(f"{source} {snippet}")
+    if not evidence_terms:
+        return False
+    if answer_terms & evidence_terms:
+        return True
+    answer = str(answer_text or "")
+    evidence = f"{source} {snippet}"
+    anchors = ("门诊", "诊室", "候诊", "公共空间", "流线", "私密", "用房", "单元")
+    return any(anchor in answer and anchor in evidence for anchor in anchors)
+
+
+def _format_missing_evidence_line(snippet: str, citation_idx: int) -> str:
+    cleaned = _clean_evidence_snippet_for_answer(snippet)
+    if not cleaned:
+        return ""
+    if cleaned.endswith(("。", "；", ";")):
+        return f"- {cleaned}[{citation_idx}]"
+    return f"- {cleaned}。[{citation_idx}]"
+
+
+def _is_complex_design_query(query: str) -> bool:
+    q = str(query or "")
+    groups = (
+        ("综合", "共同支撑", "多文档", "结合", "对比"),
+        ("空间推理", "空间", "流线", "布局", "排布", "通视", "隐私"),
+        ("设计建议", "建议", "策略", "优化", "怎么设计", "如何设计"),
+        ("证据边界", "边界", "依据", "规范", "图集", "论文"),
+    )
+    hits = sum(1 for group in groups if any(token in q for token in group))
+    return hits >= 2
+
+
+def _first_citation_in_lane(
+    evidence_tiers: Dict[str, List[Dict[str, Any]]],
+    lane: str,
+    citations: List[Dict[str, Any]],
+) -> tuple[int, Dict[str, Any]] | None:
+    lane_items = evidence_tiers.get(lane) or []
+    if not lane_items:
+        return None
+    target = _citation_identity(lane_items[0])
+    for idx, citation in enumerate(citations, start=1):
+        if _citation_identity(citation) == target:
+            return idx, citation
+    return None
+
+
+def _line_from_lane(label: str, entry: tuple[int, Dict[str, Any]] | None) -> str:
+    if not entry:
+        return ""
+    idx, citation = entry
+    snippet = _clean_evidence_snippet_for_answer(
+        citation.get("highlight_text") or citation.get("snippet") or citation.get("content") or "",
+        max_len=150,
+    )
+    if not snippet:
+        return ""
+    return f"- **{label}**：{snippet}。[{idx}]"
+
+
+def _append_multisource_design_expansion(
+    *,
+    query: str,
+    text: str,
+    citations: List[Dict[str, Any]],
+    evidence_tiers: Dict[str, List[Dict[str, Any]]],
+    coverage_passed: bool = True,
+) -> str:
+    if not coverage_passed:
+        return text
+    if not text or not citations or not _is_complex_design_query(query):
+        return text
+    if "综合设计补充" in text:
+        return text
+
+    code = _first_citation_in_lane(evidence_tiers, "code_spec", citations)
+    atlas = _first_citation_in_lane(evidence_tiers, "atlas_or_image", citations)
+    paper = _first_citation_in_lane(evidence_tiers, "paper_or_report", citations)
+    guide = _first_citation_in_lane(evidence_tiers, "guide", citations)
+    if sum(1 for entry in (code, atlas, paper, guide) if entry) < 2:
+        return text
+
+    lines = ["", "", "### 综合设计补充"]
+    for label, entry in (
+        ("规范边界", code),
+        ("空间/图集做法", atlas),
+        ("研究/案例解释", paper or guide),
+    ):
+        line = _line_from_lane(label, entry)
+        if line:
+            lines.append(line)
+
+    if len(lines) <= 3:
+        return text
+    lines.append("- **设计综合**：先用规范或标准确定不可突破的安全、流程和配置边界，再用图集校对平面组织、相邻关系和可实施做法，最后用论文或案例解释效率、可视性、隐私和体验之间的取舍。")
+    lines.append("- **证据边界**：当前回答只把上述资料中直接出现的要求和关系作为结论；没有被规范、图集或研究资料共同支撑的精确尺寸、条文编号和强制结论不扩展。")
+    return f"{text.rstrip()}{chr(10).join(lines)}"
+
+
+_INTERNAL_GRAPH_LABELS = {"space", "designmethod", "functionalzone", "knowledgepoint", "source"}
+
+
+def _clean_recommendation_term(value: Any) -> str:
+    text = re.sub(r"\s+", "", str(value or "")).strip(" ：:，,。；;?？")
+    if not text or text.lower() in _INTERNAL_GRAPH_LABELS:
+        return ""
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", text):
+        return ""
+    return text[:18]
+
+
+def _query_topic_for_recommendations(query: str) -> str:
+    topic = re.sub(r"^(请|能否|可以)?(基于.*?，)?", "", str(query or "")).strip()
+    topic = re.sub(r"[？?。；;]$", "", topic)
+    topic = re.sub(r"^(说明|总结|分析|解释)", "", topic).strip()
+    return topic[:24] or "这个问题"
+
+
+def _append_unique_question(out: List[str], question: str, max_count: int) -> None:
+    q = re.sub(r"\s+", "", str(question or "")).strip()
+    q = q.replace("最佳实践", "落地做法").replace("Space", "").replace("DesignMethod", "")
+    q = q.strip(" ，,。；;")
+    if not q:
+        return
+    if not q.endswith("？"):
+        q = f"{q}？"
+    if len(q) > 34:
+        q = q[:33].rstrip("，,；;。") + "？"
+    if q not in out and len(out) < max_count:
+        out.append(q)
+
+
+def _build_natural_recommended_questions(
+    *,
+    query: str,
+    neo4j_query_path: Optional[Dict[str, Any]],
+    aggregated_items_count: int,
+    include_online: bool = False,
+    max_questions: int = 4,
+) -> List[str]:
+    topic = _query_topic_for_recommendations(query)
+    out: List[str] = []
+    graph = neo4j_query_path or {}
+
+    for rel in list(graph.get("expanded_relations") or [])[:3]:
+        source = _clean_recommendation_term(rel.get("source"))
+        target = _clean_recommendation_term(rel.get("target"))
+        if source and target:
+            _append_unique_question(out, f"{source}和{target}如何衔接", max_questions)
+
+    for entity in list(graph.get("expanded_entities") or [])[:4]:
+        name = _clean_recommendation_term(entity.get("name"))
+        if not name or name == topic:
+            continue
+        _append_unique_question(out, f"{name}的尺度和配置要点是什么", max_questions)
+
+    if _is_complex_design_query(query):
+        _append_unique_question(out, "哪些结论需要规范、图集和案例共同核验", max_questions)
+    elif _is_normative_query(query):
+        _append_unique_question(out, f"{topic}有哪些强制边界", max_questions)
+    else:
+        _append_unique_question(out, f"{topic}在方案阶段怎么落地", max_questions)
+
+    if include_online:
+        _append_unique_question(out, f"{topic}有没有近期案例可对照", max_questions)
+    elif aggregated_items_count < 5:
+        _append_unique_question(out, f"还需要补充哪些资料才能判断{topic}", max_questions)
+
+    return out[:max_questions]
+
+
 def _compact_citations_in_block(block: str) -> str:
     """
     段落/列表块级引用压缩：
@@ -2251,27 +2649,9 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                             })
                         # ✅ [NEW] 提取图片chunk
                         else:
-                            image_url = citation.get("image_url")
-                            if image_url:
-                                image_citations.append({
-                                    "image_url": image_url,
-                                    "location": location,
-                                    "source": citation.get("source", ""),
-                                    "snippet": citation.get("snippet", "")[:100],
-                                    "positions": citation.get("positions", []),
-                                    "pdf_url": citation.get("pdf_url"),
-                                    "file_path": citation.get("file_path"),
-                                    "document_path": citation.get("document_path"),
-                                    "page_number": citation.get("page_number"),
-                                    "page_range": citation.get("page_range"),
-                                    "chapter": citation.get("chapter"),
-                                    "chapter_title": citation.get("chapter_title"),
-                                    "sub_section": citation.get("sub_section"),
-                                    "content_type": citation.get("content_type", "image"),
-                                    "chunk_id": citation.get("chunk_id"),
-                                    "doc_id": citation.get("doc_id"),
-                                    "highlight_text": citation.get("highlight_text", ""),
-                                })
+                            image_ref = _image_reference_from_citation(citation, item)
+                            if image_ref:
+                                image_citations.append(image_ref)
 
         # Milvus: 提取属性引用
         elif agent_name == "milvus_agent":
@@ -2303,8 +2683,15 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
                 reverse=True
             )[:10]
 
-    documents_payload = [_compact_document_view_for_prompt(doc) for doc in document_views[:6]]
-    top_documents = documents_payload[:4]  # 保证后续使用时已定义，避免未赋值错误
+    for item in aggregated_items:
+        for citation in item.citations or []:
+            if citation.get("image_url") or str(citation.get("content_type") or "").lower() == "image":
+                image_ref = _image_reference_from_citation(_citation_to_dict(citation), item)
+                if image_ref:
+                    image_citations.append(image_ref)
+
+    documents_payload = [_compact_document_view_for_prompt(doc) for doc in document_views]
+    top_documents = documents_payload  # 后续按 synthesis_mode["max_prompt_documents"] 统一限流。
 
     document_images: List[Dict[str, Any]] = []
     for doc in document_views:
@@ -2315,15 +2702,9 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 
     if wants_images:
         if document_images:
-            merged_images: List[Dict[str, Any]] = []
-            seen_urls: set[str] = set()
-            for img in list(image_citations) + list(document_images):
-                url = str(img.get("image_url") or "").strip()
-                if not url or url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                merged_images.append(img)
-            image_citations = merged_images
+            image_citations = _dedupe_image_references(list(image_citations) + list(document_images))
+        else:
+            image_citations = _dedupe_image_references(image_citations)
     else:
         image_citations = []
 
@@ -2671,13 +3052,24 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
 
     system_prompt = SYNTHESIZER_SYSTEM_PROMPT.format(citations_count=citations_count)
     if not synthesis_mode.get("allow_full_generation", True):
-        missing_lanes = "、".join(synthesis_mode.get("missing_required_lanes") or [])
+        lane_labels = {
+            "policy_document": "政策/规划依据",
+            "code_spec": "规范/标准依据",
+            "guide": "设计指南/手册依据",
+            "book_report": "书籍/报告依据",
+            "atlas_or_image": "图示/详图依据",
+            "paper_or_report": "研究/案例依据",
+        }
+        missing_lanes = "、".join(
+            lane_labels.get(str(lane), str(lane))
+            for lane in (synthesis_mode.get("missing_required_lanes") or [])
+        )
         system_prompt += f"""
 
-当前证据覆盖审计未通过，缺失必需证据角色：{missing_lanes or "关键证据"}。
+当前检索资料类型仍不完整{f"：{missing_lanes}" if missing_lanes else ""}。
 请采用保守回答：
-1. 先说明证据不足和缺失角色。
-2. 仅基于已有可引用证据给出有限结论。
+1. 直接基于已有可引用证据回答，不输出内部诊断字段。
+2. 缺少具体尺寸、详图或强制条文时，只说明“未检索到对应资料”，不要虚构。
 3. 不要把指南、图集、论文或知识图谱推论表述为规范条文。
 4. 对缺少 code_spec 的规范性问题，不要给出强制性合规结论。
 """
@@ -2804,6 +3196,18 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             final_answer = _strip_citations_in_tables(final_answer)
             final_answer = _relocate_leading_citations(final_answer)
             final_answer = _tighten_citation_spacing(final_answer)
+            final_answer = _append_missing_source_evidence_summary(
+                final_answer,
+                final_citations,
+                max_sources=12 if _is_benchmark_or_qa_mode(request) else 15,
+            )
+            final_answer = _append_multisource_design_expansion(
+                query=query,
+                text=final_answer,
+                citations=final_citations,
+                evidence_tiers=evidence_tiers,
+                coverage_passed=bool(getattr(coverage_audit, "passed", False)),
+            )
             final_answer, final_citations = _remap_citations_by_first_appearance(final_answer, final_citations)
             final_answer = _sort_adjacent_citation_groups(final_answer)
             final_answer = _tighten_citation_spacing(final_answer)
@@ -2829,62 +3233,13 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         claim_support_audit = audit_claim_support(final_answer, final_citations)
         claim_support_gate_diagnostics["claim_support_audit"] = asdict(claim_support_audit)
 
-        recommended_questions = []
-
-        # 策略1: 基于知识图谱扩展的实体生成深入问题（优先级最高）
-        if neo4j_query_path and neo4j_query_path.get("expanded_entities"):
-            for entity in neo4j_query_path["expanded_entities"][:3]:  # 取前3个
-                entity_name = entity.get("name", "")
-                entity_type = entity.get("type", "")
-                if entity_name and entity_name != query:
-                    if entity_type:
-                        recommended_questions.append(f"{entity_name}在{entity_type}中的详细设计要求和规范标准？")
-                    else:
-                        recommended_questions.append(f"{entity_name}的详细设计要求和相关案例？")
-
-        # 策略2: 基于关系扩展生成关联问题
-        if neo4j_query_path and neo4j_query_path.get("expanded_relations"):
-            for rel in neo4j_query_path["expanded_relations"][:2]:  # 取前2个
-                source = rel.get("source", "")
-                target = rel.get("target", "")
-                relation = rel.get("relation", "")
-                if source and target:
-                    if relation:
-                        recommended_questions.append(f"{source}与{target}之间的{relation}关系如何在实际设计中体现？")
-                    else:
-                        recommended_questions.append(f"{source}与{target}的空间关系和流线设计要点？")
-
-        # 策略3: 基于知识覆盖领域生成横向拓展问题
-        if neo4j_query_path and neo4j_query_path.get("knowledge_coverage"):
-            domains = [cov.get("domain", "") for cov in neo4j_query_path["knowledge_coverage"][:2]]
-            for domain in domains:
-                if domain:
-                    recommended_questions.append(f"在{domain}方面还有哪些相关的设计规范和最佳实践？")
-
-        # 策略4: 基于在线搜索结果生成补充问题
-        if _should_include_online_supplements(query) and online_search_results and len(online_search_results) >= 2:
-            # 如果有在线搜索结果，说明本地知识可能不足，引导用户探索新方向
-            recommended_questions.append(f"关于「{query}」的最新行业趋势和前沿技术应用有哪些？")
-
-        # 策略5: 基于检索结果质量生成深度搜索建议
-        if len(aggregated_items) < 5:
-            recommended_questions.append(f"[深度搜索] 是否需要对「{query}」进行在线深度搜索以获取更多资料？")
-
-        # 策略6: 相关案例询问（总是添加）
-        recommended_questions.append(f"能否提供{query}的实际案例和项目经验分享？")
-
-        # 策略7: 实践应用问题（总是添加）
-        recommended_questions.append(f"{query}在实际项目中的常见挑战和解决方案？")
-
-        # 去重并限制数量（保持3-5个）
-        seen = set()
-        unique_questions = []
-        for q in recommended_questions:
-            if q not in seen:
-                seen.add(q)
-                unique_questions.append(q)
-
-        recommended_questions = unique_questions[:5]  # 最多5个
+        recommended_questions = _build_natural_recommended_questions(
+            query=query,
+            neo4j_query_path=neo4j_query_path,
+            aggregated_items_count=len(aggregated_items),
+            include_online=bool(_should_include_online_supplements(query) and online_search_results and len(online_search_results) >= 2),
+            max_questions=4,
+        )
 
         logger.info("[Synthesizer->Synthesize] LLM 合成成功，生成推荐问题: %d 个", len(recommended_questions))
 

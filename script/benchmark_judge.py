@@ -12,9 +12,38 @@ from script import benchmark_pipeline
 
 
 SYSTEM_PROMPT = """You are a strict academic evaluator for a healthcare-architecture QA benchmark.
-Score only against the provided gold reference, gold evidence, gold answer, rubric, system answer, and citations.
-Do not reward plausible domain knowledge that is not grounded in the supplied evidence.
+Evaluate the question, system answer, citations, and provided reference anchors.
+The gold evidence is a reference anchor, not an exclusive answer key.
+Do not reward claims that are unsupported by the answer's cited evidence, the provided anchors, or clearly relevant healthcare-architecture design logic.
+For design and spatial-reasoning answers, distinguish cited evidence, evidence-derived spatial constraints, actionable design responses, and explicitly labeled design inference.
+Use only the allowed scoring ranges. Never output -1 or null. If evidence is missing or you cannot verify support, use 0 for that metric.
 Return JSON only."""
+
+
+V2_SCORING_GUIDANCE = """Scoring standard v2:
+- Gold evidence is a reference anchor, not an exclusive answer key. It may be incomplete, too narrow, or partially misassigned.
+- Evidence_Hit means evidence support, not exact-match scoring. Score 1 if the answer is supported by the gold anchor OR by substantively equivalent cited evidence from another source. Score 0 if the answer is unsupported, cites irrelevant sources, or provides no usable evidence.
+- Do not set Accuracy or Completeness to zero solely because the cited document differs from the gold reference.
+- Accuracy should judge whether the answer correctly responds to the question. Use 0 for wrong/irrelevant/contradictory answers, 1 for partially correct or overly generic answers, and 2 for substantively correct answers.
+- Completeness should judge whether the answer covers the major design dimensions required by the question. Use 0 for missing most required logic, 1 for partial coverage, and 2 for broad, well-structured coverage.
+- Unsupported_Claim should penalize important claims that are not backed by citations, the reference anchors, or defensible design logic. Do not treat every non-gold citation as unsupported.
+- For recommendation and spatial reasoning tasks, an answer may include four layers: evidence basis (证据依据), spatial constraints (空间约束), design response (设计回应), and inference boundary (推论边界). A clearly labeled design inference should not be penalized as Unsupported_Claim solely because it is not a verbatim standard clause, if it is a reasonable inference from cited evidence or the provided anchors.
+- Penalize design inference only when it contradicts evidence, invents numeric thresholds, misstates a cited source, or presents speculation as a binding code requirement.
+- Completeness should reward well-organized answers that connect evidence -> spatial constraint -> design response -> inference boundary for design questions, even when the answer includes evidence-informed professional judgment."""
+
+
+def normalize_timeout(timeout: int | float | None) -> int | float | None:
+    if timeout is None:
+        return None
+    try:
+        value = float(timeout)
+    except (TypeError, ValueError):
+        return timeout
+    if value <= 0:
+        return None
+    if value.is_integer():
+        return int(value)
+    return value
 
 
 def _clean(value: object) -> str:
@@ -87,6 +116,9 @@ Gold answer:
 Rubric:
 {_clean(question.get("judge_rubric"))}
 
+Additional v2 scoring calibration:
+{V2_SCORING_GUIDANCE}
+
 System answer:
 {_clean(run.get("answer"))}
 
@@ -95,10 +127,10 @@ System citations:
 
 Return JSON with exactly these keys:
 {{
-  "evidence_hit": 0 or 1,
-  "accuracy": 0, 1, or 2,
-  "completeness": 0, 1, or 2,
-  "unsupported_claim": 0, 1, or 2,
+  "evidence_hit": 0 or 1 (never -1),
+  "accuracy": 0, 1, or 2 (never -1),
+  "completeness": 0, 1, or 2 (never -1),
+  "unsupported_claim": 0, 1, or 2 (never -1),
   "rationale": "brief reason in Chinese or English"
 }}
 """
@@ -125,7 +157,7 @@ def call_judge_model(
         raise ValueError("Missing MEDIARCH_API_KEY for benchmark judge")
 
     judge_model = model or os.getenv("BENCHMARK_JUDGE_MODEL") or os.getenv("EVALUATOR_MODEL") or get_llm_model("gpt-4o-mini")
-    client = OpenAI(api_key=api_key, base_url=get_llm_base_url() or None, timeout=timeout)
+    client = OpenAI(api_key=api_key, base_url=get_llm_base_url() or None, timeout=normalize_timeout(timeout))
     response = client.chat.completions.create(
         model=judge_model,
         messages=list(messages),
@@ -156,7 +188,10 @@ def judge_runs(
     ids: set[str] | None = None,
     systems: set[str] | None = None,
     limit: int | None = None,
+    timeout: int = 90,
     dry_run: bool = False,
+    max_parse_attempts: int = 3,
+    continue_on_parse_error: bool = True,
 ) -> list[dict[str, str]]:
     questions = _load_questions(questions_path)
     runs = benchmark_pipeline.read_csv(runs_path)
@@ -189,8 +224,42 @@ def judge_runs(
                 "raw_json": json.dumps({"messages": messages}, ensure_ascii=False),
             }
         else:
-            raw = call_judge_model(messages, model=judge_model)
-            parsed = parse_judge_response(raw)
+            last_error: Exception | None = None
+            parsed = None
+            raw = ""
+            attempts = max(1, int(max_parse_attempts or 1))
+            for attempt in range(1, attempts + 1):
+                raw = call_judge_model(messages, model=judge_model, timeout=timeout)
+                try:
+                    parsed = parse_judge_response(raw)
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if attempt >= attempts:
+                        if not continue_on_parse_error:
+                            raise
+                        parsed = {
+                            "evidence_hit": "",
+                            "accuracy": "",
+                            "completeness": "",
+                            "unsupported_claim": "",
+                            "rationale": f"parse_error: {exc}",
+                            "raw_json": json.dumps({"raw": raw, "error": str(exc)}, ensure_ascii=False),
+                        }
+                        break
+                    messages = list(messages) + [
+                        {
+                            "role": "user",
+                            "content": (
+                                "Your previous JSON used an invalid score or invalid schema. "
+                                "Return valid JSON only. evidence_hit must be 0 or 1; "
+                                "accuracy/completeness/unsupported_claim must be 0, 1, or 2."
+                            ),
+                        }
+                    ]
+                    time.sleep(0.2)
+            if parsed is None:
+                raise last_error or ValueError("Judge parsing failed")
 
         row = {
             "question_id": qid,
@@ -222,7 +291,10 @@ def main() -> None:
     parser.add_argument("--ids", nargs="+", default=None)
     parser.add_argument("--systems", nargs="+", default=None)
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--timeout", type=int, default=90, help="Judge model timeout per request in seconds")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--max-parse-attempts", type=int, default=3)
+    parser.add_argument("--fail-on-parse-error", action="store_true")
     args = parser.parse_args()
 
     rows = judge_runs(
@@ -234,7 +306,10 @@ def main() -> None:
         ids={item.upper() for item in args.ids} if args.ids else None,
         systems={item.upper() for item in args.systems} if args.systems else None,
         limit=args.limit,
+        timeout=args.timeout,
         dry_run=args.dry_run,
+        max_parse_attempts=args.max_parse_attempts,
+        continue_on_parse_error=not args.fail_on_parse_error,
     )
     print(f"Wrote/updated {len(rows)} judgment rows: {args.output}")
 

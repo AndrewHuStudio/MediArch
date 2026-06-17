@@ -1,0 +1,21 @@
+============================================================
+MediArch Benchmark Runner
+============================================================
+API:       http://localhost:8013
+Questions: E:\MyPrograms\MediArch_System\docs\实验部分\54题实验补强\benchmark_questions_54.csv
+Runs:      docs\实验部分\54题实验补强\r2_perf_current8013_remaining6_unlimited_2026-06-08.csv
+Modes:     ['R2']
+Questions: ['Q019', 'Q023', 'Q024', 'Q041', 'Q045', 'Q049']
+Tasks:     6
+Timeout:   7200s per request
+============================================================
+[1/6] Q019 (R2) ... OK (61.4s, 1109 chars)
+[2/6] Q023 (R2) ... OK (94.9s, 1642 chars)
+[3/6] Q024 (R2) ... OK (125.9s, 1992 chars)
+[4/6] Q041 (R2) ... OK (99.9s, 1636 chars)
+[5/6] Q045 (R2) ... OK (91.2s, 1483 chars)
+[6/6] Q049 (R2) ... OK (145.5s, 2103 chars)
+============================================================
+Done! success=6, failed=0
+Results saved to: docs\实验部分\54题实验补强\r2_perf_current8013_remaining6_unlimited_2026-06-08.csv
+============================================================

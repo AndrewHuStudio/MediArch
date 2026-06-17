@@ -1,0 +1,52 @@
+[2026-06-09 10:11:16] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-09 10:11:16] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-09 10:11:16] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-09 10:11:17] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-09 10:11:17] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-09 10:11:50] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1780971110976
+[2026-06-09 10:11:50] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.005s | Request-ID: req-1780971110976
+INFO:     127.0.0.1:55973 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-09 10:12:03] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971123387
+[2026-06-09 10:12:03] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-7f9439a4fc3c40cf
+[2026-06-09 10:12:55] INFO - mediarch_api - [Chat] 回复成功 | Session: session-7f9439a4fc3c40cf | Time: 52551ms
+[2026-06-09 10:12:55] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 52.554s | Request-ID: req-1780971123387
+[2026-06-09 10:12:55] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 52.555s | This is a slow request!
+INFO:     127.0.0.1:55978 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 10:12:57] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971177969
+[2026-06-09 10:12:57] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-3f19c7ee0f6446d2
+[OK] 检测到 MongoDB 文本索引: content_text_idx
+[OK] MongoDB连接成功: mediarch.mediarch_chunks
+[MongoDB] 开始搜索，关键词=['护士站', '病房', '通视性', '患者隐私', '30米服务半径', '住院部设计', '空间排布', '护理单元', 'Nursing Station', 'Ward', 'DesignMethod社区', '中等护理单元', '分散式护士站', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '半分散式护士站', '服务半径', '条形板病房', '混合护士站', '空间'], 正则模式=护士站|病房|通视性|患者隐私|30米服务半径|住院部设计|空间排布|护理单元|Nursing\ Station|Ward|DesignMethod社区|中等护理单元|分散式护士站|医疗功能房间详图集...
+[MongoDB] 搜索完成：找到 1 个匹配的chunks（策略：text_index）
+[2026-06-09 10:14:02] INFO - mediarch_api - [Chat] 回复成功 | Session: session-3f19c7ee0f6446d2 | Time: 64450ms
+[2026-06-09 10:14:02] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 64.452s | Request-ID: req-1780971177969
+[2026-06-09 10:14:02] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 64.453s | This is a slow request!
+INFO:     127.0.0.1:56002 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 10:14:04] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971244456
+[2026-06-09 10:14:04] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院在医疗工艺设计阶段应如何确定门诊、急... | Session: session-cdbf449a64f54117
+[2026-06-09 10:15:05] INFO - mediarch_api - [Chat] 回复成功 | Session: session-cdbf449a64f54117 | Time: 61165ms
+[2026-06-09 10:15:05] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 61.167s | Request-ID: req-1780971244456
+[2026-06-09 10:15:05] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 61.168s | This is a slow request!
+INFO:     127.0.0.1:56058 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 10:15:07] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971307678
+[2026-06-09 10:15:07] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院在医疗工艺设计阶段应如何确定门诊、急... | Session: session-7d7337cec1ee485f
+[MongoDB] 开始搜索，关键词=['综合医院建筑设计规范', 'GB 51039-2014', '医疗工艺设计', '配置参数', '门诊', '急诊', '护理单元', '手术室', 'ICU', '医技设备', 'DesignMethod社区', 'GB 51039-2014 综合医院建筑设计规范.pdf', 'Hospital社区', 'Space社区', '中等护理单元', '医疗功能房间详图集3.pdf', '医疗工艺', '医疗建筑', '医院建筑', '医院建筑设计指南.pdf'], 正则模式=综合医院建筑设计规范|GB\ 51039\-2014|医疗工艺设计|配置参数|门诊|急诊|护理单元|手术室|ICU|医技设备|DesignMethod社区|GB\ 51039\-2014\ 综合医院建...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 10:16:30] INFO - mediarch_api - [Chat] 回复成功 | Session: session-7d7337cec1ee485f | Time: 82822ms
+[2026-06-09 10:16:30] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 82.826s | Request-ID: req-1780971307678
+[2026-06-09 10:16:30] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 82.827s | This is a slow request!
+INFO:     127.0.0.1:56076 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 10:16:32] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971392549
+[2026-06-09 10:16:32] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-9c69804dc0bd41a8
+[2026-06-09 10:17:14] INFO - mediarch_api - [Chat] 回复成功 | Session: session-9c69804dc0bd41a8 | Time: 41782ms
+[2026-06-09 10:17:14] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 41.783s | Request-ID: req-1780971392549
+[2026-06-09 10:17:14] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 41.783s | This is a slow request!
+INFO:     127.0.0.1:56108 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 10:17:16] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1780971436368
+[2026-06-09 10:17:16] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-63a414fd35874afb
+[MongoDB] 开始搜索，关键词=['手术部', '放射科', '磁共振检查室', '放射治疗科', '核医学科', '选址', '分区', '流线组织', '综合医院建筑设计标准', 'GB 51039-2014', '分区和交通系统', '分区规划', '医院建筑设计指南 → 医院', '医院建筑设计指南.pdf', '手术室流程', '手术室门', '手术室预测', '放射科分项检查占比', '放射科检查', '检查室'], 正则模式=手术部|放射科|磁共振检查室|放射治疗科|核医学科|选址|分区|流线组织|综合医院建筑设计标准|GB\ 51039\-2014|分区和交通系统|分区规划|医院建筑设计指南\ →\ 医院|医院建筑设计指...
+[MongoDB] 搜索完成：找到 66 个匹配的chunks（策略：regex_or）
+[2026-06-09 10:18:21] INFO - mediarch_api - [Chat] 回复成功 | Session: session-63a414fd35874afb | Time: 65430ms
+[2026-06-09 10:18:21] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 65.434s | Request-ID: req-1780971436368
+[2026-06-09 10:18:21] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 65.435s | This is a slow request!
+INFO:     127.0.0.1:56115 - "POST /api/v1/chat HTTP/1.1" 200 OK

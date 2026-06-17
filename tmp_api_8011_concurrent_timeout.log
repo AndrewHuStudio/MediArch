@@ -1,0 +1,633 @@
+[KG][d5d2b1c5-641] 开始构建知识图谱
+INFO:     Started server process [12488]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
+[OK] Loaded schema with 11 label types, 14 relation types
+[OK] KGBuilder initialized
+  - Neo4j: Entities + Relations
+  - Mongo chunks collection: mediarch_chunks
+  - Entity fusion suggestions: Enabled
+    * ratio>=0.9, max_pairs=50
+    * Auto alias links: Enabled
+      - min_score>=0.96, min_overlap>=2, max_edges=300
+[INFO] Build mode via parameter: incremental
+[OK] Loaded 116 concept nodes from Neo4j
+[KG][d5d2b1c5-641] cross_document_fusion:fusion_start 0/3 (0%) - 开始融合
+[KG][d5d2b1c5-641] cross_document_fusion:entity_dedup_done 1/3 (33%) - 实体去重
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 儿科诊室 (Space) -> entity_cfb600b3d7bdbc31
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: dr室 (Space) -> entity_0e847371f90a5c50
+[Concept] Referencing concept node: ct室 (Space) -> entity_65053a89a6e92209
+[Concept] Referencing concept node: 门诊部 (DepartmentGroup) -> entity_0f838f88c565353d
+[Concept] Referencing concept node: 护士站 (Space) -> entity_008d173d0981abeb
+[Concept] Referencing concept node: 眼科诊室 (Space) -> entity_38e1b285d0578dd0
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 耳鼻喉诊室 (Space) -> entity_5f378a518c13288a
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[Concept] Referencing concept node: 医生办公室 (Space) -> entity_d4f8026ce7677b3e
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 住院部 (DepartmentGroup) -> entity_da5b64478eb7f53b
+[Concept] Referencing concept node: 医技部 (DepartmentGroup) -> entity_4b2c2047916ccd49
+[Concept] Referencing concept node: 门厅 (Space) -> entity_911bc61f92b24ab3
+[Concept] Referencing concept node: 模块化设计 (DesignMethod) -> entity_0855b616bf019fd9
+[Concept] Referencing concept node: 污洗室 (Space) -> entity_ddd66d4b97e84635
+[Concept] Referencing concept node: icu病房 (Space) -> entity_c70a24a74344cccd
+[Concept] Referencing concept node: 急诊部 (DepartmentGroup) -> entity_24e90a1ae2c9daff
+[Concept] Referencing concept node: 急诊监护室 (Space) -> entity_4cfa4243a052650b
+[Concept] Referencing concept node: 辅助用房 (Space) -> entity_e8adc0f18a99032c
+[Concept] Referencing concept node: 观察室 (Space) -> entity_2b4802d6d560c992
+[Concept] Referencing concept node: mr1室 (Space) -> entity_f385b7841e4fbade
+[Concept] Referencing concept node: 公共卫生间 (Space) -> entity_f8e270d9b31d10bf
+[Concept] Referencing concept node: 门诊药房 (Space) -> entity_1a0932f8b66a48bc
+[Concept] Referencing concept node: 污物间 (Space) -> entity_920ec50df6f0b2ae
+[Concept] Referencing concept node: 急救区 (FunctionalZone) -> entity_1735dc8f647bd5ec
+[Concept] Referencing concept node: 抢救室 (Space) -> entity_ff391842f2239213
+[Concept] Referencing concept node: 清创室 (Space) -> entity_15c601dbe191ea3a
+[Concept] Referencing concept node: 洗胃室 (Space) -> entity_a3e62d58aa4737d1
+[Concept] Referencing concept node: 急诊手术室 (Space) -> entity_df94489d416a2bb6
+[Concept] Referencing concept node: 检验室 (Space) -> entity_ee3834a873f083a7
+[Concept] Referencing concept node: 换药室 (Space) -> entity_385c98ea25af3ca4
+[Concept] Referencing concept node: 输液室 (Space) -> entity_a99b99c242ebfd20
+[Concept] Referencing concept node: 病房护士站 (Space) -> entity_785d980cc7699212
+[Concept] Referencing concept node: 收费窗口 (Space) -> entity_37bc518cf90ff86a
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 功能检查室 (Space) -> entity_5da1bce92ceecec1
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 0/93100 (0%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 100/93100 (0%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 200/93100 (0%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 300/93100 (0%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 400/93100 (0%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 500/93100 (1%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 600/93100 (1%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 700/93100 (1%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 800/93100 (1%) - 关系判断进度
+[Concept] Referencing concept node: 眼科诊室 (Space) -> entity_38e1b285d0578dd0
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 护士站 (Space) -> entity_008d173d0981abeb
+[Concept] Referencing concept node: 眼科诊室 (Space) -> entity_38e1b285d0578dd0
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 900/93100 (1%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[Concept] Referencing concept node: 护士站 (Space) -> entity_008d173d0981abeb
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 辅助用房 (Space) -> entity_e8adc0f18a99032c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1000/93100 (1%) - 关系判断进度
+[Concept] Referencing concept node: 辅助用房 (Space) -> entity_e8adc0f18a99032c
+[Concept] Referencing concept node: 抢救室 (Space) -> entity_ff391842f2239213
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1100/93100 (1%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1200/93100 (1%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1300/93100 (1%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1400/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1500/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1600/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1700/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1800/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 1900/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2000/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2100/93100 (2%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2200/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2300/93100 (2%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2400/93100 (3%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2500/93100 (3%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2600/93100 (3%) - 关系判断进度
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2700/93100 (3%) - 关系判断进度
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2800/93100 (3%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 2900/93100 (3%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3000/93100 (3%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3100/93100 (3%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3200/93100 (3%) - 关系判断进度
+[Concept] Referencing concept node: 辅助用房 (Space) -> entity_e8adc0f18a99032c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3300/93100 (4%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3400/93100 (4%) - 关系判断进度
+[ERROR] LLM chat_json failed after 3 attempts (trace=c4c2aa89): Request timed out.
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3500/93100 (4%) - 关系判断进度
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3600/93100 (4%) - 关系判断进度
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3700/93100 (4%) - 关系判断进度
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3800/93100 (4%) - 关系判断进度
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 3900/93100 (4%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4000/93100 (4%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4100/93100 (4%) - 关系判断进度
+[Concept] Referencing concept node: 综合医院 (Hospital) -> entity_a8d579129fa6cdd6
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4200/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4300/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4400/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4500/93100 (5%) - 关系判断进度
+[ERROR] LLM chat_json failed after 3 attempts (trace=c600a66e): Request timed out.
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4600/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4700/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4800/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 4900/93100 (5%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5000/93100 (5%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5100/93100 (5%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 观察室 (Space) -> entity_2b4802d6d560c992
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5200/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5300/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5400/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5500/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5600/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5700/93100 (6%) - 关系判断进度
+[Concept] Referencing concept node: 观察室 (Space) -> entity_2b4802d6d560c992
+[Concept] Referencing concept node: 观察室 (Space) -> entity_2b4802d6d560c992
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5800/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 5900/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6000/93100 (6%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6100/93100 (7%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6200/93100 (7%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6300/93100 (7%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6400/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6500/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6600/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6700/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6800/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 6900/93100 (7%) - 关系判断进度
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 妇科诊室 (Space) -> entity_1b1818d1c4795d3a
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7000/93100 (8%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7100/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7200/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7300/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7400/93100 (8%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7500/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7600/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7700/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7800/93100 (8%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 7900/93100 (8%) - 关系判断进度
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8000/93100 (9%) - 关系判断进度
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8100/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8200/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8300/93100 (9%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8400/93100 (9%) - 关系判断进度
+[Concept] Referencing concept node: 护理单元 (FunctionalZone) -> entity_dbce69e725bcd089
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8500/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8600/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8700/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8800/93100 (9%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 8900/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9000/93100 (10%) - 关系判断进度
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[Concept] Referencing concept node: 病房 (Space) -> entity_a5458ab36cc68693
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9100/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9200/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9300/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9400/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9500/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9600/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9700/93100 (10%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9800/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 9900/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10000/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10100/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10200/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10300/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10400/93100 (11%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10500/93100 (11%) - 关系判断进度
+[Concept] Referencing concept node: 辅助用房 (Space) -> entity_e8adc0f18a99032c
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10600/93100 (11%) - 关系判断进度
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10700/93100 (11%) - 关系判断进度
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[Concept] Referencing concept node: 注射室 (Space) -> entity_0ecb8a1c3fb6c26a
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10800/93100 (12%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 10900/93100 (12%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11000/93100 (12%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11100/93100 (12%) - 关系判断进度
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11200/93100 (12%) - 关系判断进度
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[Concept] Referencing concept node: 治疗室 (Space) -> entity_ba076a619352da3c
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11300/93100 (12%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11400/93100 (12%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11500/93100 (12%) - 关系判断进度
+[Concept] Referencing concept node: 输液室 (Space) -> entity_a99b99c242ebfd20
+[Concept] Referencing concept node: 护士站 (Space) -> entity_008d173d0981abeb
+[Concept] Referencing concept node: 输液室 (Space) -> entity_a99b99c242ebfd20
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11600/93100 (12%) - 关系判断进度
+[Concept] Referencing concept node: 护士站 (Space) -> entity_008d173d0981abeb
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11700/93100 (13%) - 关系判断进度
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11800/93100 (13%) - 关系判断进度
+[Concept] Referencing concept node: 诊查室 (Space) -> entity_d2f4aed30a090692
+[KG][d5d2b1c5-641] cross_document_fusion:neo4j_write_progress 11900/93100 (13%) - 关系判断进度

@@ -40,6 +40,13 @@ def test_explicit_drawing_questions_still_request_images():
     assert mongodb_agent._want_images(query) is True
 
 
+def test_explicit_image_negation_disables_images():
+    query = "请总结门诊单元设计要求，不需要图片"
+
+    assert synthesizer_agent._wants_images(query) is False
+    assert mongodb_agent._want_images(query) is False
+
+
 def test_normative_queries_prioritize_code_specs_in_document_views():
     query = "根据《综合医院建筑设计规范》GB 51039-2014，推床通道和室内净高有哪些基本要求？"
     items = [
@@ -276,7 +283,9 @@ def test_r2_standards_first_plan_exposes_authority_need_not_question_patch():
     need = standards["authority_evidence_need"]
 
     assert standards["lane"] == "standards_first"
-    assert need["required_roles"] == ["code_spec", "guide", "atlas_or_image"]
+    assert need["required_roles"] == ["code_spec"]
+    assert "guide" in need["optional_roles"]
+    assert "atlas_or_image" in need["optional_roles"]
     assert "核医学" in need["domain_terms"]
     assert "防护分区" in need["constraint_terms"]
     assert "workflow_zoning" in need["claim_scopes"]

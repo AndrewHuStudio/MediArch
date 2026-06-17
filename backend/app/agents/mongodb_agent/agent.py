@@ -30,6 +30,16 @@ from backend.app.agents.base_agent import (
 )
 from backend.app.services.query_expansion import expand_query, QueryExpansion
 from backend.app.services.mongodb_search import get_retriever
+from backend.app.agents.evidence_orchestration import (
+    AuthorityEvidenceNeed,
+    CoverageAudit,
+    build_authority_evidence_need,
+    build_authority_records,
+    build_evidence_plan_for_query,
+    build_standards_first_queries,
+    build_supplemental_lane_queries,
+    rank_authority_records,
+)
 from backend.llm_env import get_api_key, get_llm_base_url, get_llm_model, get_model_provider
 
 logger = logging.getLogger("mongodb_agent")
@@ -66,6 +76,10 @@ _RE_SECTION_PATTERN_3 = re.compile(r"(第\d+章)\s+(.+)")
 _RE_DOC_PATH_STRIP = re.compile(
     r"^.*?(?:[/\\]backend[/\\]databases[/\\]documents|[/\\]data_process[/\\]documents)[/\\]"
 )
+
+# citation snippet 在源头的字符预算。提高到 300，避免正文一进 citation 就被剁碎，
+# 与合成器 PROMPT_SNIPPET_CHARS(240)/CODE_SPEC(400) 配合保证正文完整进入 prompt。
+CITATION_SNIPPET_CHARS = 300
 
 
 class MongoDBAgentError(Exception):
@@ -298,48 +312,229 @@ def heuristic_rewrite(query: str) -> Dict[str, Any]:
 
 
 def _want_images(text: str) -> bool:
-    """判断用户是否“明确想要图片/图纸/图示”。尽量用短语而不是单字，避免误触发。"""
+    """Only request image retrieval when the question has explicit visual intent."""
     q = (text or "").strip().lower()
-    if not q:
-        return True
-    triggers = [
-        "平面图",
-        "剖面图",
-        "立面图",
-        "总平面",
-        "图纸",
-        "图示",
-        "示意图",
-        "流程图",
-        "结构图",
-        "表格截图",
-        "配图",
-        "附图",
-        "带图",
-        "带图片",
-        "给图",
-        "看图",
-        "图片",
-        "image",
-        "figure",
-        "diagram",
-        "plan",
-        "section",
-    ]
     if any(neg in q for neg in ("不要图", "不需要图", "不看图", "不要图片", "不需要图片")):
         return False
-    return True
+    explicit_diagram_intent = any(
+        k in q
+        for k in (
+            "图纸",
+            "图示",
+            "示意图",
+            "流程图",
+            "平面图",
+            "剖面图",
+            "立面图",
+            "总平面",
+            "配图",
+            "附图",
+            "带图",
+            "图片",
+            "看图",
+        )
+    )
+    spatial_intent = any(k in q for k in ("空间推理", "空间排布", "空间布局", "平面组织", "流线", "通视", "隐私", "分区"))
+    return bool(explicit_diagram_intent or spatial_intent)
 
 
-def _is_room_norm_query(text: str) -> bool:
-    """判断是否属于“某房间/空间的设计规范/要求”类问题（用于多资料兜底）。"""
-    q = (text or "").strip()
-    if not q:
+EVIDENCE_SOURCE_ROLES = ("code_spec", "guide", "atlas_or_image", "paper_or_report")
+
+
+def _normalize_numeric_constraint_terms(query: str) -> List[str]:
+    """通用数值/单位归一化，避免因 30米/30m 写法不同漏检。"""
+    q = query or ""
+    terms: List[str] = []
+    for match in re.finditer(r"(\d+(?:\.\d+)?)\s*(米|m|M|毫米|mm|MM|平方米|㎡)", q):
+        number, unit = match.group(1), match.group(2).lower()
+        if unit == "米":
+            terms.extend([f"{number}m", f"{number} m"])
+        elif unit == "m":
+            terms.extend([f"{number}米"])
+        elif unit in {"毫米", "mm"}:
+            terms.extend([f"{number}mm", f"{number}毫米"])
+        elif unit in {"平方米", "㎡"}:
+            terms.extend([f"{number}㎡", f"{number}平方米"])
+    return deduplicate_terms(terms)
+
+
+def _chunk_role_text(chunk: Dict[str, Any]) -> str:
+    metadata = chunk.get("metadata") or {}
+    return " ".join(
+        str(part or "").lower()
+        for part in (
+            chunk.get("doc_title"),
+            chunk.get("source_document"),
+            chunk.get("doc_category"),
+            chunk.get("file_path"),
+            chunk.get("document_path"),
+            chunk.get("content_type"),
+            metadata.get("category") if isinstance(metadata, dict) else "",
+            metadata.get("doc_category") if isinstance(metadata, dict) else "",
+        )
+    )
+
+
+def _classify_chunk_evidence_role(chunk: Dict[str, Any]) -> str:
+    text = _chunk_role_text(chunk)
+    content_type = str(chunk.get("content_type") or "").lower()
+    if "gb" in text or "规范" in text or "标准" in text or "標準" in text:
+        return "code_spec"
+    if "指南" in text or "手册" in text or "guide" in text or "manual" in text:
+        return "guide"
+    if (
+        chunk.get("image_url")
+        or content_type == "image"
+        or "图集" in text
+        or "详图" in text
+        or "图示" in text
+        or "atlas" in text
+    ):
+        return "atlas_or_image"
+    if (
+        "论文" in text
+        or "研究" in text
+        or "报告" in text
+        or "案例" in text
+        or "paper" in text
+        or "report" in text
+        or "case" in text
+        or "journal" in text
+    ):
+        return "paper_or_report"
+    return "other"
+
+
+def _chunk_identity(chunk: Dict[str, Any]) -> str:
+    return str(
+        chunk.get("chunk_id")
+        or "|".join(
+            str(part or "")
+            for part in (
+                chunk.get("doc_id"),
+                chunk.get("doc_title") or chunk.get("source_document"),
+                chunk.get("page_range"),
+                chunk.get("content_type"),
+            )
+        )
+    )
+
+
+def _select_missing_evidence_role_chunks(
+    existing_chunks: List[Dict[str, Any]],
+    candidate_chunks: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """从通用候选中为缺失资料角色各补一条，不规定最终引用数量。"""
+    existing_roles = {
+        _classify_chunk_evidence_role(chunk)
+        for chunk in existing_chunks or []
+    }
+    missing_roles = [role for role in EVIDENCE_SOURCE_ROLES if role not in existing_roles]
+    if not missing_roles:
+        return []
+
+    existing_ids = {_chunk_identity(chunk) for chunk in existing_chunks or []}
+    selected: List[Dict[str, Any]] = []
+    selected_roles: set[str] = set()
+    for chunk in candidate_chunks or []:
+        role = _classify_chunk_evidence_role(chunk)
+        if role not in missing_roles or role in selected_roles:
+            continue
+        identity = _chunk_identity(chunk)
+        if identity in existing_ids:
+            continue
+        selected.append(chunk)
+        selected_roles.add(role)
+        if len(selected_roles) == len(missing_roles):
+            break
+    return selected
+
+
+def _role_coverage_search_terms(query: str, search_terms: List[str]) -> List[str]:
+    return deduplicate_terms(
+        list(search_terms or [])
+        + _normalize_numeric_constraint_terms(query)
+        + ([query] if query else [])
+    )
+
+
+def _planned_evidence_lane_terms(query: str, metadata: Dict[str, Any] | None = None) -> List[str]:
+    profile, _context, plan = build_evidence_plan_for_query(query, metadata)
+    planned_lanes = list(plan.required_lanes)
+    for lane in plan.optional_lanes:
+        if lane not in planned_lanes:
+            planned_lanes.append(lane)
+    if not planned_lanes:
+        return []
+
+    audit = CoverageAudit(
+        passed=False,
+        missing_required_lanes=planned_lanes,
+        needs_supplemental_retrieval=True,
+    )
+    lane_queries = build_supplemental_lane_queries(query, profile, audit)
+    terms: List[str] = []
+    for lane, queries in lane_queries.items():
+        terms.extend(queries[:2])
+        if lane == "code_spec":
+            terms.extend(["规范", "标准", "条文"])
+        elif lane == "policy_document":
+            terms.extend(["政策", "规划", "指导原则", "实施方案"])
+        elif lane == "guide":
+            terms.extend(["指南", "手册"])
+        elif lane == "book_report":
+            terms.extend(["医院建筑设计指南", "书籍", "专著"])
+        elif lane == "atlas_or_image":
+            terms.extend(["图集", "详图"])
+        elif lane == "paper_or_report":
+            terms.extend(["研究", "报告"])
+    return deduplicate_terms(terms)
+
+
+def _is_r2_request(request: AgentRequest | None) -> bool:
+    if not request or not request.metadata:
         return False
+    return str(request.metadata.get("retrieval_mode") or "").upper() == "R2"
 
-    has_room = any(k in q for k in ("手术室", "手术部", "手术间", "洁净手术", "洁净手术部"))
-    has_norm = any(k in q for k in ("设计规范", "设计标准", "规范", "标准", "要求", "怎么设计", "布置原则"))
-    return bool(has_room and has_norm)
+
+def _build_search_query_plan(
+    query: str,
+    search_terms: List[str],
+    request: AgentRequest | None,
+) -> List[Dict[str, Any]]:
+    plan: List[Dict[str, Any]] = []
+
+    if _is_r2_request(request):
+        metadata = request.metadata if request else {}
+        profile, evidence_context, evidence_plan = build_evidence_plan_for_query(query, metadata)
+        authority_need = build_authority_evidence_need(query, profile, evidence_plan)
+        standards_queries = build_standards_first_queries(query, profile, evidence_plan)
+        standards_queries = deduplicate_terms(list(standards_queries) + list(authority_need.search_terms[:12]))
+        if "code_spec" in evidence_plan.required_lanes and standards_queries:
+            plan.append(
+                {
+                    "lane": "standards_first",
+                    "queries": standards_queries,
+                    "evidence_context": {
+                        "source_type": evidence_context.source_type,
+                        "task_type": evidence_context.task_type,
+                        "difficulty": evidence_context.difficulty,
+                        "question_id": evidence_context.question_id,
+                    },
+                    "evidence_plan_required_lanes": list(evidence_plan.required_lanes),
+                    "authority_evidence_need": {
+                        "required_roles": list(authority_need.required_roles),
+                        "optional_roles": list(authority_need.optional_roles),
+                        "domain_terms": list(authority_need.domain_terms),
+                        "constraint_terms": list(authority_need.constraint_terms),
+                        "claim_scopes": list(authority_need.claim_scopes),
+                        "search_terms": list(authority_need.search_terms),
+                    },
+                }
+            )
+
+    plan.append({"lane": "general", "queries": [query] if query else [], "search_terms": list(search_terms or [])})
+    return plan
 
 
 def _should_auto_include_diagrams(text: str) -> bool:
@@ -356,10 +551,27 @@ def _should_auto_include_diagrams(text: str) -> bool:
     if any(k in q for k in ("不要图", "不需要图", "不要图片", "不看图")):
         return False
 
-    # “规范/要求/布置/配置”类提问，适合补图
+    # 只有明确的图纸/图示/平面/示意意图才自动补图，避免把所有规范题都拉进视觉噪声
+    explicit_diagram_intent = any(
+        k in q
+        for k in (
+            "图纸",
+            "图示",
+            "示意图",
+            "流程图",
+            "平面图",
+            "剖面图",
+            "立面图",
+            "总平面",
+            "配图",
+            "附图",
+            "带图",
+            "图片",
+        )
+    )
     has_norm = any(k in q for k in ("设计规范", "设计标准", "规范", "标准", "要求", "配置", "布置"))
     has_space = any(k in q for k in ("手术室", "手术部", "手术间", "房间", "用房", "空间"))
-    return bool(has_norm and has_space)
+    return bool(explicit_diagram_intent and has_norm and has_space)
 
 
 def _count_doc_distribution(chunks: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -373,6 +585,101 @@ def _count_doc_distribution(chunks: List[Dict[str, Any]]) -> Dict[str, int]:
         )
         dist[doc_name] = dist.get(doc_name, 0) + 1
     return dist
+
+
+def _summarize_standards_first_hits(chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    role_distribution: Dict[str, int] = {}
+    doc_titles: List[str] = []
+    code_spec_doc_titles: List[str] = []
+
+    for chunk in chunks or []:
+        role = _classify_chunk_evidence_role(chunk)
+        role_distribution[role] = role_distribution.get(role, 0) + 1
+        doc_title = str(chunk.get("doc_title") or chunk.get("source_document") or chunk.get("doc_category") or "").strip()
+        if doc_title and doc_title not in doc_titles:
+            doc_titles.append(doc_title)
+        if role == "code_spec" and doc_title and doc_title not in code_spec_doc_titles:
+            code_spec_doc_titles.append(doc_title)
+
+    return {
+        "hit_count": len(chunks or []),
+        "code_spec_count": role_distribution.get("code_spec", 0),
+        "role_distribution": role_distribution,
+        "doc_titles": doc_titles,
+        "code_spec_doc_titles": code_spec_doc_titles,
+    }
+
+
+def _authority_need_from_dict(data: Dict[str, Any] | None) -> AuthorityEvidenceNeed:
+    data = data or {}
+    required_roles = list(data.get("required_roles") or [])
+    optional_roles = list(data.get("optional_roles") or [])
+    if "guide" in optional_roles and "guide" not in required_roles:
+        required_roles.append("guide")
+    if "atlas_or_image" in optional_roles and "atlas_or_image" not in required_roles:
+        required_roles.append("atlas_or_image")
+    return AuthorityEvidenceNeed(
+        required_roles=required_roles,
+        optional_roles=optional_roles,
+        domain_terms=list(data.get("domain_terms") or []),
+        constraint_terms=list(data.get("constraint_terms") or []),
+        claim_scopes=list(data.get("claim_scopes") or []),
+        search_terms=list(data.get("search_terms") or []),
+    )
+
+
+def _record_to_chunk_metadata(record: Any) -> Dict[str, Any]:
+    return {
+        "record_id": record.record_id,
+        "source_role": record.source_role,
+        "content_type": record.content_type,
+        "anchor": record.anchor,
+        "domain_terms": list(record.domain_terms),
+        "constraint_terms": list(record.constraint_terms),
+        "claim_scopes": list(record.claim_scopes),
+    }
+
+
+def _rank_standards_first_chunks(
+    chunks: List[Dict[str, Any]],
+    authority_evidence_need: Dict[str, Any] | None,
+) -> List[Dict[str, Any]]:
+    if not chunks:
+        return []
+
+    need = _authority_need_from_dict(authority_evidence_need)
+    records = build_authority_records(chunks)
+    ranked_records = rank_authority_records(need, records)
+    record_by_id = {record.record_id: record for record in ranked_records}
+    chunk_by_id = {_chunk_identity(chunk): dict(chunk) for chunk in chunks or []}
+
+    ranked_chunks: List[Dict[str, Any]] = []
+    used_ids: set[str] = set()
+    for record in ranked_records:
+        key = str(record.chunk_id or record.record_id)
+        chunk = chunk_by_id.get(key)
+        if chunk is None:
+            chunk = next((dict(candidate) for candidate in chunks if str(candidate.get("chunk_id") or candidate.get("id") or "") == key), None)
+        if chunk is None:
+            continue
+        used_ids.add(_chunk_identity(chunk))
+        chunk["retrieval_lane"] = "standards_first"
+        chunk["authority_record"] = _record_to_chunk_metadata(record)
+        if record.source_role == "code_spec":
+            chunk["evidence_tier"] = "code_spec"
+        ranked_chunks.append(chunk)
+
+    for chunk in chunks or []:
+        identity = _chunk_identity(chunk)
+        if identity in used_ids:
+            continue
+        copy = dict(chunk)
+        copy["retrieval_lane"] = "standards_first"
+        if _classify_chunk_evidence_role(copy) == "code_spec":
+            copy["evidence_tier"] = "code_spec"
+        ranked_chunks.append(copy)
+
+    return ranked_chunks
 
 
 def _dedup_chunks_by_id(chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -530,108 +837,135 @@ async def _execute_keyword_search(
     )
 
 
+async def _execute_standards_first_search(
+    retriever: Any,
+    standards_queries: List[str],
+    *,
+    authority_evidence_need: Dict[str, Any] | None,
+    top_k: int,
+    doc_ids: List[str],
+    source_documents: List[str],
+) -> List[Dict[str, Any]]:
+    if not standards_queries:
+        return []
+
+    chunks, _used_strategy, _diag = await _execute_keyword_search(
+        retriever,
+        standards_queries,
+        standards_queries[0],
+        max(top_k, MongoDBAgentConfig.DEFAULT_TOP_K),
+        doc_ids,
+        source_documents,
+    )
+    return _rank_standards_first_chunks(chunks or [], authority_evidence_need)
+
+
+async def _apply_graph_source_document_supplement(
+    chunks: List[Dict[str, Any]],
+    *,
+    query: str,
+    search_terms: List[str],
+    top_k: int,
+    retriever: Any,
+    unified_hints: Dict[str, Any],
+    doc_ids: List[str],
+    source_documents: List[str],
+) -> tuple[List[Dict[str, Any]], int]:
+    """补查 KG 图谱中出现但当前 chunk 结果未覆盖的资料源正文。"""
+    if not chunks or doc_ids or source_documents:
+        return chunks, 0
+
+    hinted_sources = _normalize_str_list((unified_hints or {}).get("source_documents"))
+    if not hinted_sources:
+        return chunks, 0
+
+    covered_docs = {
+        str(chunk.get("doc_title") or chunk.get("source_document") or "").strip()
+        for chunk in chunks
+        if str(chunk.get("doc_title") or chunk.get("source_document") or "").strip()
+    }
+    missing_sources = [source for source in hinted_sources if source not in covered_docs]
+    if not missing_sources:
+        return chunks, 0
+
+    supplements: List[Dict[str, Any]] = []
+    per_doc_limit = max(1, min(2, top_k // max(len(missing_sources), 1)))
+    for source in missing_sources[:8]:
+        try:
+            found, _strategy, _diag = await _execute_keyword_search(
+                retriever,
+                search_terms or [query],
+                query,
+                per_doc_limit,
+                [],
+                [source],
+            )
+        except Exception as exc:
+            logger.info("[MongoDB→Search] KG Source 补查失败 source=%s: %s", source, exc)
+            continue
+        supplements.extend(found or [])
+
+    if not supplements:
+        return chunks, 0
+
+    before = len(chunks)
+    merged = _dedup_chunks_by_id(chunks + supplements)
+    added = max(0, len(merged) - before)
+    if added:
+        logger.info(
+            "[MongoDB→Search] KG Source 资料补查: +%s 条, hinted_sources=%s, covered_before=%s",
+            added,
+            len(hinted_sources),
+            len(covered_docs),
+        )
+    return merged, added
+
+
 async def _apply_priority_doc_fallback(
     chunks: List[Dict[str, Any]],
     *,
     query: str,
     search_terms: List[str],
+    top_k: int,
     doc_ids: List[str],
     source_documents: List[str],
     retriever: Any,
     doc_distribution: Dict[str, int],
 ) -> tuple[List[Dict[str, Any]], int, Dict[str, int]]:
-    if not chunks or doc_ids or source_documents or (not _is_room_norm_query(query)):
+    if not chunks or doc_ids or source_documents:
         return chunks, 0, doc_distribution
 
-    existing_dist = _count_doc_distribution(chunks)
-
-    def _norm(s: str) -> str:
-        return str(s or "").replace("《", "").replace("》", "").replace(" ", "").lower()
-
-    existing_norm = {_norm(k) for k in existing_dist.keys()}
-    need_standard = not any("gb51039" in k or ("综合医院建筑设计" in k and ("规范" in k or "标准" in k)) for k in existing_norm)
-    need_atlas = not any("医疗功能房间详图集3" in k or ("详图集" in k and "医疗功能房间" in k) for k in existing_norm)
-
-    priority_terms = deduplicate_terms(
-        list(search_terms)
-        + [
-            "手术室",
-            "手术部",
-            "洁净手术部",
-            "净化",
-            "刷手",
-            "更衣",
-            "缓冲间",
-            "无菌",
-            "正压",
-            "气密",
-            "平面",
-            "布局",
-            "配置",
-        ]
-    )[:MongoDBAgentConfig.PRIORITY_TERMS_LIMIT]
-
-    async def _search_in_doc(doc_title: str, *, per_doc_limit: int, prefer_images: bool) -> List[Dict[str, Any]]:
-        if not doc_title:
-            return []
-        normalized_title = _norm(doc_title)
-        if any(normalized_title in k for k in existing_norm):
-            return []
-        try:
-            candidates = await asyncio.to_thread(
-                retriever.search_by_any_keywords,
-                priority_terms,
-                max(per_doc_limit * 2, 4),
-                False,
-                None,
-                [doc_title],
-            )
-        except Exception as e:
-            logger.info("[MongoDB→Search] PriorityDoc 搜索失败: %s (%s)", doc_title, e)
-            return []
-
-        def _rank(ch: Dict[str, Any]) -> tuple[int, int]:
-            is_img = bool(ch.get("image_url")) or (ch.get("content_type") == "image")
-            page = 10**6
-            pr = ch.get("page_range") or []
-            if isinstance(pr, list) and pr:
-                try:
-                    page = int(pr[0])
-                except Exception:
-                    page = 10**6
-            img_score = 1 if is_img else 0
-            if prefer_images:
-                img_score = 1 if is_img else 0
-            else:
-                img_score = 1 if (not is_img) else 0
-            return (img_score, -page)
-
-        return sorted(candidates or [], key=_rank, reverse=True)[:per_doc_limit]
-
-    tasks: List[asyncio.Future] = []
-    if need_standard:
-        tasks.append(_search_in_doc("GB 51039-2014 综合医院建筑设计规范.pdf", per_doc_limit=1, prefer_images=False))
-        tasks.append(_search_in_doc("GB51039-2014综合医院建筑设计标准.pdf", per_doc_limit=1, prefer_images=False))
-    if need_atlas:
-        tasks.append(_search_in_doc("医疗功能房间详图集3.pdf", per_doc_limit=2, prefer_images=True))
-
-    if not tasks:
+    coverage_terms = _role_coverage_search_terms(query, search_terms)[: max(MongoDBAgentConfig.PRIORITY_TERMS_LIMIT, 20)]
+    if not coverage_terms:
         return chunks, 0, doc_distribution
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    priority_added: List[Dict[str, Any]] = []
-    for result in results:
-        if isinstance(result, list):
-            priority_added.extend(result)
+    try:
+        candidates = await asyncio.to_thread(
+            retriever.search_by_any_keywords,
+            coverage_terms,
+            max(top_k * 8, 40),
+            False,
+            None,
+            None,
+        )
+    except Exception as e:
+        logger.info("[MongoDB→Search] EvidenceRole 覆盖搜索失败: %s", e)
+        return chunks, 0, doc_distribution
 
-    if not priority_added:
+    role_added = _select_missing_evidence_role_chunks(chunks, candidates)
+    if not role_added:
         return chunks, 0, doc_distribution
 
     before = len(chunks)
-    chunks = _dedup_chunks_by_id(chunks + priority_added)
+    chunks = _dedup_chunks_by_id(chunks + role_added)
     priority_docs_added = max(0, len(chunks) - before)
     doc_distribution = _count_doc_distribution(chunks)
-    logger.info("[MongoDB→Search] PriorityDoc 兜底: +%s 条, 资料数=%s", priority_docs_added, len(doc_distribution))
+    logger.info(
+        "[MongoDB→Search] EvidenceRole 覆盖补充: +%s 条, roles=%s, 资料数=%s",
+        priority_docs_added,
+        [_classify_chunk_evidence_role(chunk) for chunk in role_added],
+        len(doc_distribution),
+    )
     return chunks, priority_docs_added, doc_distribution
 
 
@@ -869,6 +1203,19 @@ async def node_rewrite_query(state: MongoDBState) -> Dict[str, Any]:
         )
         reasoning += f" + Neo4j扩展({len(expanded_entity_names)}个实体)"
 
+    normalized_constraint_terms = _normalize_numeric_constraint_terms(query)
+    if normalized_constraint_terms:
+        search_terms.extend(normalized_constraint_terms)
+        search_terms = deduplicate_terms(search_terms)
+        reasoning += f" + 数值约束归一化({len(normalized_constraint_terms)}个)"
+
+    request = state.get("request")
+    planned_lane_terms = _planned_evidence_lane_terms(query, request.metadata if request else None)
+    if planned_lane_terms:
+        search_terms.extend(planned_lane_terms)
+        search_terms = deduplicate_terms(search_terms)
+        reasoning += f" + 证据角色检索词({len(planned_lane_terms)}个)"
+
     logger.info(f"[MongoDB→Rewrite] 模式={mode}, search_terms={search_terms[:MongoDBAgentConfig.LOG_SEARCH_TERMS]}...")
 
     return {
@@ -942,6 +1289,11 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
     retriever_diag: Dict[str, Any] = {}
     images_added = 0
     priority_docs_added = 0
+    graph_source_docs_added = 0
+    standards_first_added = 0
+    standards_first_diagnostics: Dict[str, Any] = _summarize_standards_first_hits([])
+    standards_first_retained = 0
+    search_query_plan = _build_search_query_plan(query, search_terms, request)
 
     # 执行搜索
     try:
@@ -954,6 +1306,20 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
         else:
             # 模式2：关键词搜索（内置文本索引 + 回退策略）
             logger.info(f"[MongoDB→Search] 使用关键词搜索模式")
+            standards_plan = next((entry for entry in search_query_plan if entry.get("lane") == "standards_first"), None)
+            standards_chunks = await _execute_standards_first_search(
+                retriever,
+                standards_plan.get("queries", []) if standards_plan else [],
+                authority_evidence_need=standards_plan.get("authority_evidence_need") if standards_plan else None,
+                top_k=top_k,
+                doc_ids=doc_ids,
+                source_documents=source_documents,
+            )
+            if standards_chunks:
+                standards_first_added = len(standards_chunks)
+                standards_first_diagnostics = _summarize_standards_first_hits(standards_chunks)
+                logger.info("[MongoDB→Search] StandardsFirst 命中: %s 条", standards_first_added)
+
             chunks, used_strategy, retriever_diag = await _execute_keyword_search(
                 retriever,
                 search_terms,
@@ -962,6 +1328,24 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
                 doc_ids,
                 source_documents,
             )
+            if standards_chunks:
+                chunks = _dedup_chunks_by_id(standards_chunks + chunks)
+                standards_first_ids = {_chunk_identity(chunk) for chunk in standards_chunks}
+                standards_first_retained = sum(1 for chunk in chunks if _chunk_identity(chunk) in standards_first_ids)
+                used_strategy = f"standards_first+{used_strategy}"
+
+        chunks, graph_source_docs_added = await _apply_graph_source_document_supplement(
+            chunks,
+            query=query,
+            search_terms=search_terms,
+            top_k=top_k,
+            retriever=retriever,
+            unified_hints=unified_hints,
+            doc_ids=doc_ids,
+            source_documents=source_documents,
+        )
+        if graph_source_docs_added:
+            used_strategy = f"{used_strategy}+graph_source_docs"
 
         # 重新平衡跨资料覆盖：限制同一资料返回数量
         if chunks:
@@ -983,6 +1367,7 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
             chunks,
             query=query,
             search_terms=search_terms,
+            top_k=top_k,
             doc_ids=doc_ids,
             source_documents=source_documents,
             retriever=retriever,
@@ -1022,6 +1407,12 @@ async def node_search_mongodb(state: MongoDBState) -> Dict[str, Any]:
             "retriever_attempts": retriever_diag.get("attempts") if retriever_diag else None,
             "images_added": images_added,
             "priority_docs_added": priority_docs_added,
+            "graph_source_docs_added": graph_source_docs_added,
+            "standards_first_added": standards_first_added,
+            "standards_first_retained": standards_first_retained,
+            "standards_first_dropped_by_dedup_or_rebalance": max(0, standards_first_added - standards_first_retained),
+            "standards_first_diagnostics": standards_first_diagnostics,
+            "search_query_plan": search_query_plan,
         },
     }
 
@@ -1157,7 +1548,7 @@ async def node_format_results(state: MongoDBState) -> Dict[str, Any]:
                 "sub_section": sub_section,
                 "content_type": content_type,
                 "image_url": image_url,
-                "snippet": chunk.get("chunk_text", "")[:150],
+                "snippet": chunk.get("chunk_text", "")[:CITATION_SNIPPET_CHARS],
                 "metadata": metadata,
                 "file_path": file_path,
                 "document_path": chunk.get("document_path"),
@@ -1165,9 +1556,16 @@ async def node_format_results(state: MongoDBState) -> Dict[str, Any]:
                 "positions": chunk.get("positions", []),
                 "doc_id": chunk.get("doc_id"),
                 "doc_category": chunk.get("doc_category"),
-                "highlight_text": chunk.get("chunk_text", "")[:300],
+                "highlight_text": chunk.get("chunk_text", "")[:400],
             }
         ]
+        if chunk.get("retrieval_lane"):
+            citations[0]["retrieval_lane"] = chunk.get("retrieval_lane")
+        chunk_evidence_role = _classify_chunk_evidence_role(chunk)
+        if chunk_evidence_role == "code_spec" and (
+            chunk.get("evidence_tier") or chunk.get("retrieval_lane") == "standards_first"
+        ):
+            citations[0]["evidence_tier"] = "code_spec"
 
         attrs: Dict[str, Any] = {
             "chunk_text": chunk.get("chunk_text", ""),
@@ -1177,6 +1575,12 @@ async def node_format_results(state: MongoDBState) -> Dict[str, Any]:
             "document_path": chunk.get("document_path"),
             "file_path": chunk.get("file_path"),
         }
+        if chunk.get("retrieval_lane"):
+            attrs["retrieval_lane"] = chunk.get("retrieval_lane")
+        if chunk_evidence_role == "code_spec" and (
+            chunk.get("evidence_tier") or chunk.get("retrieval_lane") == "standards_first"
+        ):
+            attrs["evidence_tier"] = "code_spec"
 
         # [DONE] [NEW] 如果是图片，优先显示图片信息
         if content_type == "image" or image_url:

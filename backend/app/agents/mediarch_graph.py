@@ -233,7 +233,10 @@ class MediArchGraphState(TypedDict, total=False):
     # ✅ 严格交叉验证：用于 API 对齐 [n] 引用
     strict_cross_doc: bool
     strict_citations_candidate_count: int
+    image_references: List[Dict[str, Any]]
     final_citations: List[Dict[str, Any]]
+    document_citations: Dict[str, List[Dict[str, Any]]]
+    synthesizer_diagnostics: Dict[str, Any]
 
     # ========== Human-in-the-Loop（新增）==========
     waiting_for_feedback: bool  # 是否等待用户反馈
@@ -1003,6 +1006,7 @@ def build_mediarch_graph():
                 "page_ranges": fusion_result.unified_hints.page_ranges,
                 "relations": fusion_result.unified_hints.relations,
                 "search_terms": fusion_result.unified_hints.search_terms,
+                "source_documents": fusion_result.unified_hints.source_documents,
                 "neo4j_entity_count": fusion_result.unified_hints.neo4j_entity_count,
                 "milvus_chunk_count": fusion_result.unified_hints.milvus_chunk_count,
                 "fusion_score": fusion_result.unified_hints.fusion_score,

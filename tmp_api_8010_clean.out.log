@@ -1,0 +1,58 @@
+[2026-06-14 21:39:21] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-14 21:39:21] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-14 21:39:21] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-14 21:39:21] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-14 21:39:21] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-14 21:39:26] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1781444366895
+[2026-06-14 21:39:27] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.433s | Request-ID: req-1781444366895
+INFO:     127.0.0.1:49176 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-14 21:39:47] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781444387501
+[2026-06-14 21:39:47] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院基地选址与总平面设计应满足哪些核心要... | Session: session-3c91ccd860774f69
+[2026-06-14 21:44:11] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781444651241
+[2026-06-14 21:44:11] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院基地选址与总平面设计应满足哪些核心要... | Session: session-9634af4cb06048e4
+[2026-06-14 21:44:21] ERROR - mediarch_api - [Chat] 处理失败: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+Traceback (most recent call last):
+  File "E:\MyPrograms\MediArch_System\backend\app\services\milvus_chunk_search.py", line 38, in __init__
+    connections.connect(alias="default", host=self.host, port=self.port)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 472, in connect
+    connect_milvus(**kwargs, user=user, password=password, token=token, db_name=db_name)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 426, in connect_milvus
+    raise e from e
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 418, in connect_milvus
+    gh._wait_for_channel_ready(timeout=timeout)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\client\grpc_handler.py", line 162, in _wait_for_channel_ready
+    raise MilvusException(
+pymilvus.exceptions.MilvusException: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\MyPrograms\MediArch_System\backend\api\routers\chat.py", line 1001, in chat
+    result = await _run_baseline_pipeline(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\api\routers\chat.py", line 898, in _run_baseline_pipeline
+    baseline = await asyncio.to_thread(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\my_envs\agent_env_2\Lib\asyncio\threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\my_envs\agent_env_2\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\baseline_rag.py", line 276, in retrieve_vector
+    retriever = self._get_milvus()
+                ^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\baseline_rag.py", line 216, in _get_milvus
+    self.milvus_retriever = MilvusChunkRetriever()
+                            ^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\milvus_chunk_search.py", line 40, in __init__
+    raise RuntimeError(f"Milvus 连接失败: {e}") from e
+RuntimeError: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+[2026-06-14 21:44:21] ERROR - mediarch_api - [HTTP Error] POST /api/v1/chat | Status: 500 | Detail: 对话处理失败: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+[2026-06-14 21:44:21] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 500 | Time: 10.233s | Request-ID: req-1781444651241
+[2026-06-14 21:44:21] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 10.234s | This is a slow request!
+INFO:     127.0.0.1:50314 - "POST /api/v1/chat HTTP/1.1" 500 Internal Server Error
+[2026-06-14 21:44:46] INFO - mediarch_api - [ExtractCitations] 提取了 0 个有效的 citations
+[2026-06-14 21:44:46] INFO - mediarch_api - [Chat] 回复成功 | Session: session-3c91ccd860774f69 | Time: 299008ms
+[2026-06-14 21:44:46] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 299.017s | Request-ID: req-1781444387501
+[2026-06-14 21:44:46] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 299.017s | This is a slow request!

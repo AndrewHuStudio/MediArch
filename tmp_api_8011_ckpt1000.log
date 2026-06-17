@@ -1,0 +1,43 @@
+[KG][d5d2b1c5-641] 开始构建知识图谱
+E:\MyPrograms\MediArch_System\data_process\run_api.py:78: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event("startup")
+INFO:     Will watch for changes in these directories: ['E:\\MyPrograms\\MediArch_System']
+INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
+INFO:     Started reloader process [25076] using WatchFiles
+[KG][d5d2b1c5-641] 开始构建知识图谱
+[OK] Loaded schema with 11 label types, 14 relation types
+[OK] KGBuilder initialized
+  - Neo4j: Entities + Relations
+  - Mongo chunks collection: mediarch_chunks
+  - Entity fusion suggestions: Enabled
+    * ratio>=0.9, max_pairs=50
+    * Auto alias links: Enabled
+      - min_score>=0.96, min_overlap>=2, max_edges=300
+[INFO] Build mode via parameter: incremental
+[OK] Loaded 116 concept nodes from Neo4j
+[KG][d5d2b1c5-641] cross_document_fusion:fusion_start 0/3 (0%) - 开始融合
+INFO:     Started server process [19520]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[OK] Loaded schema with 11 label types, 14 relation types
+[OK] KGBuilder initialized
+  - Neo4j: Entities + Relations
+  - Mongo chunks collection: mediarch_chunks
+  - Entity fusion suggestions: Enabled
+    * ratio>=0.9, max_pairs=50
+    * Auto alias links: Enabled
+      - min_score>=0.96, min_overlap>=2, max_edges=300
+[INFO] Build mode via parameter: incremental
+[OK] Loaded 116 concept nodes from Neo4j
+[KG][d5d2b1c5-641] cross_document_fusion:fusion_start 0/3 (0%) - 开始融合
+[KG][d5d2b1c5-641] cross_document_fusion:entity_dedup_done 1/3 (33%) - 实体去重
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别
+[KG][d5d2b1c5-641] cross_document_fusion:entity_dedup_done 1/3 (33%) - 实体去重
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别
+[KG][d5d2b1c5-641] cross_document_fusion:latent_recognition_done 2/3 (67%) - 潜在关系识别

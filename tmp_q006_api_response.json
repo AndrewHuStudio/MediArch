@@ -1,0 +1,2280 @@
+{
+  "message": "GB 51039-2014《综合医院建筑设计规范》是中国综合医院建筑设计的国家标准，其内容全面覆盖了从总体规划到各功能单元、建筑、结构、设备及环境等各方面的强制性要求与设计参数。根据检索到的规范目录信息，其核心内容可归纳如下：\n\n### 条文依据 -> 设计回应\n1. **医疗功能单元的划分与配置**\n    * **条文依据**：规范明确了医疗功能单元的划分方法[1][2]，并提供了各科门诊量占总门诊量的比例[1][2]以及各科住院床位数占医院总床位数的比例[1][2]等关键设计参数。这些表格是确定医院各科室规模、进行功能分区和面积测算的基础。\n    * **设计回应**：设计时，需依据这些比例数据，结合医院的总床位数和门诊量，科学计算并分配各科室（如内科、外科、妇产科、儿科等）的诊室数量、候诊面积及住院病区规模，确保功能配置满足预期的医疗服务需求。\n\n2. **主要医疗用房的详细设计参数**\n    * **条文依据**：规范对关键医疗用房给出了具体的尺寸要求，例如，提供了手术室的平面净尺寸表[1][2]。\n    * **设计回应**：这为手术部、中心供应室、放射科、检验科等核心医技科室的平面布局、流线设计和设备布置提供了直接的尺寸依据，确保房间满足医疗工艺流程和设备安装的基本空间需求。\n\n3. **建筑设备与医用系统专项要求**\n    * **条文依据**：规范对给排水、暖通空调、电气等系统设置了详细指标。例如，规定了医院生活用水量定额[1][2][3][4]、生活热水（60°C）用水量定额[1][2][3][4]、室内供暖计算温度[4]以及净化用房的分级标准[4]。\n    * **设计回应**：这些是进行医院给排水系统计算、热水供应系统设计、供暖空调负荷计算以及洁净手术部、ICU、骨髓移植病房等净化区域设计时必须遵守的技术标准，直接关系到医院的能耗、环境安全与舒适度。\n\n4. **标识系统与人性化设计**\n    * **条文依据**：规范包含了医院标识导向的分级系统要求[1][2][3][4]。\n    * **设计回应**：设计需据此建立清晰、连贯的室内外标识导向系统，通常分为一级（院区）、二级（建筑）、三级（楼层）和四级（房间）标识，以保障患者、访客和医护人员高效、安全地通行。\n\n### 注意事项\n* **规范的系统性**：GB 51039-2014 是一个综合性标准，上述内容仅为基于检索到的目录片段所揭示的部分核心章节。完整的规范还应包括总则、选址、总体规划、建筑设计、消防、安全防护、节能等多方面内容，共同构成医院设计的完整技术框架。\n* **与专项规范及图集的配合使用**：在实际设计中，本规范需与《建筑设计防火规范》、《综合医院建设标准》以及各类医疗工艺专项设计指南配合使用。例如，具体房间的机电配置（如医疗气体接口、网络点位、照明照度）可参考《医疗功能房间详图集》等工具书进行深化[5][6][7][8]，但其设计原则和最低要求需以GB 51039-2014为基准。\n* **版本与更新**：需注意规范的时效性。检索到的《医院建筑设计指南》为2023年出版[9][10]，其内容可能反映了新的设计理念或技术发展，在应用GB 51039-2014时，应关注是否有更新的版本或相关条文解释发布。\n\n**证据边界**\n当前回答中存在引用支撑范围不足的表述，已在诊断信息中标记；涉及数量、配置或规范结论时，应以直接包含相应范围的规范证据为准。",
+  "session_id": "debug-q006-python-post-001",
+  "knowledge_graph_path": {
+    "nodes": [
+      {
+        "id": "entity_a8d579129fa6cdd6",
+        "name": "综合医院",
+        "type": "Hospital",
+        "properties": {
+          "slug": "entity_a8d579129fa6cdd6",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "综合医院建筑设计规范"
+        },
+        "score": 6.303153991699219
+      },
+      {
+        "id": "entity_dac209d16cdeb62e",
+        "name": "医院建筑",
+        "type": "Hospital",
+        "properties": {
+          "slug": "entity_dac209d16cdeb62e",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "综合医院建筑设计规范"
+        },
+        "score": 6.0259294509887695
+      },
+      {
+        "id": "entity_cbea7ebebe9912f7",
+        "name": "医院",
+        "type": "Hospital",
+        "properties": {
+          "slug": "entity_cbea7ebebe9912f7",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "综合医院建筑设计规范"
+        },
+        "score": 2.451226234436035
+      },
+      {
+        "id": "entity_3b17249e293ee5d8",
+        "name": "医疗建筑",
+        "type": "DesignMethod",
+        "properties": {
+          "slug": "entity_3b17249e293ee5d8",
+          "source_document": "ZGFArchitects",
+          "source_documents": [
+            "ZGFArchitects",
+            "安德森·米科斯建筑事务所",
+            "所罗门·科德威尔·布恩茨建筑事务所",
+            "ReiachandHall"
+          ],
+          "search_term": "医疗建筑规范"
+        },
+        "score": 1.0
+      },
+      {
+        "id": "entity_b82ccf4e4f6ab4ee",
+        "name": "医疗设施设计",
+        "type": "DesignMethod",
+        "properties": {
+          "slug": "entity_b82ccf4e4f6ab4ee",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "医疗设施设计规范"
+        },
+        "score": 1.0
+      },
+      {
+        "id": "entity_37384f464af92a07",
+        "name": "功能",
+        "type": "DesignMethod",
+        "properties": {
+          "slug": "entity_37384f464af92a07",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "医院功能布局"
+        },
+        "score": 1.0
+      },
+      {
+        "id": "entity_727bc205f92e1f98",
+        "name": "功能布局",
+        "type": "DesignMethod",
+        "properties": {
+          "slug": "entity_727bc205f92e1f98",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "医院功能布局"
+        },
+        "score": 1.0
+      },
+      {
+        "id": "entity_0c866bec98db5513",
+        "name": "布局",
+        "type": "DesignMethod",
+        "properties": {
+          "slug": "entity_0c866bec98db5513",
+          "source_document": "unknown",
+          "source_documents": [],
+          "search_term": "医院功能布局"
+        },
+        "score": 1.0
+      },
+      {
+        "id": "community_Hospital_综合医院建筑设计规范",
+        "name": "Hospital社区",
+        "type": "Hospital",
+        "properties": {
+          "community_type": "Hospital",
+          "members": [
+            "综合医院",
+            "医院建筑",
+            "医院"
+          ],
+          "size": 3,
+          "source_document": "multiple",
+          "source_documents": [
+            "multiple"
+          ],
+          "search_term": "综合医院建筑设计规范"
+        },
+        "score": 0.8
+      },
+      {
+        "id": "rel_entity_a8d579129fa6cdd6__entity_24e90a1ae2c9daff",
+        "name": "综合医院 → 急诊部",
+        "type": "Hospital",
+        "properties": {
+          "source_node": "entity_a8d579129fa6cdd6",
+          "target_node": "entity_24e90a1ae2c9daff",
+          "relation_type": "CONTAINS",
+          "source_document": "unknown",
+          "source_documents": []
+        },
+        "score": 0.8
+      },
+      {
+        "id": "rel_entity_0c866bec98db5513__entity_24e90a1ae2c9daff",
+        "name": "布局 → 急诊部",
+        "type": "DepartmentGroup",
+        "properties": {
+          "source_node": "entity_0c866bec98db5513",
+          "target_node": "entity_24e90a1ae2c9daff",
+          "relation_type": "GUIDES",
+          "source_document": "unknown",
+          "source_documents": []
+        },
+        "score": 0.8
+      },
+      {
+        "id": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "name": "门诊 → 布局",
+        "type": "DesignMethod",
+        "properties": {
+          "source_node": "entity_f2bfd567cc5fbbc6",
+          "target_node": "entity_0c866bec98db5513",
+          "relation_type": "MENTIONED_IN",
+          "source_document": "unknown",
+          "source_documents": []
+        },
+        "score": 0.8
+      },
+      {
+        "id": "doc_296d296ef0",
+        "name": "医疗功能房间详图集3.pdf",
+        "type": "Source",
+        "properties": {
+          "source": "医疗功能房间详图集3.pdf",
+          "source_type": "图集书籍",
+          "title": "医疗功能房间详图集3.pdf"
+        },
+        "score": null
+      },
+      {
+        "id": "doc_fb46dde30d",
+        "name": "GB51039-2014综合医院建筑设计标准.pdf",
+        "type": "Source",
+        "properties": {
+          "source": "GB51039-2014综合医院建筑设计标准.pdf",
+          "source_type": "规范标准",
+          "title": "GB51039-2014综合医院建筑设计标准.pdf"
+        },
+        "score": null
+      },
+      {
+        "id": "doc_6069b3e231",
+        "name": "GB 51039-2014 综合医院建筑设计规范.pdf",
+        "type": "Source",
+        "properties": {
+          "source": "GB 51039-2014 综合医院建筑设计规范.pdf",
+          "source_type": "规范标准",
+          "title": "GB 51039-2014 综合医院建筑设计规范.pdf"
+        },
+        "score": null
+      },
+      {
+        "id": "doc_6e7e2c648e",
+        "name": "医院建筑设计指南.pdf",
+        "type": "Source",
+        "properties": {
+          "source": "医院建筑设计指南.pdf",
+          "source_type": "政策文件",
+          "title": "医院建筑设计指南.pdf"
+        },
+        "score": null
+      },
+      {
+        "id": "kp_b3be975fc7",
+        "name": "61.全景室",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电",
+          "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电",
+          "score": 0.4287,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4287
+      },
+      {
+        "id": "kp_00c6a38a77",
+        "name": "表格",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+          "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+          "score": 0.4431,
+          "source_document": "GB51039-2014综合医院建筑设计标准.pdf"
+        },
+        "score": 0.4431
+      },
+      {
+        "id": "kp_1766d14f15",
+        "name": "表格",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+          "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+          "score": 0.422,
+          "source_document": "GB 51039-2014 综合医院建筑设计规范.pdf"
+        },
+        "score": 0.422
+      },
+      {
+        "id": "kp_5e0ebd8ec8",
+        "name": "$^ *$",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+          "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+          "score": 0.4036,
+          "source_document": "医院建筑设计指南.pdf"
+        },
+        "score": 0.4036
+      },
+      {
+        "id": "kp_dc425349db",
+        "name": "21.监护岛型单床病房",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "score": 0.4086,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4086
+      },
+      {
+        "id": "kp_23622433f3",
+        "name": "67.耳鼻喉特需诊室",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 ",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 ",
+          "score": 0.4075,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4075
+      },
+      {
+        "id": "kp_5582ecd84e",
+        "name": "19.儿童营养诊室",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "score": 0.4061,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4061
+      },
+      {
+        "id": "kp_4e3369a55b",
+        "name": "25.核医学单人候诊室",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装",
+          "score": 0.4032,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4032
+      },
+      {
+        "id": "kp_a01b98d836",
+        "name": "78.放射免疫分析室",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1",
+          "score": 0.4028,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4028
+      },
+      {
+        "id": "kp_1942a155f9",
+        "name": "22.骨髓移植层流病房",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+          "score": 0.4025,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4025
+      },
+      {
+        "id": "kp_aadd2fd7f8",
+        "name": "86.医生休息室 (沙发)",
+        "type": "KnowledgePoint",
+        "properties": {
+          "content": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安",
+          "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安",
+          "score": 0.4019,
+          "source_document": "医疗功能房间详图集3.pdf"
+        },
+        "score": 0.4019
+      }
+    ],
+    "edges": [
+      {
+        "source": "kp_b3be975fc7",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_00c6a38a77",
+        "target": "doc_fb46dde30d",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_1766d14f15",
+        "target": "doc_6069b3e231",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_5e0ebd8ec8",
+        "target": "doc_6e7e2c648e",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_dc425349db",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_23622433f3",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_5582ecd84e",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_4e3369a55b",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_a01b98d836",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_1942a155f9",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "kp_aadd2fd7f8",
+        "target": "doc_296d296ef0",
+        "relation": "MENTIONED_IN",
+        "weight": 1.0,
+        "properties": {}
+      },
+      {
+        "source": "entity_3b17249e293ee5d8",
+        "target": "doc_0e6909db44",
+        "relation": "MENTIONED_IN",
+        "weight": 0.8,
+        "properties": {}
+      },
+      {
+        "source": "entity_3b17249e293ee5d8",
+        "target": "doc_0c620bb3e6",
+        "relation": "MENTIONED_IN",
+        "weight": 0.8,
+        "properties": {}
+      },
+      {
+        "source": "entity_3b17249e293ee5d8",
+        "target": "doc_12f79ff84a",
+        "relation": "MENTIONED_IN",
+        "weight": 0.8,
+        "properties": {}
+      },
+      {
+        "source": "community_Hospital_综合医院建筑设计规范",
+        "target": "doc_ce495ab8d7",
+        "relation": "MENTIONED_IN",
+        "weight": 0.8,
+        "properties": {}
+      },
+      {
+        "source": "entity_37384f464af92a07",
+        "target": "kp_00c6a38a77",
+        "relation": "MENTIONED_IN",
+        "weight": 0.9,
+        "properties": {}
+      },
+      {
+        "source": "entity_37384f464af92a07",
+        "target": "kp_1766d14f15",
+        "relation": "MENTIONED_IN",
+        "weight": 0.9,
+        "properties": {}
+      },
+      {
+        "source": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "target": "kp_1766d14f15",
+        "relation": "MENTIONED_IN",
+        "weight": 0.9,
+        "properties": {}
+      },
+      {
+        "source": "kp_00c6a38a77",
+        "target": "kp_aadd2fd7f8",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 15.0
+        }
+      },
+      {
+        "source": "kp_5e0ebd8ec8",
+        "target": "kp_aadd2fd7f8",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 15.0
+        }
+      },
+      {
+        "source": "entity_a8d579129fa6cdd6",
+        "target": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 14.0
+        }
+      },
+      {
+        "source": "rel_entity_a8d579129fa6cdd6__entity_24e90a1ae2c9daff",
+        "target": "entity_a8d579129fa6cdd6",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 64.0
+        }
+      },
+      {
+        "source": "entity_cbea7ebebe9912f7",
+        "target": "rel_entity_a8d579129fa6cdd6__entity_24e90a1ae2c9daff",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 54.0
+        }
+      },
+      {
+        "source": "entity_dac209d16cdeb62e",
+        "target": "entity_cbea7ebebe9912f7",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 54.0
+        }
+      },
+      {
+        "source": "community_Hospital_综合医院建筑设计规范",
+        "target": "rel_entity_a8d579129fa6cdd6__entity_24e90a1ae2c9daff",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 26.0
+        }
+      },
+      {
+        "source": "rel_entity_0c866bec98db5513__entity_24e90a1ae2c9daff",
+        "target": "rel_entity_a8d579129fa6cdd6__entity_24e90a1ae2c9daff",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 29.0
+        }
+      },
+      {
+        "source": "entity_b82ccf4e4f6ab4ee",
+        "target": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 18.0
+        }
+      },
+      {
+        "source": "entity_727bc205f92e1f98",
+        "target": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 26.0
+        }
+      },
+      {
+        "source": "entity_0c866bec98db5513",
+        "target": "rel_entity_f2bfd567cc5fbbc6__entity_0c866bec98db5513",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 46.0
+        }
+      },
+      {
+        "source": "entity_3b17249e293ee5d8",
+        "target": "entity_b82ccf4e4f6ab4ee",
+        "relation": "BRIDGED_TO",
+        "weight": 0.35,
+        "properties": {
+          "synthetic": true,
+          "visual_bridge": true,
+          "reason": "connect_components",
+          "bridge_score": 26.0
+        }
+      }
+    ],
+    "citations": [
+      {
+        "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 148,
+        "page_range": null,
+        "section": "61.全景室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电",
+        "image_url": null
+      },
+      {
+        "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+        "source": "GB51039-2014综合医院建筑设计标准.pdf",
+        "page": 1,
+        "page_range": null,
+        "section": "表格",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+        "image_url": null
+      },
+      {
+        "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+        "source": "GB 51039-2014 综合医院建筑设计规范.pdf",
+        "page": 1,
+        "page_range": null,
+        "section": "表格",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+        "image_url": null
+      },
+      {
+        "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+        "source": "医院建筑设计指南.pdf",
+        "page": 3,
+        "page_range": null,
+        "section": "$^ *$",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "text",
+        "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+        "image_url": null
+      },
+      {
+        "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 64,
+        "page_range": null,
+        "section": "21.监护岛型单床病房",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+        "image_url": null
+      },
+      {
+        "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 160,
+        "page_range": null,
+        "section": "67.耳鼻喉特需诊室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 ",
+        "image_url": null
+      },
+      {
+        "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 62,
+        "page_range": null,
+        "section": "19.儿童营养诊室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+        "image_url": null
+      },
+      {
+        "chunk_id": "ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 72,
+        "page_range": null,
+        "section": "25.核医学单人候诊室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装",
+        "image_url": null
+      },
+      {
+        "chunk_id": "b89ca85e-6a9a-435a-9815-2726d598fdde",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 184,
+        "page_range": null,
+        "section": "78.放射免疫分析室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1",
+        "image_url": null
+      },
+      {
+        "chunk_id": "472ae418-69fa-4497-9a10-2f1bd25c701a",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 66,
+        "page_range": null,
+        "section": "22.骨髓移植层流病房",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+        "image_url": null
+      },
+      {
+        "chunk_id": "4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 149,
+        "page_range": null,
+        "section": "61.全景室",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105",
+        "image_url": null
+      },
+      {
+        "chunk_id": "dc20421b-41ca-49da-8282-ce9ac05d40b4",
+        "source": "医疗功能房间详图集3.pdf",
+        "page": 200,
+        "page_range": null,
+        "section": "86.医生休息室 (沙发)",
+        "heading": null,
+        "sub_section": null,
+        "positions": null,
+        "content_type": "table",
+        "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安",
+        "image_url": null
+      }
+    ],
+    "total_entities": 12,
+    "total_relations": 30,
+    "total_citations": 12
+  },
+  "citations": [
+    {
+      "source": "GB 51039-2014 综合医院建筑设计规范",
+      "location": "1页|表格",
+      "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.",
+      "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+      "page_number": 1,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 1,
+        "page": 1,
+        "section": "表格",
+        "caption": "表3.1.4医疗功能单元的划分",
+        "year": 2014
+      },
+      "page_range": [
+        1,
+        1
+      ],
+      "chapter": "",
+      "chapter_title": "表格",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": "E:/MyPrograms/MediArch_System/backend/data_process/documents/标准规范/GB 51039-2014 综合医院建筑设计规范.pdf",
+      "document_path": "标准规范/GB 51039-2014 综合医院建筑设计规范.pdf",
+      "pdf_url": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB%2051039-2014%20%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83.pdf",
+      "positions": [],
+      "doc_id": "69b4fe3418a5d5511fc05e09",
+      "doc_category": "标准规范",
+      "highlight_text": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表格] 表7.1.4室内采暖计算温度\n\n[表格] 表7.2.2洁净用房的分级标准（空态或静态）\n\n[表格] 表8.1.2医疗场所及设施的类别划分及要求恢复供电的时间\n\n[表格] 续表8.1.2\n\n[表格",
+      "pdf_link": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB%2051039-2014%20%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83.pdf#page=1"
+    },
+    {
+      "source": "GB 51039-2014 综合医院建筑设计规范.pdf",
+      "location": "1页|表格",
+      "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+      "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+      "page_number": 1,
+      "section": "表格",
+      "metadata": {},
+      "page_range": null,
+      "chapter": null,
+      "chapter_title": null,
+      "sub_section": null,
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": null,
+      "doc_id": null,
+      "doc_category": null,
+      "highlight_text": null,
+      "similarity": 0.422,
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "GB51039-2014综合医院建筑设计标准",
+      "location": "1页|表格",
+      "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.",
+      "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+      "page_number": 1,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 1,
+        "page": 1,
+        "section": "表格",
+        "caption": "表3.1.5医疗功能单元分类划分表",
+        "year": 2014
+      },
+      "page_range": [
+        1,
+        1
+      ],
+      "chapter": "",
+      "chapter_title": "表格",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": "E:/MyPrograms/MediArch_System/backend/data_process/documents/标准规范/GB51039-2014综合医院建筑设计标准.pdf",
+      "document_path": "标准规范/GB51039-2014综合医院建筑设计标准.pdf",
+      "pdf_url": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB51039-2014%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E6%A0%87%E5%87%86.pdf",
+      "positions": [],
+      "doc_id": "69b4fe3418a5d5511fc05e08",
+      "doc_category": "标准规范",
+      "highlight_text": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态）\n\n[表格] 表8.1.2医疗场所分类及安全设施供电系统分级、负荷分级\n\n[表格] 续表8.1.2\n\n[表格] 续表8.1.2\n\n[表格] 续表8.1.2\n\n[表格] 表10.3.5氧气管与其他管线",
+      "pdf_link": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB51039-2014%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E6%A0%87%E5%87%86.pdf#page=1"
+    },
+    {
+      "source": "GB51039-2014综合医院建筑设计标准.pdf",
+      "location": "1页|表格",
+      "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+      "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+      "page_number": 1,
+      "section": "表格",
+      "metadata": {},
+      "page_range": null,
+      "chapter": null,
+      "chapter_title": null,
+      "sub_section": null,
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": null,
+      "doc_id": null,
+      "doc_category": null,
+      "highlight_text": null,
+      "similarity": 0.4431,
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医疗功能房间详图集3",
+      "location": "148页|61.全景室",
+      "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 10",
+      "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+      "page_number": 148,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 148,
+        "page": 148,
+        "section": "61.全景室",
+        "caption": "",
+        "year": null
+      },
+      "page_range": [
+        148,
+        148
+      ],
+      "chapter": "",
+      "chapter_title": "61.全景室",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": [],
+      "doc_id": "69c22ce0719b7d444da30372",
+      "doc_category": "书籍报告",
+      "highlight_text": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电压 380 V±10%，50/60 Hz 三相五线制（三相线、中性线、接地线） 峰值功率 出束状态118kVA，电流86A 标准功率 29.9 kVA 防护要求 技术指标 直线加速器系统 根据《放射治",
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医疗功能房间详图集3",
+      "location": "64页|21.监护岛型单床病房",
+      "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+      "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+      "page_number": 64,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 64,
+        "page": 64,
+        "section": "21.监护岛型单床病房",
+        "caption": "",
+        "year": null
+      },
+      "page_range": [
+        64,
+        64
+      ],
+      "chapter": "",
+      "chapter_title": "21.监护岛型单床病房",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": [],
+      "doc_id": "69c22ce0719b7d444da30372",
+      "doc_category": "书籍报告",
+      "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 给排水 上下水 4 安装混水器 洗手盆、坐便、淋浴 地漏 2 暖通 湿度/% 30~60 温度/℃ 冬季：20～24；夏季：23～26 机械排风 净化 新风量满足要求（有外窗，过渡季可采用自然通风）",
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医疗功能房间详图集3",
+      "location": "160页|67.耳鼻喉特需诊室",
+      "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K",
+      "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+      "page_number": 160,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 160,
+        "page": 160,
+        "section": "67.耳鼻喉特需诊室",
+        "caption": "",
+        "year": null
+      },
+      "page_range": [
+        160,
+        160
+      ],
+      "chapter": "",
+      "chapter_title": "67.耳鼻喉特需诊室",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": [],
+      "doc_id": "69c22ce0719b7d444da30372",
+      "doc_category": "书籍报告",
+      "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安装混水器 洗手盆 地漏 二 一 暖通 湿度/% 30~60 温度/℃ 18~26 宜优先采用自然通风 净化 新风量满足规定要求",
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医疗功能房间详图集3",
+      "location": "62页|19.儿童营养诊室",
+      "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+      "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+      "page_number": 62,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [],
+        "page_number": 62,
+        "page": 62,
+        "section": "19.儿童营养诊室",
+        "caption": "",
+        "year": null
+      },
+      "page_range": [
+        62,
+        62
+      ],
+      "chapter": "",
+      "chapter_title": "19.儿童营养诊室",
+      "sub_section": "",
+      "content_type": "table",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": [],
+      "doc_id": "69c22ce0719b7d444da30372",
+      "doc_category": "书籍报告",
+      "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 给排水 上下水 3 安装混水器 洗手盆、坐便、淋浴 地漏 2 暖通 湿度/% 30~60 温度/℃ 冬季：20～24；夏季:23～26 机械排风 净化 新风量满足要求（有外窗，过渡季可采用自然通风)",
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医院建筑设计指南",
+      "location": "3页|$^ *$",
+      "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+      "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+      "page_number": 3,
+      "section": null,
+      "metadata": {
+        "paragraph_ids": [
+          23,
+          24
+        ],
+        "has_title": true,
+        "page_number": 3,
+        "page": 3,
+        "section": "$^ *$",
+        "heading": "$^ *$",
+        "year": null
+      },
+      "page_range": [
+        3,
+        3
+      ],
+      "chapter": "",
+      "chapter_title": "$^ *$",
+      "sub_section": "",
+      "content_type": "text",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": [
+        {
+          "page": 3,
+          "bbox": [
+            0.5023,
+            0.9467,
+            1.0,
+            1.0
+          ]
+        }
+      ],
+      "doc_id": "69c22d5b719b7d444da3061c",
+      "doc_category": "书籍报告",
+      "highlight_text": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+      "pdf_link": "#",
+      "link_placeholder": true
+    },
+    {
+      "source": "医院建筑设计指南.pdf",
+      "location": "3页|$^ *$",
+      "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+      "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+      "page_number": 3,
+      "section": "$^ *$",
+      "metadata": {},
+      "page_range": null,
+      "chapter": null,
+      "chapter_title": null,
+      "sub_section": null,
+      "content_type": "text",
+      "image_url": null,
+      "file_path": null,
+      "document_path": null,
+      "pdf_url": null,
+      "positions": null,
+      "doc_id": null,
+      "doc_category": null,
+      "highlight_text": null,
+      "similarity": 0.4036,
+      "pdf_link": "#",
+      "link_placeholder": true
+    }
+  ],
+  "recommended_questions": [
+    "综合医院在Hospital中的详细设计要求和规范标准？",
+    "医院建筑在Hospital中的详细设计要求和规范标准？",
+    "医院在Hospital中的详细设计要求和规范标准？",
+    "在DesignMethod方面还有哪些相关的设计规范和最佳实践？",
+    "在Hospital方面还有哪些相关的设计规范和最佳实践？"
+  ],
+  "images": [],
+  "diagnostics": [
+    {
+      "took_ms": null,
+      "agent_name": null,
+      "query_type": null,
+      "items_count": null,
+      "error": null,
+      "additional_info": {
+        "result_has_strict_cross_doc": true,
+        "result_has_final_citations": true,
+        "result_has_strict_citations_candidate_count": true,
+        "agents_used": [
+          "milvus_agent",
+          "neo4j_agent",
+          "mongodb_agent"
+        ],
+        "worker_timings": [
+          {
+            "agent_name": "milvus_agent",
+            "took_ms": 6744,
+            "item_count": 12
+          },
+          {
+            "agent_name": "neo4j_agent",
+            "took_ms": 11952,
+            "item_count": 12
+          },
+          {
+            "agent_name": "mongodb_agent",
+            "took_ms": 17782,
+            "item_count": 13
+          }
+        ],
+        "phase1_retrieval_mode": {
+          "configured": "neo4j_first",
+          "effective": "parallel",
+          "is_forced": true
+        },
+        "checkpointer_runtime": {
+          "configured": "sqlite",
+          "effective": "sqlite",
+          "fallback_reason": null,
+          "is_fallback": false
+        },
+        "store_runtime": {
+          "configured": "sqlite",
+          "effective": "sqlite",
+          "fallback_reason": null,
+          "is_fallback": false
+        },
+        "query_expansion_runtime": {
+          "jieba_available": true,
+          "tokenizer_backend": "jieba",
+          "fallback_reason": null,
+          "import_error": null
+        },
+        "strict_cross_doc": false,
+        "synthesizer_diagnostics": {
+          "prompt_chars": 37706,
+          "synthesize_node_took_ms": 37189,
+          "documents_total": 17,
+          "citations_count": 25,
+          "fallback_used": false,
+          "fallback_reason": null,
+          "question_profile": {
+            "requires_code_spec": true,
+            "requires_design_translation": true,
+            "requires_spatial_reference": false,
+            "requires_empirical_reasoning": false,
+            "requires_cross_department_synthesis": false,
+            "constraint_types": [],
+            "medical_domains": []
+          },
+          "evidence_context": {
+            "source_type": "technical_standard",
+            "task_type": "fact",
+            "difficulty": "medium",
+            "question_id": "Q006"
+          },
+          "evidence_plan": {
+            "required_lanes": [
+              "code_spec",
+              "guide"
+            ],
+            "optional_lanes": [
+              "atlas_or_image",
+              "paper_or_report"
+            ],
+            "minimum_code_spec_evidence": 1,
+            "requires_lane_audit": true,
+            "answer_policy": "evidence_to_constraints_to_response_to_boundary"
+          },
+          "coverage_audit": {
+            "passed": true,
+            "missing_required_lanes": [],
+            "weak_lanes": [],
+            "needs_supplemental_retrieval": false,
+            "notes": []
+          },
+          "supplemental_lane_queries": {},
+          "synthesis_mode": {
+            "mode": "full_evidence_grounded",
+            "allow_full_generation": true,
+            "max_prompt_documents": 6,
+            "max_citations_per_tier": 5,
+            "missing_required_lanes": [],
+            "must_state_evidence_gap": false
+          },
+          "evidence_ledger": {
+            "cards": [
+              {
+                "card_id": "E1",
+                "source_role": "code_spec",
+                "authority_level": 100,
+                "source": "GB51039-2014综合医院建筑设计标准",
+                "location": "1页|表格",
+                "page_number": 1,
+                "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+                "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.",
+                "anchor": "GB51039-2014综合医院建筑设计标准 / 1页|表格 / 表格 / 1 / c728d328-77cf-429a-91dd-9827e7b9339b",
+                "claim_scopes": [
+                  "normative_requirement"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "GB51039-2014综合医院建筑设计标准",
+                  "location": "1页|表格",
+                  "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.",
+                  "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+                  "page_number": 1,
+                  "page_range": [
+                    1,
+                    1
+                  ],
+                  "chapter": "",
+                  "chapter_title": "表格",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 1,
+                    "page": 1,
+                    "section": "表格",
+                    "caption": "表3.1.5医疗功能单元分类划分表",
+                    "year": 2014
+                  },
+                  "file_path": "标准规范/GB51039-2014综合医院建筑设计标准.pdf",
+                  "document_path": "标准规范/GB51039-2014综合医院建筑设计标准.pdf",
+                  "pdf_url": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB51039-2014%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E6%A0%87%E5%87%86.pdf",
+                  "positions": [],
+                  "doc_id": "69b4fe3418a5d5511fc05e08",
+                  "doc_category": "标准规范",
+                  "highlight_text": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态）\n\n[表格] 表8.1.2医疗场所分类及安全设施供电系统分级、负荷分级\n\n[表格] 续表8.1.2\n\n[表格] 续表8.1.2\n\n[表格] 续表8.1.2\n\n[表格] 表10.3.5氧气管与其他管线"
+                }
+              },
+              {
+                "card_id": "E2",
+                "source_role": "code_spec",
+                "authority_level": 100,
+                "source": "GB51039-2014综合医院建筑设计标准.pdf",
+                "location": "1页|表格",
+                "page_number": 1,
+                "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+                "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+                "anchor": "GB51039-2014综合医院建筑设计标准.pdf / 1页|表格 / 1 / c728d328-77cf-429a-91dd-9827e7b9339b",
+                "claim_scopes": [
+                  "normative_requirement"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "GB51039-2014综合医院建筑设计标准.pdf",
+                  "location": "1页|表格",
+                  "snippet": "[表格] 表3.1.5医疗功能单元分类划分表\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $( \\mathbf { 6 0 } ^ { \\circ } \\mathbf { C }$ )用水量定额\n\n[表格] 续表6.4.1\n\n[表格] 表7.1.4室内供暖计算温度\n\n[表格] 表7.2.2净化用房的分级标准(空态或静态",
+                  "chunk_id": "c728d328-77cf-429a-91dd-9827e7b9339b",
+                  "page_number": 1,
+                  "section": "表格",
+                  "content_type": "table",
+                  "similarity": 0.4431
+                }
+              },
+              {
+                "card_id": "E3",
+                "source_role": "code_spec",
+                "authority_level": 100,
+                "source": "GB 51039-2014 综合医院建筑设计规范",
+                "location": "1页|表格",
+                "page_number": 1,
+                "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+                "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.",
+                "anchor": "GB 51039-2014 综合医院建筑设计规范 / 1页|表格 / 表格 / 1 / d324e7dd-477b-493a-9bf4-ea922643b99b",
+                "claim_scopes": [
+                  "normative_requirement",
+                  "spatial_layout",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "GB 51039-2014 综合医院建筑设计规范",
+                  "location": "1页|表格",
+                  "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.",
+                  "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+                  "page_number": 1,
+                  "page_range": [
+                    1,
+                    1
+                  ],
+                  "chapter": "",
+                  "chapter_title": "表格",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 1,
+                    "page": 1,
+                    "section": "表格",
+                    "caption": "表3.1.4医疗功能单元的划分",
+                    "year": 2014
+                  },
+                  "file_path": "标准规范/GB 51039-2014 综合医院建筑设计规范.pdf",
+                  "document_path": "标准规范/GB 51039-2014 综合医院建筑设计规范.pdf",
+                  "pdf_url": "/documents/pdf?path=%E6%A0%87%E5%87%86%E8%A7%84%E8%8C%83/GB%2051039-2014%20%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%BB%BA%E7%AD%91%E8%AE%BE%E8%AE%A1%E8%A7%84%E8%8C%83.pdf",
+                  "positions": [],
+                  "doc_id": "69b4fe3418a5d5511fc05e09",
+                  "doc_category": "标准规范",
+                  "highlight_text": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表格] 表7.1.4室内采暖计算温度\n\n[表格] 表7.2.2洁净用房的分级标准（空态或静态）\n\n[表格] 表8.1.2医疗场所及设施的类别划分及要求恢复供电的时间\n\n[表格] 续表8.1.2\n\n[表格"
+                }
+              },
+              {
+                "card_id": "E4",
+                "source_role": "code_spec",
+                "authority_level": 100,
+                "source": "GB 51039-2014 综合医院建筑设计规范.pdf",
+                "location": "1页|表格",
+                "page_number": 1,
+                "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+                "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+                "anchor": "GB 51039-2014 综合医院建筑设计规范.pdf / 1页|表格 / 1 / d324e7dd-477b-493a-9bf4-ea922643b99b",
+                "claim_scopes": [
+                  "normative_requirement",
+                  "spatial_layout",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "GB 51039-2014 综合医院建筑设计规范.pdf",
+                  "location": "1页|表格",
+                  "snippet": "[表格] 表3.1.4医疗功能单元的划分\n\n[表格] 表3.2.2各科门诊量占总门诊量比例\n\n[表格] 表3.2.3各科住院床位数占医院总床位数比例\n\n[表格] 表5.1.3医院标识导向分级\n\n[表格] 表5.7:4手术室平面净尺寸\n\n[表格] 表6.2.2医院生活用水量定额\n\n[表格] 表6.4.1医院生活热水 $\\mathbf { 6 0 ^ { \\circ } C }$ ）用水量定额\n\n[表",
+                  "chunk_id": "d324e7dd-477b-493a-9bf4-ea922643b99b",
+                  "page_number": 1,
+                  "section": "表格",
+                  "content_type": "table",
+                  "similarity": 0.422
+                }
+              },
+              {
+                "card_id": "E5",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医院建筑设计指南",
+                "location": "3页|$^ *$",
+                "page_number": 3,
+                "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+                "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+                "anchor": "医院建筑设计指南 / 3页|$^ *$ / $^ *$ / 3 / 72d60832-affb-4db9-abff-c53a62cf7b5a",
+                "claim_scopes": [
+                  "design_translation",
+                  "numeric_parameter"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医院建筑设计指南",
+                  "location": "3页|$^ *$",
+                  "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+                  "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+                  "page_number": 3,
+                  "page_range": [
+                    3,
+                    3
+                  ],
+                  "chapter": "",
+                  "chapter_title": "$^ *$",
+                  "sub_section": "",
+                  "content_type": "text",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [
+                      23,
+                      24
+                    ],
+                    "has_title": true,
+                    "page_number": 3,
+                    "page": 3,
+                    "section": "$^ *$",
+                    "heading": "$^ *$",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [
+                    {
+                      "page": 3,
+                      "bbox": [
+                        0.5023,
+                        0.9467,
+                        1.0,
+                        1.0
+                      ]
+                    }
+                  ],
+                  "doc_id": "69c22d5b719b7d444da3061c",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）"
+                }
+              },
+              {
+                "card_id": "E6",
+                "source_role": "guide",
+                "authority_level": 70,
+                "source": "医院建筑设计指南.pdf",
+                "location": "3页|$^ *$",
+                "page_number": 3,
+                "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+                "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+                "anchor": "医院建筑设计指南.pdf / 3页|$^ *$ / 3 / 72d60832-affb-4db9-abff-c53a62cf7b5a",
+                "claim_scopes": [
+                  "design_translation",
+                  "numeric_parameter"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医院建筑设计指南.pdf",
+                  "location": "3页|$^ *$",
+                  "snippet": "$^ *$\n\n开本：965毫米 $\\times$ 1270毫米1/16印张： $1 7 1 \\%$ 字数：623千字2023年3月第一版2023年3月第一次印刷定价：238.00元ISBN978-7-112-27052-1（38740）",
+                  "chunk_id": "72d60832-affb-4db9-abff-c53a62cf7b5a",
+                  "page_number": 3,
+                  "section": "$^ *$",
+                  "content_type": "text",
+                  "similarity": 0.4036
+                }
+              },
+              {
+                "card_id": "E7",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "148页|61.全景室",
+                "page_number": 148,
+                "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 10",
+                "anchor": "医疗功能房间详图集3 / 148页|61.全景室 / 61.全景室 / 148 / 875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                "claim_scopes": [
+                  "design_translation",
+                  "numeric_parameter",
+                  "spatial_layout"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "148页|61.全景室",
+                  "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 10",
+                  "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                  "page_number": 148,
+                  "page_range": [
+                    148,
+                    148
+                  ],
+                  "chapter": "",
+                  "chapter_title": "61.全景室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 148,
+                    "page": 148,
+                    "section": "61.全景室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电压 380 V±10%，50/60 Hz 三相五线制（三相线、中性线、接地线） 峰值功率 出束状态118kVA，电流86A 标准功率 29.9 kVA 防护要求 技术指标 直线加速器系统 根据《放射治"
+                }
+              },
+              {
+                "card_id": "E8",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "148页|61.全景室",
+                "page_number": 148,
+                "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电",
+                "anchor": "医疗功能房间详图集3.pdf / 148页|61.全景室 / 148 / 875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "148页|61.全景室",
+                  "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105 建筑要求 技术指标 电缆沟1 尺寸（宽×深） 300×50 位置说明 治疗区连接控制区、设备间 内容说明 冷却水管、电力电缆、梯度电缆、信号电缆 电缆沟2 尺寸（宽×深） 100×50 位置说明 控制区连接技术室 内容说明 信号电缆 电源要求 技术指标 直线加速器系统 输入电",
+                  "chunk_id": "875a2dc4-d101-4b2c-baf5-1a62637ad37b",
+                  "page_number": 148,
+                  "section": "61.全景室",
+                  "content_type": "table",
+                  "similarity": 0.4287
+                }
+              },
+              {
+                "card_id": "E9",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "64页|21.监护岛型单床病房",
+                "page_number": 64,
+                "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                "anchor": "医疗功能房间详图集3 / 64页|21.监护岛型单床病房 / 21.监护岛型单床病房 / 64 / 8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "64页|21.监护岛型单床病房",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                  "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                  "page_number": 64,
+                  "page_range": [
+                    64,
+                    64
+                  ],
+                  "chapter": "",
+                  "chapter_title": "21.监护岛型单床病房",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 64,
+                    "page": 64,
+                    "section": "21.监护岛型单床病房",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 给排水 上下水 4 安装混水器 洗手盆、坐便、淋浴 地漏 2 暖通 湿度/% 30~60 温度/℃ 冬季：20～24；夏季：23～26 机械排风 净化 新风量满足要求（有外窗，过渡季可采用自然通风）"
+                }
+              },
+              {
+                "card_id": "E10",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "64页|21.监护岛型单床病房",
+                "page_number": 64,
+                "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                "anchor": "医疗功能房间详图集3.pdf / 64页|21.监护岛型单床病房 / 64 / 8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "64页|21.监护岛型单床病房",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 5 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 15 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                  "chunk_id": "8f14c433-d81b-4710-b140-a38a1e8ca9f3",
+                  "page_number": 64,
+                  "section": "21.监护岛型单床病房",
+                  "content_type": "table",
+                  "similarity": 0.4086
+                }
+              },
+              {
+                "card_id": "E11",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "160页|67.耳鼻喉特需诊室",
+                "page_number": 160,
+                "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K",
+                "anchor": "医疗功能房间详图集3 / 160页|67.耳鼻喉特需诊室 / 67.耳鼻喉特需诊室 / 160 / 410a2041-887c-427e-862d-87dc67450d65",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "160页|67.耳鼻喉特需诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K",
+                  "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+                  "page_number": 160,
+                  "page_range": [
+                    160,
+                    160
+                  ],
+                  "chapter": "",
+                  "chapter_title": "67.耳鼻喉特需诊室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 160,
+                    "page": 160,
+                    "section": "67.耳鼻喉特需诊室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安装混水器 洗手盆 地漏 二 一 暖通 湿度/% 30~60 温度/℃ 18~26 宜优先采用自然通风 净化 新风量满足规定要求"
+                }
+              },
+              {
+                "card_id": "E12",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "160页|67.耳鼻喉特需诊室",
+                "page_number": 160,
+                "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 ",
+                "anchor": "医疗功能房间详图集3.pdf / 160页|67.耳鼻喉特需诊室 / 160 / 410a2041-887c-427e-862d-87dc67450d65",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "160页|67.耳鼻喉特需诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 二 弱电 网络接口 2 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：300lx，色温:3300～5300K，显色指数：不低于80 电插座 9 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 ",
+                  "chunk_id": "410a2041-887c-427e-862d-87dc67450d65",
+                  "page_number": 160,
+                  "section": "67.耳鼻喉特需诊室",
+                  "content_type": "table",
+                  "similarity": 0.4075
+                }
+              },
+              {
+                "card_id": "E13",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "62页|19.儿童营养诊室",
+                "page_number": 62,
+                "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                "anchor": "医疗功能房间详图集3 / 62页|19.儿童营养诊室 / 19.儿童营养诊室 / 62 / cd45922d-4585-49f6-b284-7e15a3ae370b",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "62页|19.儿童营养诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                  "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+                  "page_number": 62,
+                  "page_range": [
+                    62,
+                    62
+                  ],
+                  "chapter": "",
+                  "chapter_title": "19.儿童营养诊室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 62,
+                    "page": 62,
+                    "section": "19.儿童营养诊室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 给排水 上下水 3 安装混水器 洗手盆、坐便、淋浴 地漏 2 暖通 湿度/% 30~60 温度/℃ 冬季：20～24；夏季:23～26 机械排风 净化 新风量满足要求（有外窗，过渡季可采用自然通风)"
+                }
+              },
+              {
+                "card_id": "E14",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "62页|19.儿童营养诊室",
+                "page_number": 62,
+                "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                "anchor": "医疗功能房间详图集3.pdf / 62页|19.儿童营养诊室 / 62 / cd45922d-4585-49f6-b284-7e15a3ae370b",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "62页|19.儿童营养诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 2 二 负压(V) 2 二 正压(A) 二 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                  "chunk_id": "cd45922d-4585-49f6-b284-7e15a3ae370b",
+                  "page_number": 62,
+                  "section": "19.儿童营养诊室",
+                  "content_type": "table",
+                  "similarity": 0.4061
+                }
+              },
+              {
+                "card_id": "E15",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "72页|25.核医学单人候诊室",
+                "page_number": 72,
+                "chunk_id": "ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，",
+                "anchor": "医疗功能房间详图集3 / 72页|25.核医学单人候诊室 / 25.核医学单人候诊室 / 72 / ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "72页|25.核医学单人候诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，",
+                  "chunk_id": "ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                  "page_number": 72,
+                  "page_range": [
+                    72,
+                    72
+                  ],
+                  "chapter": "",
+                  "chapter_title": "25.核医学单人候诊室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 72,
+                    "page": 72,
+                    "section": "25.核医学单人候诊室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装混水器 洗手盆 地漏 二 二 暖通 湿度/% 30~60 温度/℃ 18~26 宜优先采用自然通风 净化 一"
+                }
+              },
+              {
+                "card_id": "E16",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "72页|25.核医学单人候诊室",
+                "page_number": 72,
+                "chunk_id": "ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装",
+                "anchor": "医疗功能房间详图集3.pdf / 72页|25.核医学单人候诊室 / 72 / ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "72页|25.核医学单人候诊室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 三 RJ11 或综合布线 电视接口 1 二 呼叫接口 1 丨 强电 照明 二 照度：3001x，色温： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 7 220V，50 Hz 五孔 接地 二 一 给排水 上下水 3 安装",
+                  "chunk_id": "ea587854-ee1b-4d65-be06-e9b63fff5cc8",
+                  "page_number": 72,
+                  "section": "25.核医学单人候诊室",
+                  "content_type": "table",
+                  "similarity": 0.4032
+                }
+              },
+              {
+                "card_id": "E17",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "184页|78.放射免疫分析室",
+                "page_number": 184,
+                "chunk_id": "b89ca85e-6a9a-435a-9815-2726d598fdde",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K",
+                "anchor": "医疗功能房间详图集3 / 184页|78.放射免疫分析室 / 78.放射免疫分析室 / 184 / b89ca85e-6a9a-435a-9815-2726d598fdde",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "184页|78.放射免疫分析室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K",
+                  "chunk_id": "b89ca85e-6a9a-435a-9815-2726d598fdde",
+                  "page_number": 184,
+                  "page_range": [
+                    184,
+                    184
+                  ],
+                  "chapter": "",
+                  "chapter_title": "78.放射免疫分析室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 184,
+                    "page": 184,
+                    "section": "78.放射免疫分析室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安装混水器 洗手盆 地漏 二 暖通 湿度/% 30~65 温度/℃ 冬季：20～24;夏季：23～26 设置机械排风系统，处理达标后排放 净化 新风量满足规定要求"
+                }
+              },
+              {
+                "card_id": "E18",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "184页|78.放射免疫分析室",
+                "page_number": 184,
+                "chunk_id": "b89ca85e-6a9a-435a-9815-2726d598fdde",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1",
+                "anchor": "医疗功能房间详图集3.pdf / 184页|78.放射免疫分析室 / 184 / b89ca85e-6a9a-435a-9815-2726d598fdde",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "184页|78.放射免疫分析室",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V） 二 二 正压(A) 二 一 弱电 网络接口 7 RJ45 电话接口 1 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：5001x，色温：： 照度：5001x，色温:3300～5300K，显色指数：不低于80 电插座 12 220 V，50 Hz 五孔 接地 二 一 给排水 上下水 1",
+                  "chunk_id": "b89ca85e-6a9a-435a-9815-2726d598fdde",
+                  "page_number": 184,
+                  "section": "78.放射免疫分析室",
+                  "content_type": "table",
+                  "similarity": 0.4028
+                }
+              },
+              {
+                "card_id": "E19",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "66页|22.骨髓移植层流病房",
+                "page_number": 66,
+                "chunk_id": "472ae418-69fa-4497-9a10-2f1bd25c701a",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                "anchor": "医疗功能房间详图集3 / 66页|22.骨髓移植层流病房 / 22.骨髓移植层流病房 / 66 / 472ae418-69fa-4497-9a10-2f1bd25c701a",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "66页|22.骨髓移植层流病房",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色",
+                  "chunk_id": "472ae418-69fa-4497-9a10-2f1bd25c701a",
+                  "page_number": 66,
+                  "page_range": [
+                    66,
+                    66
+                  ],
+                  "chapter": "",
+                  "chapter_title": "22.骨髓移植层流病房",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 66,
+                    "page": 66,
+                    "section": "22.骨髓移植层流病房",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 给排水 上下水 3 安装混水器 洗手盆、坐便、淋浴 地漏 1 暖通 湿度/% 30~60 温度/℃ 冬季：20～24；夏季:23～26 机械排风 净化 新风量满足要求（有外窗，过渡季可采用自然通风)"
+                }
+              },
+              {
+                "card_id": "E20",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "66页|22.骨髓移植层流病房",
+                "page_number": 66,
+                "chunk_id": "472ae418-69fa-4497-9a10-2f1bd25c701a",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                "anchor": "医疗功能房间详图集3.pdf / 66页|22.骨髓移植层流病房 / 66 / 472ae418-69fa-4497-9a10-2f1bd25c701a",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "66页|22.骨髓移植层流病房",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 1 二 负压(V) 1 二 正压(A) 三 二 弱电 网络接口 3 RJ45 电话接口 二 RJ11 或综合布线 电视接口 1 二 呼叫接口 3 强电 照明 二 照度：100lx，色温： 照度：100lx，色温:3300～5300K，显色指数：不低于80 电插座 11 220V，50 Hz 五孔 接地 2 小于1Ω 设在卫生间、治疗带 ",
+                  "chunk_id": "472ae418-69fa-4497-9a10-2f1bd25c701a",
+                  "page_number": 66,
+                  "section": "22.骨髓移植层流病房",
+                  "content_type": "table",
+                  "similarity": 0.4025
+                }
+              },
+              {
+                "card_id": "E21",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "149页|61.全景室",
+                "page_number": 149,
+                "chunk_id": "4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105",
+                "anchor": "医疗功能房间详图集3 / 149页|61.全景室 / 61.全景室 / 149 / 4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                "claim_scopes": [
+                  "design_translation",
+                  "numeric_parameter",
+                  "spatial_layout"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "149页|61.全景室",
+                  "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105",
+                  "chunk_id": "4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                  "page_number": 149,
+                  "page_range": [
+                    149,
+                    149
+                  ],
+                  "chapter": "",
+                  "chapter_title": "61.全景室",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 149,
+                    "page": 149,
+                    "section": "61.全景室",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105"
+                }
+              },
+              {
+                "card_id": "E22",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "149页|61.全景室",
+                "page_number": 149,
+                "chunk_id": "4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105",
+                "anchor": "医疗功能房间详图集3.pdf / 149页|61.全景室 / 149 / 4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "149页|61.全景室",
+                  "snippet": "[表格] \n续表 空间类别 医疗设备 房间编码 装备及环境 房间名称 MRI-GRT（8MV直线加速器） R3320105",
+                  "chunk_id": "4549e500-e9d4-4490-9a20-e0bb0fa7f269",
+                  "page_number": 149,
+                  "section": "61.全景室",
+                  "content_type": "table",
+                  "similarity": 0.4022
+                }
+              },
+              {
+                "card_id": "E23",
+                "source_role": "book_report",
+                "authority_level": 65,
+                "source": "医疗功能房间详图集3",
+                "location": "200页|86.医生休息室 (沙发)",
+                "page_number": 200,
+                "chunk_id": "dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K",
+                "anchor": "医疗功能房间详图集3 / 200页|86.医生休息室 (沙发) / 86.医生休息室 (沙发) / 200 / dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                "claim_scopes": [
+                  "design_translation",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3",
+                  "location": "200页|86.医生休息室 (沙发)",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K",
+                  "chunk_id": "dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                  "page_number": 200,
+                  "page_range": [
+                    200,
+                    200
+                  ],
+                  "chapter": "",
+                  "chapter_title": "86.医生休息室 (沙发)",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 200,
+                    "page": 200,
+                    "section": "86.医生休息室 (沙发)",
+                    "caption": "",
+                    "year": null
+                  },
+                  "file_path": null,
+                  "document_path": null,
+                  "pdf_url": null,
+                  "positions": [],
+                  "doc_id": "69c22ce0719b7d444da30372",
+                  "doc_category": "书籍报告",
+                  "highlight_text": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安装混水器 洗手盆 地漏 二 二 暖通 湿度/% 30~60 温度/℃ 18~26 宜优先采用自然通风 净化 一"
+                }
+              },
+              {
+                "card_id": "E24",
+                "source_role": "atlas_or_image",
+                "authority_level": 60,
+                "source": "医疗功能房间详图集3.pdf",
+                "location": "200页|86.医生休息室 (沙发)",
+                "page_number": 200,
+                "chunk_id": "dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安",
+                "anchor": "医疗功能房间详图集3.pdf / 200页|86.医生休息室 (沙发) / 200 / dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                "claim_scopes": [
+                  "spatial_layout",
+                  "image_reference",
+                  "numeric_parameter",
+                  "quantity_configuration"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "医疗功能房间详图集3.pdf",
+                  "location": "200页|86.医生休息室 (沙发)",
+                  "snippet": "[表格] \n机电要求 数量 规格 备注 医疗气体 氧气（0） 二 二 负压(V) 二 二 正压(A) 二 二 弱电 网络接口 1 RJ45 电话接口 二 RJ11 或综合布线 电视接口 二 二 呼叫接口 二 一 强电 照明 二 照度：3001x，色温：： 照度：3001x，色温：3300～5300K，显色指数：不低于80 电插座 4 220V，50 Hz 五孔 接地 二 一 给排水 上下水 1 安",
+                  "chunk_id": "dc20421b-41ca-49da-8282-ce9ac05d40b4",
+                  "page_number": 200,
+                  "section": "86.医生休息室 (沙发)",
+                  "content_type": "table",
+                  "similarity": 0.4019
+                }
+              },
+              {
+                "card_id": "E25",
+                "source_role": "paper_or_report",
+                "authority_level": 45,
+                "source": "综合医院医疗功能规模循证设计_崔怡卓",
+                "location": "1页|表格",
+                "page_number": 1,
+                "chunk_id": "76cd81ed-6f41-40de-873e-435c0541e2f7",
+                "snippet": "[表格] 表1部分医院手术部建设情况一览表\n\n[表格] 表2部分医院放射科设备配置一览表\n\n[表格] 表3部分医院检验科功能配置一览表",
+                "anchor": "综合医院医疗功能规模循证设计_崔怡卓 / 1页|表格 / 表格 / 1 / 76cd81ed-6f41-40de-873e-435c0541e2f7",
+                "claim_scopes": [
+                  "empirical_inference"
+                ],
+                "support_level": "direct",
+                "citation": {
+                  "source": "综合医院医疗功能规模循证设计_崔怡卓",
+                  "location": "1页|表格",
+                  "snippet": "[表格] 表1部分医院手术部建设情况一览表\n\n[表格] 表2部分医院放射科设备配置一览表\n\n[表格] 表3部分医院检验科功能配置一览表",
+                  "chunk_id": "76cd81ed-6f41-40de-873e-435c0541e2f7",
+                  "page_number": 1,
+                  "page_range": [
+                    1,
+                    1
+                  ],
+                  "chapter": "",
+                  "chapter_title": "表格",
+                  "sub_section": "",
+                  "content_type": "table",
+                  "image_url": null,
+                  "metadata": {
+                    "paragraph_ids": [],
+                    "page_number": 1,
+                    "page": 1,
+                    "section": "表格",
+                    "caption": "表1部分医院手术部建设情况一览表",
+                    "year": null
+                  },
+                  "file_path": "参考论文/综合医院医疗功能规模循证设计_崔怡卓.pdf",
+                  "document_path": "参考论文/综合医院医疗功能规模循证设计_崔怡卓.pdf",
+                  "pdf_url": "/documents/pdf?path=%E5%8F%82%E8%80%83%E8%AE%BA%E6%96%87/%E7%BB%BC%E5%90%88%E5%8C%BB%E9%99%A2%E5%8C%BB%E7%96%97%E5%8A%9F%E8%83%BD%E8%A7%84%E6%A8%A1%E5%BE%AA%E8%AF%81%E8%AE%BE%E8%AE%A1_%E5%B4%94%E6%80%A1%E5%8D%93.pdf",
+                  "positions": [],
+                  "doc_id": "69b4fe3318a5d5511fc05e05",
+                  "doc_category": "参考论文",
+                  "highlight_text": "[表格] 表1部分医院手术部建设情况一览表\n\n[表格] 表2部分医院放射科设备配置一览表\n\n[表格] 表3部分医院检验科功能配置一览表"
+                }
+              }
+            ],
+            "rejected_count": 0,
+            "rejected_reasons": []
+          },
+          "claim_support_audit": {
+            "passed": false,
+            "bindings": [
+              {
+                "claim": "* **条文依据**：规范明确了医疗功能单元的划分方法[1][2]，并提供了各科门诊量占总门诊量的比例[1][2]以及各科住院床位数占医院总床位数的比例[1][2]等关键设计参数。这些表格是确定医院各科室规模、进行功能分区和面积测算的基础。",
+                "required_scope": "quantity_configuration",
+                "citation_ids": [
+                  1,
+                  2,
+                  1,
+                  2,
+                  1,
+                  2
+                ],
+                "supported": true,
+                "reason": ""
+              },
+              {
+                "claim": "* **条文依据**：规范对关键医疗用房给出了具体的尺寸要求，例如，提供了手术室的平面净尺寸表[1][2]。",
+                "required_scope": "normative_requirement",
+                "citation_ids": [
+                  1,
+                  2
+                ],
+                "supported": true,
+                "reason": ""
+              },
+              {
+                "claim": "* **条文依据**：规范对给排水、暖通空调、电气等系统设置了详细指标。例如，规定了医院生活用水量定额[1][2][3][4]、生活热水（60°C）用水量定额[1][2][3][4]、室内供暖计算温度[4]以及净化用房的分级标准[4]。",
+                "required_scope": "normative_requirement",
+                "citation_ids": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  1,
+                  2,
+                  3,
+                  4,
+                  4,
+                  4
+                ],
+                "supported": true,
+                "reason": ""
+              },
+              {
+                "claim": "* **条文依据**：规范包含了医院标识导向的分级系统要求[1][2][3][4]。",
+                "required_scope": "normative_requirement",
+                "citation_ids": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "supported": true,
+                "reason": ""
+              },
+              {
+                "claim": "* **与专项规范及图集的配合使用**：在实际设计中，本规范需与《建筑设计防火规范》、《综合医院建设标准》以及各类医疗工艺专项设计指南配合使用。例如，具体房间的机电配置（如医疗气体接口、网络点位、照明照度）可参考《医疗功能房间详图集》等工具书进行深化[5][6][7][8]，但其设计原则和最低要求需以GB 51039-2014为基准。",
+                "required_scope": "quantity_configuration",
+                "citation_ids": [
+                  5,
+                  6,
+                  7,
+                  8
+                ],
+                "supported": true,
+                "reason": ""
+              },
+              {
+                "claim": "* **版本与更新**：需注意规范的时效性。检索到的《医院建筑设计指南》为2023年出版[9][10]，其内容可能反映了新的设计理念或技术发展，在应用GB 51039-2014时，应关注是否有更新的版本或相关条文解释发布。",
+                "required_scope": "normative_requirement",
+                "citation_ids": [
+                  9,
+                  10
+                ],
+                "supported": false,
+                "reason": "citation does not support required scope"
+              }
+            ],
+            "unsupported_claim_count": 1,
+            "notes": [
+              "citation does not support required scope"
+            ]
+          }
+        },
+        "final_citations_count": 10,
+        "strict_citations_candidate_count": 0,
+        "state_filters_keys": [],
+        "state_doc_ids_count": 0,
+        "state_strict_cross_doc_request": false
+      }
+    }
+  ],
+  "took_ms": 72252,
+  "agents_used": [
+    "milvus_agent",
+    "neo4j_agent",
+    "mongodb_agent"
+  ]
+}

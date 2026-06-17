@@ -1,0 +1,47 @@
+============================================================
+MediArch Benchmark Runner
+============================================================
+API:       http://localhost:8011
+Questions: E:\MyPrograms\MediArch_System\docs\实验部分\54题实验补强\benchmark_questions_54.csv
+Runs:      docs\实验部分\benchmark_runs_stratified16_breadthfix_2026-06-15.csv
+Modes:     ['R2', 'VRAG']
+Questions: ['Q004', 'Q005', 'Q012', 'Q016', 'Q019', 'Q020', 'Q021', 'Q022', 'Q024', 'Q029', 'Q033', 'Q037', 'Q041', 'Q045', 'Q050', 'Q054']
+Tasks:     32
+Timeout:   unlimited per request
+============================================================
+[1/32] Q004 (VRAG) ... OK (38.5s, 1495 chars)
+[2/32] Q004 (R2) ... OK (47.5s, 700 chars)
+[3/32] Q005 (VRAG) ... OK (49.1s, 1795 chars)
+[4/32] Q005 (R2) ... OK (49.4s, 841 chars)
+[5/32] Q012 (VRAG) ... OK (41.9s, 1735 chars)
+[6/32] Q012 (R2) ... OK (48.0s, 1024 chars)
+[7/32] Q016 (VRAG) ... OK (40.6s, 1668 chars)
+[8/32] Q016 (R2) ... OK (57.3s, 1424 chars)
+[9/32] Q019 (VRAG) ... OK (29.1s, 1165 chars)
+[10/32] Q019 (R2) ... OK (41.8s, 612 chars)
+[11/32] Q020 (VRAG) ... OK (26.4s, 825 chars)
+[12/32] Q020 (R2) ... OK (57.6s, 991 chars)
+[13/32] Q021 (VRAG) ... OK (44.9s, 1729 chars)
+[14/32] Q021 (R2) ... OK (51.2s, 975 chars)
+[15/32] Q022 (VRAG) ... OK (52.0s, 1689 chars)
+[16/32] Q022 (R2) ... OK (62.2s, 1511 chars)
+[17/32] Q024 (VRAG) ... OK (47.6s, 1902 chars)
+[18/32] Q024 (R2) ... OK (73.1s, 1665 chars)
+[19/32] Q029 (VRAG) ... OK (24.9s, 826 chars)
+[20/32] Q029 (R2) ... OK (50.1s, 615 chars)
+[21/32] Q033 (VRAG) ... OK (32.4s, 1188 chars)
+[22/32] Q033 (R2) ... OK (49.3s, 943 chars)
+[23/32] Q037 (VRAG) ... OK (36.0s, 1462 chars)
+[24/32] Q037 (R2) ... OK (72.0s, 2007 chars)
+[25/32] Q041 (VRAG) ... OK (62.3s, 2362 chars)
+[26/32] Q041 (R2) ... OK (68.7s, 1785 chars)
+[27/32] Q045 (VRAG) ... OK (21.5s, 758 chars)
+[28/32] Q045 (R2) ... OK (47.7s, 727 chars)
+[29/32] Q050 (VRAG) ... OK (35.7s, 1456 chars)
+[30/32] Q050 (R2) ... OK (42.9s, 790 chars)
+[31/32] Q054 (VRAG) ... OK (45.8s, 1786 chars)
+[32/32] Q054 (R2) ... OK (58.0s, 1182 chars)
+============================================================
+Done! success=32, failed=0
+Results saved to: docs\实验部分\benchmark_runs_stratified16_breadthfix_2026-06-15.csv
+============================================================

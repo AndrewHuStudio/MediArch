@@ -1,0 +1,236 @@
+[2026-06-09 18:59:51] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-09 18:59:51] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-09 18:59:51] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-09 18:59:51] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-09 18:59:51] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-09 19:00:02] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1781002802925
+[2026-06-09 19:00:02] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.004s | Request-ID: req-1781002802925
+INFO:     127.0.0.1:56320 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-09 19:00:41] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781002841667
+[2026-06-09 19:00:41] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-d393d70e65cb44e1
+[2026-06-09 19:01:35] INFO - mediarch_api - [Chat] 回复成功 | Session: session-d393d70e65cb44e1 | Time: 54196ms
+[2026-06-09 19:01:35] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 54.197s | Request-ID: req-1781002841667
+[2026-06-09 19:01:35] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 54.197s | This is a slow request!
+INFO:     127.0.0.1:56350 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:01:37] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781002897922
+[2026-06-09 19:01:37] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-5534556bf341465c
+[OK] 检测到 MongoDB 文本索引: content_text_idx
+[OK] MongoDB连接成功: mediarch.mediarch_chunks
+[MongoDB] 开始搜索，关键词=['护士站', '病房通视性', '患者隐私', '30米服务半径', '住院部设计', '空间排布', '护理单元', '病房布局', 'Nursing Station', 'Ward Design', 'DesignMethod社区', '中等护理单元', '分散式护士站', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '半分散式护士站', '服务半径', '条形板病房', '混合护士站', '病房'], 正则模式=护士站|病房通视性|患者隐私|30米服务半径|住院部设计|空间排布|护理单元|病房布局|Nursing\ Station|Ward\ Design|DesignMethod社区|中等护理单元|分散式护...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:02:53] INFO - mediarch_api - [Chat] 回复成功 | Session: session-5534556bf341465c | Time: 75423ms
+[2026-06-09 19:02:53] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 75.425s | Request-ID: req-1781002897922
+[2026-06-09 19:02:53] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 75.426s | This is a slow request!
+INFO:     127.0.0.1:56387 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:02:55] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781002975375
+[2026-06-09 19:02:55] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院在医疗工艺设计阶段应如何确定门诊、急... | Session: session-31c72c24bcc6412c
+[2026-06-09 19:03:59] INFO - mediarch_api - [Chat] 回复成功 | Session: session-31c72c24bcc6412c | Time: 63941ms
+[2026-06-09 19:03:59] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 63.944s | Request-ID: req-1781002975375
+[2026-06-09 19:03:59] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 63.944s | This is a slow request!
+INFO:     127.0.0.1:56445 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:04:01] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003041347
+[2026-06-09 19:04:01] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院在医疗工艺设计阶段应如何确定门诊、急... | Session: session-15a3f8cffb8844ef
+[MongoDB] 开始搜索，关键词=['医疗工艺设计', '配置参数', '门诊', '急诊', '护理单元', '手术室', 'ICU', '医技设备', 'GB 51039-2014', '综合医院建筑设计规范', 'DesignMethod社区', 'GB 51039-2014 综合医院建筑设计规范.pdf', 'Hospital社区', 'Space社区', '中等护理单元', '医疗功能房间详图集3.pdf', '医疗工艺', '医疗建筑', '医院建筑', '医院建筑设计指南.pdf'], 正则模式=医疗工艺设计|配置参数|门诊|急诊|护理单元|手术室|ICU|医技设备|GB\ 51039\-2014|综合医院建筑设计规范|DesignMethod社区|GB\ 51039\-2014\ 综合医院建...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:05:37] INFO - mediarch_api - [Chat] 回复成功 | Session: session-15a3f8cffb8844ef | Time: 96287ms
+[2026-06-09 19:05:37] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 96.290s | Request-ID: req-1781003041347
+[2026-06-09 19:05:37] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 96.291s | This is a slow request!
+INFO:     127.0.0.1:56469 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:05:39] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003139672
+[2026-06-09 19:05:39] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-4e35b1c0f9e84151
+[2026-06-09 19:07:07] INFO - mediarch_api - [Chat] 回复成功 | Session: session-4e35b1c0f9e84151 | Time: 87570ms
+[2026-06-09 19:07:07] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 87.573s | Request-ID: req-1781003139672
+[2026-06-09 19:07:07] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 87.574s | This is a slow request!
+INFO:     127.0.0.1:56515 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:07:09] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003229287
+[2026-06-09 19:07:09] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-03a66653866b43e5
+[MongoDB] 开始搜索，关键词=['手术部', '放射科', '磁共振检查室', '放射治疗科', '核医学科', '选址', '分区', '流线组织', 'GB 51039-2014', '综合医院建筑设计标准', 'Hospital社区', '分区和交通系统', '分区规划', '医院', '医院建筑', '医院建筑设计指南.pdf', '手术室预测', '放射科分项检查占比', '放射科检查', '检查室'], 正则模式=手术部|放射科|磁共振检查室|放射治疗科|核医学科|选址|分区|流线组织|GB\ 51039\-2014|综合医院建筑设计标准|Hospital社区|分区和交通系统|分区规划|医院|医院建筑|医院建筑...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:08:33] INFO - mediarch_api - [Chat] 回复成功 | Session: session-03a66653866b43e5 | Time: 83742ms
+[2026-06-09 19:08:33] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 83.748s | Request-ID: req-1781003229287
+[2026-06-09 19:08:33] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 83.748s | This is a slow request!
+INFO:     127.0.0.1:56541 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:08:35] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003315087
+[2026-06-09 19:08:35] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，医院通风与空调系统在感染控制、净化用房、门急... | Session: session-fd993bfd86c5471b
+[2026-06-09 19:09:29] INFO - mediarch_api - [Chat] 回复成功 | Session: session-fd993bfd86c5471b | Time: 54607ms
+[2026-06-09 19:09:29] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 54.612s | Request-ID: req-1781003315087
+[2026-06-09 19:09:29] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 54.613s | This is a slow request!
+INFO:     127.0.0.1:56583 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:09:31] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003371740
+[2026-06-09 19:09:31] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，医院通风与空调系统在感染控制、净化用房、门急... | Session: session-476e91f55c6e4772
+[MongoDB] 开始搜索，关键词=['通风与空调系统', '感染控制', '净化用房', '门急诊', '住院特殊病房', '综合医院建筑设计标准', 'GB 51039-2014', 'HVAC', '空气净化', '特殊病房', '分散护理 → 信息技术', '分散护理 → 护理单元', '分散护理 → 酒精机', '医疗功能房间详图集3.pdf', '单人病房 → 分散护理', '感染', '护理单元 → 病房', '病房', '系统', '根据《综合医院建筑设计标准》GB 51039-2014，医院通风与空调系统在感染控制、净化用房、门急诊和住院特殊病房中应如何设计？'], 正则模式=通风与空调系统|感染控制|净化用房|门急诊|住院特殊病房|综合医院建筑设计标准|GB\ 51039\-2014|HVAC|空气净化|特殊病房|分散护理\ →\ 信息技术|分散护理\ →\ 护理单元|分...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:10:53] INFO - mediarch_api - [Chat] 回复成功 | Session: session-476e91f55c6e4772 | Time: 81504ms
+[2026-06-09 19:10:53] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 81.507s | Request-ID: req-1781003371740
+[2026-06-09 19:10:53] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 81.509s | This is a slow request!
+INFO:     127.0.0.1:56600 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:10:55] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003455282
+[2026-06-09 19:10:55] INFO - mediarch_api - [Chat] 收到消息: 《医疗机构设置规划指导原则（2021-2025年）》明确了医疗机构设置应坚持哪些基本原则？... | Session: session-bb0528e1ccd24da2
+[2026-06-09 19:11:24] INFO - mediarch_api - [Chat] 回复成功 | Session: session-bb0528e1ccd24da2 | Time: 29408ms
+[2026-06-09 19:11:24] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 29.409s | Request-ID: req-1781003455282
+[2026-06-09 19:11:24] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 29.409s | This is a slow request!
+INFO:     127.0.0.1:56619 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:11:26] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003486742
+[2026-06-09 19:11:26] INFO - mediarch_api - [Chat] 收到消息: 《医疗机构设置规划指导原则（2021-2025年）》明确了医疗机构设置应坚持哪些基本原则？... | Session: session-f0d015a5018247ab
+[MongoDB] 开始搜索，关键词=['医疗机构设置规划指导原则', '医疗机构设置', '基本原则', '2021-2025', '指导原则', '设置规划', '医疗机构', '规划原则', '设置原则', '医疗规划', 'GB51039-2014综合医院建筑设计标准.pdf', '分区规划', '功能', '功能性规划', '医疗功能房间详图集3.pdf', '医疗机构布局', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '医院设计文件', '原则'], 正则模式=医疗机构设置规划指导原则|医疗机构设置|基本原则|2021\-2025|指导原则|设置规划|医疗机构|规划原则|设置原则|医疗规划|GB51039\-2014综合医院建筑设计标准\.pdf|分区规划|...
+[MongoDB] 搜索完成：找到 5 个匹配的chunks（策略：text_index）
+[2026-06-09 19:13:17] INFO - mediarch_api - [Chat] 回复成功 | Session: session-f0d015a5018247ab | Time: 110406ms
+[2026-06-09 19:13:17] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 110.411s | Request-ID: req-1781003486742
+[2026-06-09 19:13:17] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 110.412s | This is a slow request!
+INFO:     127.0.0.1:56630 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:13:19] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003599200
+[2026-06-09 19:13:19] INFO - mediarch_api - [Chat] 收到消息: 该指导原则对县办、市办、省办及以上综合医院的适宜床位规模分别如何规定？... | Session: session-a8f1fb40494a4ddf
+[2026-06-09 19:14:12] INFO - mediarch_api - [Chat] 回复成功 | Session: session-a8f1fb40494a4ddf | Time: 53117ms
+[2026-06-09 19:14:12] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 53.122s | Request-ID: req-1781003599200
+[2026-06-09 19:14:12] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 53.122s | This is a slow request!
+INFO:     127.0.0.1:56654 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:14:14] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003654368
+[2026-06-09 19:14:14] INFO - mediarch_api - [Chat] 收到消息: 该指导原则对县办、市办、省办及以上综合医院的适宜床位规模分别如何规定？... | Session: session-b866abbba4f84885
+[MongoDB] 开始搜索，关键词=['床位规模', '适宜床位规模', '医院床位', '综合医院', '县办医院', '市办医院', '省办医院', '指导原则', '医院建设标准', 'hospital bed capacity', 'general hospital', 'Hospital社区', '区域医疗中心', '医疗功能房间详图集3.pdf', '医疗机构', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '原则', '县办', '县办综合医院'], 正则模式=床位规模|适宜床位规模|医院床位|综合医院|县办医院|市办医院|省办医院|指导原则|医院建设标准|hospital\ bed\ capacity|general\ hospital|Hospital社...
+[MongoDB] 搜索完成：找到 116 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:15:50] INFO - mediarch_api - [Chat] 回复成功 | Session: session-b866abbba4f84885 | Time: 96547ms
+[2026-06-09 19:15:50] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 96.552s | Request-ID: req-1781003654368
+[2026-06-09 19:15:50] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 96.552s | This is a slow request!
+INFO:     127.0.0.1:56662 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:15:52] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003752966
+[2026-06-09 19:15:52] INFO - mediarch_api - [Chat] 收到消息: 公立医院申请设置分院区需要满足哪些基本条件？医院建设发展阶段测算中的R值如何判断是否适宜发展分院区？... | Session: session-ab46e4e0a643422d
+[2026-06-09 19:16:36] INFO - mediarch_api - [Chat] 回复成功 | Session: session-ab46e4e0a643422d | Time: 43265ms
+[2026-06-09 19:16:36] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 43.268s | Request-ID: req-1781003752966
+[2026-06-09 19:16:36] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 43.268s | This is a slow request!
+INFO:     127.0.0.1:56694 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:16:38] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003798279
+[2026-06-09 19:16:38] INFO - mediarch_api - [Chat] 收到消息: 公立医院申请设置分院区需要满足哪些基本条件？医院建设发展阶段测算中的R值如何判断是否适宜发展分院区？... | Session: session-fcd3ca5c67544393
+[MongoDB] 开始搜索，关键词=['分院区', '分院', '分设机构', '分支机构', '公立医院', '医院设置', '申请条件', '基本条件', 'R值', '发展阶段测算', '医院建设', '适宜发展', 'GB51039-2014综合医院建筑设计标准.pdf', 'Hospital社区', '三级公立医院', '三级甲等公立医院', '专科型分院区', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '医院建设发展阶段测算模型'], 正则模式=分院区|分院|分设机构|分支机构|公立医院|医院设置|申请条件|基本条件|R值|发展阶段测算|医院建设|适宜发展|GB51039\-2014综合医院建筑设计标准\.pdf|Hospital社区|三级公...
+[MongoDB] 搜索完成：找到 2 个匹配的chunks（策略：text_index）
+[2026-06-09 19:17:55] INFO - mediarch_api - [Chat] 回复成功 | Session: session-fcd3ca5c67544393 | Time: 76889ms
+[2026-06-09 19:17:55] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 76.891s | Request-ID: req-1781003798279
+[2026-06-09 19:17:55] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 76.892s | This is a slow request!
+INFO:     127.0.0.1:56709 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:17:57] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003877198
+[2026-06-09 19:17:57] INFO - mediarch_api - [Chat] 收到消息: 地方卫生健康行政部门在制定和更新医疗机构设置规划时，各级权限和程序如何衔接？... | Session: session-86b4e50714244ad4
+[2026-06-09 19:18:42] INFO - mediarch_api - [Chat] 回复成功 | Session: session-86b4e50714244ad4 | Time: 45123ms
+[2026-06-09 19:18:42] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 45.125s | Request-ID: req-1781003877198
+[2026-06-09 19:18:42] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 45.125s | This is a slow request!
+INFO:     127.0.0.1:56727 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:18:44] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003924358
+[2026-06-09 19:18:44] INFO - mediarch_api - [Chat] 收到消息: 地方卫生健康行政部门在制定和更新医疗机构设置规划时，各级权限和程序如何衔接？... | Session: session-8e6aab4c0c4c46f7
+[MongoDB] 开始搜索，关键词=['医疗机构设置规划', '卫生健康行政部门', '权限', '程序', '衔接', '地方', '制定', '更新', '医疗机构规划', '卫生规划', 'GB51039-2014综合医院建筑设计标准.pdf', '功能', '医疗功能房间详图集3.pdf', '医疗机构布局', '医疗机构设置规划指导原则（2021-2025）.pdf', '医疗资源', '医院建筑设计指南.pdf', '医院规划', '卫生', '国家医学中心和国家区域医疗中心设置实施方案.pdf'], 正则模式=医疗机构设置规划|卫生健康行政部门|权限|程序|衔接|地方|制定|更新|医疗机构规划|卫生规划|GB51039\-2014综合医院建筑设计标准\.pdf|功能|医疗功能房间详图集3\.pdf|医疗机构...
+[MongoDB] 搜索完成：找到 3 个匹配的chunks（策略：text_index）
+[2026-06-09 19:19:48] INFO - mediarch_api - [Chat] 回复成功 | Session: session-8e6aab4c0c4c46f7 | Time: 64180ms
+[2026-06-09 19:19:48] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 64.182s | Request-ID: req-1781003924358
+[2026-06-09 19:19:48] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 64.182s | This is a slow request!
+INFO:     127.0.0.1:56737 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:19:50] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781003990588
+[2026-06-09 19:19:50] INFO - mediarch_api - [Chat] 收到消息: 在“平急结合”需求下，如何通过流线重构解决急诊部的“空间冗余”与“效率瓶颈”？
+问题背景... | Session: session-31ecd10c556b46ac
+[2026-06-09 19:20:42] INFO - mediarch_api - [Chat] 回复成功 | Session: session-31ecd10c556b46ac | Time: 52378ms
+[2026-06-09 19:20:42] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 52.380s | Request-ID: req-1781003990588
+[2026-06-09 19:20:42] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 52.380s | This is a slow request!
+INFO:     127.0.0.1:56763 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:20:45] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004045038
+[2026-06-09 19:20:45] INFO - mediarch_api - [Chat] 收到消息: 在“平急结合”需求下，如何通过流线重构解决急诊部的“空间冗余”与“效率瓶颈”？
+问题背景... | Session: session-9a5e1a1ea008404c
+[MongoDB] 开始搜索，关键词=['平急结合', '流线重构', '急诊部', '空间冗余', '效率瓶颈', '急诊流程', '应急转换', '医疗流线', '急诊科', 'Emergency Department', 'MRI → 地漏感应龙头', 'MRI → 定位', 'MRI → 网络', '创伤中心', '医疗功能房间详图集3.pdf', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '定位 → 空间', '流线', '空间'], 正则模式=平急结合|流线重构|急诊部|空间冗余|效率瓶颈|急诊流程|应急转换|医疗流线|急诊科|Emergency\ Department|MRI\ →\ 地漏感应龙头|MRI\ →\ 定位|MRI\ →\ 网...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:21:43] INFO - mediarch_api - [Chat] 回复成功 | Session: session-9a5e1a1ea008404c | Time: 58006ms
+[2026-06-09 19:21:43] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 58.010s | Request-ID: req-1781004045038
+[2026-06-09 19:21:43] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 58.011s | This is a slow request!
+INFO:     127.0.0.1:56778 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:21:45] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004105088
+[2026-06-09 19:21:45] INFO - mediarch_api - [Chat] 收到消息: 根据《多联手术室布局优化与气流控制》，作者在 CFD 模拟中主要比较了哪三类影响因素，以评估多联手术... | Session: session-32b129b9bdbe4fed
+[2026-06-09 19:22:05] INFO - mediarch_api - [Chat] 回复成功 | Session: session-32b129b9bdbe4fed | Time: 20359ms
+[2026-06-09 19:22:05] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 20.361s | Request-ID: req-1781004105088
+[2026-06-09 19:22:05] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 20.361s | This is a slow request!
+INFO:     127.0.0.1:56795 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:22:07] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004127502
+[2026-06-09 19:22:07] INFO - mediarch_api - [Chat] 收到消息: 根据《多联手术室布局优化与气流控制》，作者在 CFD 模拟中主要比较了哪三类影响因素，以评估多联手术... | Session: session-d24d2f40f79a4090
+[MongoDB] 开始搜索，关键词=['多联手术室', 'CFD模拟', '气流控制', '布局优化', '气流组织', '影响因素', '手术室', 'CFD', '气流', '优化配置', '功能', '医院建筑设计指南.pdf', '布局', '第二种模式 → 就医流程', '第二种模式 → 检查', '第二种模式 → 门诊', '第二种模式 → 门诊部', '综合医院医疗功能规模循证设计_崔怡卓.pdf', '门诊 → 布局', '根据《多联手术室布局优化与气流控制》，作者在 CFD 模拟中主要比较了哪三类影响因素，以评估多联手术室的气流组织与优化配置？'], 正则模式=多联手术室|CFD模拟|气流控制|布局优化|气流组织|影响因素|手术室|CFD|气流|优化配置|功能|医院建筑设计指南\.pdf|布局|第二种模式\ →\ 就医流程|第二种模式\ →\ 检查|第二种模...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:22:43] INFO - mediarch_api - [Chat] 回复成功 | Session: session-d24d2f40f79a4090 | Time: 35778ms
+[2026-06-09 19:22:43] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 35.779s | Request-ID: req-1781004127502
+[2026-06-09 19:22:43] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 35.780s | This is a slow request!
+INFO:     127.0.0.1:56802 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:22:45] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004165347
+[2026-06-09 19:22:45] INFO - mediarch_api - [Chat] 收到消息: 根据《基于医疗工艺流程的综合医院日间手术中心设计初探》，日间手术中心的设计应如何从运营模式、医疗工艺... | Session: session-1aa42210d16347dc
+[2026-06-09 19:23:27] INFO - mediarch_api - [Chat] 回复成功 | Session: session-1aa42210d16347dc | Time: 41969ms
+[2026-06-09 19:23:27] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 41.973s | Request-ID: req-1781004165347
+[2026-06-09 19:23:27] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 41.974s | This is a slow request!
+INFO:     127.0.0.1:56818 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:23:29] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004209367
+[2026-06-09 19:23:29] INFO - mediarch_api - [Chat] 收到消息: 根据《基于医疗工艺流程的综合医院日间手术中心设计初探》，日间手术中心的设计应如何从运营模式、医疗工艺... | Session: session-8fd564ae879449c5
+[MongoDB] 开始搜索，关键词=['日间手术中心', '日间手术', 'Day Surgery Center', 'Ambulatory Surgery Center', '医疗工艺流程', '医疗流程', '运营模式', '建筑空间', '设计', '综合医院', 'Gartnavel综合医院', 'Hospital社区', '医疗功能房间详图集3.pdf', '医疗工艺', '医院建筑设计指南.pdf', '外科手术室', '大型综合医院', '日间外科病房', '日间护理病房', '综合医院医疗功能规模循证设计_崔怡卓.pdf'], 正则模式=日间手术中心|日间手术|Day\ Surgery\ Center|Ambulatory\ Surgery\ Center|医疗工艺流程|医疗流程|运营模式|建筑空间|设计|综合医院|Gartnavel...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:24:34] INFO - mediarch_api - [Chat] 回复成功 | Session: session-8fd564ae879449c5 | Time: 65238ms
+[2026-06-09 19:24:34] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 65.240s | Request-ID: req-1781004209367
+[2026-06-09 19:24:34] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 65.242s | This is a slow request!
+INFO:     127.0.0.1:56824 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:24:36] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004276661
+[2026-06-09 19:24:36] INFO - mediarch_api - [Chat] 收到消息: 根据《手术室设计新思维、新分类与新措施》，在开放手术、微创手术和无创手术并存的背景下，手术室设计应如... | Session: session-1afc4d0111a7402c
+[2026-06-09 19:25:20] INFO - mediarch_api - [Chat] 回复成功 | Session: session-1afc4d0111a7402c | Time: 43657ms
+[2026-06-09 19:25:20] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 43.658s | Request-ID: req-1781004276661
+[2026-06-09 19:25:20] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 43.658s | This is a slow request!
+INFO:     127.0.0.1:56842 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:25:22] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004322371
+[2026-06-09 19:25:22] INFO - mediarch_api - [Chat] 收到消息: 根据《手术室设计新思维、新分类与新措施》，在开放手术、微创手术和无创手术并存的背景下，手术室设计应如... | Session: session-3a8ad93f85374a48
+[MongoDB] 开始搜索，关键词=['手术室设计', '手术室分类', '外科操作侵入性', '环境控制措施', '开放手术', '微创手术', '无创手术', 'Operating Room Design', 'Surgical Invasiveness', 'Environmental Control', '功能', '医技部 → 手术部', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '布局', '手术室', '手术室流程', '手术部 → 手术间', '手术间', '环境'], 正则模式=手术室设计|手术室分类|外科操作侵入性|环境控制措施|开放手术|微创手术|无创手术|Operating\ Room\ Design|Surgical\ Invasiveness|Environment...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:26:33] INFO - mediarch_api - [Chat] 回复成功 | Session: session-3a8ad93f85374a48 | Time: 71318ms
+[2026-06-09 19:26:33] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 71.331s | Request-ID: req-1781004322371
+[2026-06-09 19:26:33] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 71.332s | This is a slow request!
+INFO:     127.0.0.1:56846 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:26:35] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004395760
+[2026-06-09 19:26:35] INFO - mediarch_api - [Chat] 收到消息: 在现代手术部设计中，如何通过流线模式的优化（如“洁净走廊中核式”对比“双廊模式”），在提升手术周转效... | Session: session-e814a3f76acf4588
+[2026-06-09 19:27:44] INFO - mediarch_api - [Chat] 回复成功 | Session: session-e814a3f76acf4588 | Time: 68280ms
+[2026-06-09 19:27:44] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 68.282s | Request-ID: req-1781004395760
+[2026-06-09 19:27:44] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 68.283s | This is a slow request!
+INFO:     127.0.0.1:56869 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:27:46] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004466098
+[2026-06-09 19:27:46] INFO - mediarch_api - [Chat] 收到消息: 在现代手术部设计中，如何通过流线模式的优化（如“洁净走廊中核式”对比“双廊模式”），在提升手术周转效... | Session: session-85e78a3c18994a5c
+[MongoDB] 开始搜索，关键词=['手术部设计', '流线模式', '洁净走廊中核式', '双廊模式', '手术周转效率', '术后感染风险', '手术室布局', '洁净走廊', '中核式', '双廊', '医疗功能房间详图集3.pdf', '医院', '医院建筑设计指南.pdf', '双廊布局', '感染', '感染风险', '无菌走廊', '既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf', '流线', '环境'], 正则模式=手术部设计|流线模式|洁净走廊中核式|双廊模式|手术周转效率|术后感染风险|手术室布局|洁净走廊|中核式|双廊|医疗功能房间详图集3\.pdf|医院|医院建筑设计指南\.pdf|双廊布局|感染|感染风...
+[MongoDB] 搜索完成：找到 15 个匹配的chunks（策略：text_index）
+[2026-06-09 19:28:52] INFO - mediarch_api - [Chat] 回复成功 | Session: session-85e78a3c18994a5c | Time: 66415ms
+[2026-06-09 19:28:52] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 66.427s | Request-ID: req-1781004466098
+[2026-06-09 19:28:52] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 66.428s | This is a slow request!
+INFO:     127.0.0.1:56891 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:28:54] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004534584
+[2026-06-09 19:28:54] INFO - mediarch_api - [Chat] 收到消息: 根据《医院建筑设计指南》“分区和交通系统”一节，医院建筑通常可分为哪四个功能区？技术区域在总体布局中... | Session: session-5e8375a6228c4ceb
+[2026-06-09 19:29:29] INFO - mediarch_api - [Chat] 回复成功 | Session: session-5e8375a6228c4ceb | Time: 34665ms
+[2026-06-09 19:29:29] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 34.667s | Request-ID: req-1781004534584
+[2026-06-09 19:29:29] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 34.667s | This is a slow request!
+INFO:     127.0.0.1:56909 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:29:31] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004571297
+[2026-06-09 19:29:31] INFO - mediarch_api - [Chat] 收到消息: 根据《医院建筑设计指南》“分区和交通系统”一节，医院建筑通常可分为哪四个功能区？技术区域在总体布局中... | Session: session-fa28ecdef9614edb
+[MongoDB] 开始搜索，关键词=['分区和交通系统', '功能区', '技术区域', '总体布局', '医院建筑设计指南', '医院建筑', '功能分区', '医疗区', '后勤保障区', '行政管理区', '功能', '医疗功能房间详图集3.pdf', '医疗建筑', '医院', '医院建筑设计指南 → 医院', '医院建筑设计指南.pdf', '医院规划', '布局', '技术', '既有大型综合医院门诊部功能布局优化设计研究_呙俊.pdf'], 正则模式=分区和交通系统|功能区|技术区域|总体布局|医院建筑设计指南|医院建筑|功能分区|医疗区|后勤保障区|行政管理区|功能|医疗功能房间详图集3\.pdf|医疗建筑|医院|医院建筑设计指南\ →\ 医院|...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:30:23] INFO - mediarch_api - [Chat] 回复成功 | Session: session-fa28ecdef9614edb | Time: 51787ms
+[2026-06-09 19:30:23] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 51.790s | Request-ID: req-1781004571297
+[2026-06-09 19:30:23] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 51.792s | This is a slow request!
+INFO:     127.0.0.1:56917 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:30:25] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004625143
+[2026-06-09 19:30:25] INFO - mediarch_api - [Chat] 收到消息: 综合《医院建筑设计指南》中“分区和交通系统”与“手术室和恢复区”的内容，为什么手术部设计不能只按房间... | Session: session-7e81a8d502094fbb
+[2026-06-09 19:31:10] INFO - mediarch_api - [Chat] 回复成功 | Session: session-7e81a8d502094fbb | Time: 45540ms
+[2026-06-09 19:31:10] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 45.544s | Request-ID: req-1781004625143
+[2026-06-09 19:31:10] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 45.545s | This is a slow request!
+INFO:     127.0.0.1:56938 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:31:12] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004672754
+[2026-06-09 19:31:12] INFO - mediarch_api - [Chat] 收到消息: 综合《医院建筑设计指南》中“分区和交通系统”与“手术室和恢复区”的内容，为什么手术部设计不能只按房间... | Session: session-93a4b1c0ddd44a93
+[MongoDB] 开始搜索，关键词=['手术部', '手术室', '手术区', '功能分区', '交通系统', '流线设计', '洁污分流', '医院总体布局', '手术部规划', '医疗流程', 'DesignMethod社区', 'Space社区', '分区和交通系统', '功能', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '恢复区', '手术室流程', '手术室门', '手术室预测'], 正则模式=手术部|手术室|手术区|功能分区|交通系统|流线设计|洁污分流|医院总体布局|手术部规划|医疗流程|DesignMethod社区|Space社区|分区和交通系统|功能|医疗功能房间详图集3\.pdf|...
+[MongoDB] 搜索完成：找到 30 个匹配的chunks（策略：text_index）
+[2026-06-09 19:32:24] INFO - mediarch_api - [Chat] 回复成功 | Session: session-93a4b1c0ddd44a93 | Time: 72165ms
+[2026-06-09 19:32:24] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 72.168s | Request-ID: req-1781004672754
+[2026-06-09 19:32:24] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 72.169s | This is a slow request!
+INFO:     127.0.0.1:56949 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:32:26] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004746978
+[2026-06-09 19:32:26] INFO - mediarch_api - [Chat] 收到消息: 在核医学科设置高活性注射室（给药室）时，应如何在约5m2的小房间内组织放射防护、医患交互、药物配送、... | Session: session-23eef9896e1a4a41
+[2026-06-09 19:33:24] INFO - mediarch_api - [Chat] 回复成功 | Session: session-23eef9896e1a4a41 | Time: 57977ms
+[2026-06-09 19:33:24] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 57.981s | Request-ID: req-1781004746978
+[2026-06-09 19:33:24] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 57.982s | This is a slow request!
+INFO:     127.0.0.1:56959 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 19:33:27] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781004807026
+[2026-06-09 19:33:27] INFO - mediarch_api - [Chat] 收到消息: 在核医学科设置高活性注射室（给药室）时，应如何在约5m2的小房间内组织放射防护、医患交互、药物配送、... | Session: session-0c20a9e6c0fe4074
+[MongoDB] 开始搜索，关键词=['核医学科', '高活性注射室', '给药室', '放射防护', '医患交互', '药物配送', '排风', '清洁', '机电信息系统', '小房间设计', 'GB 51039-2014 综合医院建筑设计规范.pdf', 'Space社区', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '放射治疗空间', '核医学单人候诊室', '检查治疗区 → 注射室', '注射室', '系统', '在核医学科设置高活性注射室（给药室）时，应如何在约5m2的小房间内组织放射防护、医患交互、药物配送、排风清洁和机电信息系统，以降低工作人员暴露和环境污染风险？'], 正则模式=核医学科|高活性注射室|给药室|放射防护|医患交互|药物配送|排风|清洁|机电信息系统|小房间设计|GB\ 51039\-2014\ 综合医院建筑设计规范\.pdf|Space社区|医疗功能房间详图集...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 19:34:30] INFO - mediarch_api - [Chat] 回复成功 | Session: session-0c20a9e6c0fe4074 | Time: 63375ms
+[2026-06-09 19:34:30] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 63.378s | Request-ID: req-1781004807026
+[2026-06-09 19:34:30] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 63.382s | This is a slow request!
+INFO:     127.0.0.1:56973 - "POST /api/v1/chat HTTP/1.1" 200 OK

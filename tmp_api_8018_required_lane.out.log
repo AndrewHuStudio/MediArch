@@ -1,0 +1,23 @@
+[2026-06-09 18:47:26] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-09 18:47:26] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-09 18:47:26] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-09 18:47:26] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-09 18:47:26] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-09 18:48:09] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781002089170
+[2026-06-09 18:48:09] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院基地选址与总平面设计应满足哪些核心要... | Session: session-8121831371f545a0
+[OK] 检测到 MongoDB 文本索引: content_text_idx
+[OK] MongoDB连接成功: mediarch.mediarch_chunks
+[MongoDB] 开始搜索，关键词=['综合医院建筑设计规范', 'GB 51039-2014', '基地选址', '总平面设计', '选址要求', '总平面布局', '医院总图', '医院规划', 'site selection', 'master plan', 'Hospital社区', '功能', '功能布局', '医疗建筑', '医院', '医院建筑', '医院建筑设计指南.pdf', '国家医学中心和国家区域医疗中心设置实施方案.pdf', '场地', '基地'], 正则模式=综合医院建筑设计规范|GB\ 51039\-2014|基地选址|总平面设计|选址要求|总平面布局|医院总图|医院规划|site\ selection|master\ plan|Hospital社区|功...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 18:48:56] INFO - mediarch_api - [Chat] 回复成功 | Session: session-8121831371f545a0 | Time: 46860ms
+[2026-06-09 18:48:56] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 46.868s | Request-ID: req-1781002089170
+[2026-06-09 18:48:56] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 46.869s | This is a slow request!
+INFO:     127.0.0.1:55656 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-09 18:49:34] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781002174821
+[2026-06-09 18:49:34] INFO - mediarch_api - [Chat] 收到消息: ??????????????GB 51039-2014???????????????????????... | Session: debug-q006-python-post-001
+[MongoDB] 开始搜索，关键词=['GB 51039-2014', '综合医院建筑设计规范', '医院建筑设计规范', '综合医院设计规范', 'GB51039', 'GB 51039', '综合医院建筑规范', '医院设计规范', '建筑设计规范', '主要内容', 'GB 51039-2014 综合医院建筑设计规范.pdf', 'GB51039-2014综合医院建筑设计标准.pdf', 'Hospital社区', '功能', '功能布局', '医疗功能房间详图集3.pdf', '医疗建筑', '医疗设施设计', '医院', '医院建筑'], 正则模式=GB\ 51039\-2014|综合医院建筑设计规范|医院建筑设计规范|综合医院设计规范|GB51039|GB\ 51039|综合医院建筑规范|医院设计规范|建筑设计规范|主要内容|GB\ 51039...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-09 18:50:47] INFO - mediarch_api - [Chat] 回复成功 | Session: debug-q006-python-post-001 | Time: 72252ms
+[2026-06-09 18:50:47] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 72.254s | Request-ID: req-1781002174821
+[2026-06-09 18:50:47] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 72.254s | This is a slow request!
+INFO:     127.0.0.1:55798 - "POST /api/v1/chat HTTP/1.1" 200 OK

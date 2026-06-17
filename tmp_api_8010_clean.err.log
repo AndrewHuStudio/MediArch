@@ -1,0 +1,184 @@
+INFO:     Started server process [2772]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8010 (Press CTRL+C to quit)
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\82064\AppData\Local\Temp\jieba.cache
+Loading model cost 0.807 seconds.
+Prefix dict has been built successfully.
+WARNING:root:Async index ensure failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+ERROR:milvus_agent:[Milvus→Search] Retriever 获取失败: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async expand_neighborhood failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:backend.app.agents.neo4j_agent.agent:[Neo4jAgent->Reflection] 质量不足，准备重试 (retry=0)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async expand_neighborhood failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+INFO:mediarch_api:[Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781444651241
+INFO:mediarch_api:[Chat] 收到消息: 根据《综合医院建筑设计规范》GB 51039-2014，综合医院基地选址与总平面设计应满足哪些核心要... | Session: session-9634af4cb06048e4
+ERROR:mediarch_api:[Chat] 处理失败: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+Traceback (most recent call last):
+  File "E:\MyPrograms\MediArch_System\backend\app\services\milvus_chunk_search.py", line 38, in __init__
+    connections.connect(alias="default", host=self.host, port=self.port)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 472, in connect
+    connect_milvus(**kwargs, user=user, password=password, token=token, db_name=db_name)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 426, in connect_milvus
+    raise e from e
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\orm\connections.py", line 418, in connect_milvus
+    gh._wait_for_channel_ready(timeout=timeout)
+  File "E:\my_envs\agent_env_2\Lib\site-packages\pymilvus\client\grpc_handler.py", line 162, in _wait_for_channel_ready
+    raise MilvusException(
+pymilvus.exceptions.MilvusException: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "E:\MyPrograms\MediArch_System\backend\api\routers\chat.py", line 1001, in chat
+    result = await _run_baseline_pipeline(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\api\routers\chat.py", line 898, in _run_baseline_pipeline
+    baseline = await asyncio.to_thread(
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\my_envs\agent_env_2\Lib\asyncio\threads.py", line 25, in to_thread
+    return await loop.run_in_executor(None, func_call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\my_envs\agent_env_2\Lib\concurrent\futures\thread.py", line 58, in run
+    result = self.fn(*self.args, **self.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\baseline_rag.py", line 276, in retrieve_vector
+    retriever = self._get_milvus()
+                ^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\baseline_rag.py", line 216, in _get_milvus
+    self.milvus_retriever = MilvusChunkRetriever()
+                            ^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\MyPrograms\MediArch_System\backend\app\services\milvus_chunk_search.py", line 40, in __init__
+    raise RuntimeError(f"Milvus 连接失败: {e}") from e
+RuntimeError: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+ERROR:mediarch_api:[HTTP Error] POST /api/v1/chat | Status: 500 | Detail: 对话处理失败: Milvus 连接失败: <MilvusException: (code=2, message=Fail connecting to server on localhost:19530, illegal connection params or server unavailable)>
+INFO:mediarch_api:[Response] POST /api/v1/chat | Status: 500 | Time: 10.233s | Request-ID: req-1781444651241
+WARNING:mediarch_api:[SLOW] POST /api/v1/chat | Time: 10.234s | This is a slow request!
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:root:Async fallback contains search failed: Couldn't connect to localhost:7687 (resolved to ('[::1]:7687', '127.0.0.1:7687')):
+Failed to establish connection to ResolvedIPv6Address(('::1', 7687, 0, 0)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+Failed to establish connection to ResolvedIPv4Address(('127.0.0.1', 7687)) (reason [WinError 1225] 远程计算机拒绝网络连接。)
+WARNING:result_synthesizer_agent:[Synthesizer→Route] 已达最大重试次数，标注后输出
+INFO:mediarch_api:[ExtractCitations] 提取了 0 个有效的 citations
+INFO:mediarch_api:[Chat] 回复成功 | Session: session-3c91ccd860774f69 | Time: 299008ms
+INFO:mediarch_api:[Response] POST /api/v1/chat | Status: 200 | Time: 299.017s | Request-ID: req-1781444387501
+WARNING:mediarch_api:[SLOW] POST /api/v1/chat | Time: 299.017s | This is a slow request!

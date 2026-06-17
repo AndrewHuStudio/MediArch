@@ -1,0 +1,5 @@
+[2026-06-14 20:55:45] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-14 20:55:45] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-14 20:55:45] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-14 20:55:45] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-14 20:55:45] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！

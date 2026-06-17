@@ -1,5 +1,5 @@
 const citationClassName =
-  "inline-flex items-center align-middle text-blue-200 text-[11px] font-semibold px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-400/30 cursor-pointer hover:bg-blue-500/20 transition-colors mx-0.5 leading-none"
+  "inline-flex items-center align-middle text-[#034b63] text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-[#dff5fb] border border-[#0891b2] cursor-pointer hover:bg-[#c7edf7] transition-colors mx-0.5 leading-none shadow-[0_0_0_1px_rgba(255,255,255,0.65)]"
 
 const inlineReferenceClassName =
   "inline-block align-baseline text-[10px] font-medium text-gray-400 tracking-[0.02em]"
@@ -311,12 +311,15 @@ export const applyCitationMarkup = (text: string, maxCitation: number) => {
   return transformOutsideCodeFences(text, (segment) => replaceCitations(segment, maxCitation))
 }
 
-export const replaceImagePlaceholders = (text: string) =>
+export const replaceImagePlaceholders = (text: string, availableImageCount?: number) =>
   transformOutsideCodeFences(text, (segment) =>
     segment
       .replace(/(^[ \t]*)\[image:(\d+)\][ \t]*$/gm, (_raw, indent, indexRaw) => {
         const index = Number.parseInt(indexRaw, 10)
         if (!Number.isFinite(index) || index < 0) {
+          return ""
+        }
+        if (typeof availableImageCount === "number" && index >= availableImageCount) {
           return ""
         }
         return `${indent}<figure data-chat-image-index="${index}"></figure>`
@@ -326,14 +329,17 @@ export const replaceImagePlaceholders = (text: string) =>
         if (!Number.isFinite(index) || index < 0) {
           return "\n\n"
         }
+        if (typeof availableImageCount === "number" && index >= availableImageCount) {
+          return "\n\n"
+        }
         return `\n\n<figure data-chat-image-index="${index}"></figure>\n\n`
       })
   ).replace(/\n{3,}/g, "\n\n")
 
-export const buildMarkdownDisplayContent = (text: string, maxCitation: number) => {
+export const buildMarkdownDisplayContent = (text: string, maxCitation: number, availableImageCount?: number) => {
   const normalizedTables = normalizeMarkdownTables(text)
   const normalizedLists = normalizeOrderedListHierarchy(normalizedTables)
   const withInlineReferences = applyInlineReferenceMarkup(normalizedLists)
-  const withImages = replaceImagePlaceholders(withInlineReferences)
+  const withImages = replaceImagePlaceholders(withInlineReferences, availableImageCount)
   return applyCitationMarkup(withImages, maxCitation)
 }

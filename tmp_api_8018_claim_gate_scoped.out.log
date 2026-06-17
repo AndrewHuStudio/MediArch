@@ -1,0 +1,68 @@
+[2026-06-10 00:06:44] INFO - mediarch_api - [OK] MediArch FastAPI 正在启动...
+[2026-06-10 00:06:44] INFO - mediarch_api - [OK] 运行环境: development
+[2026-06-10 00:06:44] INFO - mediarch_api - [OK] CORS允许来源: ['http://localhost:3010', 'http://localhost:3011', 'http://127.0.0.1:3010', 'http://127.0.0.1:3011']
+[2026-06-10 00:06:44] INFO - mediarch_api - [OK] LangGraph MediArch Graph 预热成功
+[2026-06-10 00:06:44] INFO - mediarch_api - [OK] MediArch FastAPI 启动完成！
+[2026-06-10 00:07:02] INFO - mediarch_api - [Request] GET /api/v1/health | Client: 127.0.0.1 | Request-ID: req-1781021222398
+[2026-06-10 00:07:02] INFO - mediarch_api - [Response] GET /api/v1/health | Status: 200 | Time: 0.004s | Request-ID: req-1781021222398
+INFO:     127.0.0.1:49294 - "GET /api/v1/health HTTP/1.1" 200 OK
+[2026-06-10 00:07:14] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021234253
+[2026-06-10 00:07:14] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-ec2486d8bbf54161
+[2026-06-10 00:08:53] INFO - mediarch_api - [Chat] 回复成功 | Session: session-ec2486d8bbf54161 | Time: 98967ms
+[2026-06-10 00:08:53] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 98.971s | Request-ID: req-1781021234253
+[2026-06-10 00:08:53] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 98.971s | This is a slow request!
+INFO:     127.0.0.1:49300 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:08:55] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021335269
+[2026-06-10 00:08:55] INFO - mediarch_api - [Chat] 收到消息: 在现代住院部设计中，如何通过空间排布在满足“30米服务半径”的同时，解决护士站对病房通视性与患者隐私... | Session: session-e20c1527967d4344
+[OK] 检测到 MongoDB 文本索引: content_text_idx
+[OK] MongoDB连接成功: mediarch.mediarch_chunks
+[MongoDB] 开始搜索，关键词=['护士站', '病房通视性', '患者隐私', '30米服务半径', '住院部设计', '空间排布', '护理单元', '病房布局', 'Nursing Station', 'Ward Design', 'DesignMethod社区', '住院病房入口', '分散式护士站', '医疗功能房间详图集3.pdf', '医院建筑设计指南.pdf', '半分散式护士站', '服务半径', '混合护士站', '病房', '空间'], 正则模式=护士站|病房通视性|患者隐私|30米服务半径|住院部设计|空间排布|护理单元|病房布局|Nursing\ Station|Ward\ Design|DesignMethod社区|住院病房入口|分散式护...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-10 00:09:54] INFO - mediarch_api - [Chat] 回复成功 | Session: session-e20c1527967d4344 | Time: 59515ms
+[2026-06-10 00:09:54] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 59.518s | Request-ID: req-1781021335269
+[2026-06-10 00:09:54] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 59.519s | This is a slow request!
+INFO:     127.0.0.1:49341 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:09:56] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021396830
+[2026-06-10 00:09:56] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-d3f5d8a0481343f5
+[2026-06-10 00:10:43] INFO - mediarch_api - [Chat] 回复成功 | Session: session-d3f5d8a0481343f5 | Time: 46962ms
+[2026-06-10 00:10:43] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 46.965s | Request-ID: req-1781021396830
+[2026-06-10 00:10:43] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 46.965s | This is a slow request!
+INFO:     127.0.0.1:49403 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:10:45] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021445827
+[2026-06-10 00:10:45] INFO - mediarch_api - [Chat] 收到消息: 根据《综合医院建筑设计标准》GB 51039-2014，手术部、放射科、磁共振检查室、放射治疗科和核... | Session: session-0c7945c906754b71
+[MongoDB] 开始搜索，关键词=['手术部', '放射科', '磁共振检查室', '放射治疗科', '核医学科', '选址', '分区', '流线组织', 'GB 51039-2014', '综合医院建筑设计标准', 'Hospital社区', '分区和交通系统', '分区规划', '医院', '医院建筑', '医院建筑设计指南.pdf', '手术室预测', '放射科分项检查占比', '放射科检查', '检查室'], 正则模式=手术部|放射科|磁共振检查室|放射治疗科|核医学科|选址|分区|流线组织|GB\ 51039\-2014|综合医院建筑设计标准|Hospital社区|分区和交通系统|分区规划|医院|医院建筑|医院建筑...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-10 00:13:33] INFO - mediarch_api - [Chat] 回复成功 | Session: session-0c7945c906754b71 | Time: 167530ms
+[2026-06-10 00:13:33] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 167.532s | Request-ID: req-1781021445827
+[2026-06-10 00:13:33] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 167.533s | This is a slow request!
+INFO:     127.0.0.1:49412 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:13:35] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021615393
+[2026-06-10 00:13:35] INFO - mediarch_api - [Chat] 收到消息: 《医疗机构设置规划指导原则（2021-2025年）》明确了医疗机构设置应坚持哪些基本原则？... | Session: session-6d4bb378ffdd4a71
+[2026-06-10 00:14:07] INFO - mediarch_api - [Chat] 回复成功 | Session: session-6d4bb378ffdd4a71 | Time: 32521ms
+[2026-06-10 00:14:07] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 32.527s | Request-ID: req-1781021615393
+[2026-06-10 00:14:07] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 32.528s | This is a slow request!
+INFO:     127.0.0.1:49474 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:14:09] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021649977
+[2026-06-10 00:14:09] INFO - mediarch_api - [Chat] 收到消息: 《医疗机构设置规划指导原则（2021-2025年）》明确了医疗机构设置应坚持哪些基本原则？... | Session: session-45a649bc7cb84d4e
+[MongoDB] 开始搜索，关键词=['医疗机构设置规划指导原则', '医疗机构设置', '基本原则', '2021-2025年', '指导原则', '设置规划', '医疗机构规划', '医疗资源配置', '规划原则', '医疗机构设置原则', 'GB51039-2014综合医院建筑设计标准.pdf', '分区规划', '功能', '医疗功能房间详图集3.pdf', '医疗机构', '医疗机构布局', '医疗机构设置规划指导原则（2021-2025）.pdf', '医疗资源', '医院', '医院建筑设计指南.pdf'], 正则模式=医疗机构设置规划指导原则|医疗机构设置|基本原则|2021\-2025年|指导原则|设置规划|医疗机构规划|医疗资源配置|规划原则|医疗机构设置原则|GB51039\-2014综合医院建筑设计标准\....
+[MongoDB] 搜索完成：找到 5 个匹配的chunks（策略：text_index）
+[2026-06-10 00:15:06] INFO - mediarch_api - [Chat] 回复成功 | Session: session-45a649bc7cb84d4e | Time: 56665ms
+[2026-06-10 00:15:06] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 56.665s | Request-ID: req-1781021649977
+[2026-06-10 00:15:06] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 56.665s | This is a slow request!
+INFO:     127.0.0.1:49483 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:15:08] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021708672
+[2026-06-10 00:15:08] INFO - mediarch_api - [Chat] 收到消息: 在“平急结合”需求下，如何通过流线重构解决急诊部的“空间冗余”与“效率瓶颈”？
+问题背景... | Session: session-5f6b0416654f4a93
+[2026-06-10 00:15:58] INFO - mediarch_api - [Chat] 回复成功 | Session: session-5f6b0416654f4a93 | Time: 50050ms
+[2026-06-10 00:15:58] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 50.058s | Request-ID: req-1781021708672
+[2026-06-10 00:15:58] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 50.058s | This is a slow request!
+INFO:     127.0.0.1:49503 - "POST /api/v1/chat HTTP/1.1" 200 OK
+[2026-06-10 00:16:00] INFO - mediarch_api - [Request] POST /api/v1/chat | Client: 127.0.0.1 | Request-ID: req-1781021760760
+[2026-06-10 00:16:00] INFO - mediarch_api - [Chat] 收到消息: 在“平急结合”需求下，如何通过流线重构解决急诊部的“空间冗余”与“效率瓶颈”？
+问题背景... | Session: session-c36c17e914f74be8
+[MongoDB] 开始搜索，关键词=['平急结合', '流线重构', '急诊部', '空间冗余', '效率瓶颈', '急诊流程', '应急转换', '医疗流程', '急诊科', 'Emergency Department', '功能', '医疗功能房间详图集3.pdf', '医疗机构设置规划指导原则（2021-2025）.pdf', '医院建筑设计指南.pdf', '布局', '急救室', '流线', '空间', '第二种模式 → 检查', '第二种模式 → 门诊'], 正则模式=平急结合|流线重构|急诊部|空间冗余|效率瓶颈|急诊流程|应急转换|医疗流程|急诊科|Emergency\ Department|功能|医疗功能房间详图集3\.pdf|医疗机构设置规划指导原则（202...
+[MongoDB] 搜索完成：找到 192 个匹配的chunks（策略：regex_or）
+[2026-06-10 00:17:13] INFO - mediarch_api - [Chat] 回复成功 | Session: session-c36c17e914f74be8 | Time: 72931ms
+[2026-06-10 00:17:13] INFO - mediarch_api - [Response] POST /api/v1/chat | Status: 200 | Time: 72.933s | Request-ID: req-1781021760760
+[2026-06-10 00:17:13] WARNING - mediarch_api - [SLOW] POST /api/v1/chat | Time: 72.933s | This is a slow request!
+INFO:     127.0.0.1:49514 - "POST /api/v1/chat HTTP/1.1" 200 OK

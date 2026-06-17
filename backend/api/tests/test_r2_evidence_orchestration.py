@@ -44,13 +44,15 @@ def test_profile_cross_department_code_question_requires_code_spec_and_synthesis
     assert "circulation" in profile.constraint_types
 
 
-def test_plan_code_spec_plus_design_lanes_for_implicit_normative_design():
+def test_plan_keeps_design_lanes_optional_for_implicit_normative_design():
     profile = profile_question("如何在满足30米服务半径时平衡护士站通视和患者隐私？")
     plan = build_evidence_plan(profile)
 
     assert "code_spec" in plan.required_lanes
-    assert "guide" in plan.required_lanes
-    assert "atlas_or_image" in plan.required_lanes
+    assert "guide" not in plan.required_lanes
+    assert "atlas_or_image" not in plan.required_lanes
+    assert "guide" in plan.optional_lanes
+    assert "atlas_or_image" in plan.optional_lanes
     assert "paper_or_report" not in plan.required_lanes
     assert plan.minimum_code_spec_evidence >= 1
 
@@ -109,6 +111,19 @@ def test_technical_standard_question_still_requires_code_spec():
 
     assert context.source_type == "technical_standard"
     assert "code_spec" in plan.required_lanes
+
+
+def test_technical_standard_design_lanes_are_optional_unless_explicitly_required():
+    query = "根据《综合医院建筑设计规范》GB 51039-2014，护士站通视和患者隐私应如何平衡？"
+    _profile, context, plan = build_evidence_plan_for_query(
+        query,
+        {"source_type": "technical_standard", "task_type": "spatial_reasoning", "question_id": "Q999"},
+    )
+
+    assert context.source_type == "technical_standard"
+    assert plan.required_lanes == ["code_spec"]
+    assert "guide" in plan.optional_lanes
+    assert "atlas_or_image" in plan.optional_lanes
 
 
 def test_classify_source_role_from_metadata_and_title():
@@ -185,13 +200,11 @@ def test_audit_flags_missing_code_spec_when_required():
     assert audit.needs_supplemental_retrieval is True
 
 
-def test_audit_passes_when_code_spec_and_design_lanes_exist():
+def test_audit_passes_when_required_code_spec_exists_even_without_design_lanes():
     profile = profile_question("如何在满足30米服务半径时平衡护士站通视和患者隐私？")
     plan = build_evidence_plan(profile)
     tiers = build_evidence_tiers([
         {"source": "GB 51039-2014 综合医院建筑设计规范", "snippet": "护士站到最远病房门口距离不宜超过30m"},
-        {"source": "医院建筑设计指南.pdf", "snippet": "护理单元布局"},
-        {"source": "医疗功能房间详图集3.pdf", "snippet": "病房配置参考"},
     ])
 
     audit = audit_evidence_coverage(plan, tiers)
@@ -232,6 +245,25 @@ def test_structured_fallback_does_not_emit_legacy_exploration_template():
     assert "[unknown]" not in answer
     assert "证据不足" in answer
     assert "推论边界" in answer
+
+
+def test_structured_fallback_explains_missing_evidence_lanes_without_internal_key_evidence_label():
+    answer = build_structured_fallback_answer(
+        query="门诊单元如何设计",
+        evidence_tiers=build_evidence_tiers(
+            [{"source": "医院建筑设计指南.pdf", "snippet": "门诊单元组织模式。"}]
+        ),
+        coverage_audit={
+            "passed": False,
+            "missing_required_lanes": ["code_spec", "atlas_or_image"],
+            "weak_lanes": [],
+            "notes": [],
+        },
+    )
+
+    assert "关键证据" not in answer
+    assert "规范/标准依据" in answer
+    assert "图示/详图依据" in answer
 
 
 def test_supplemental_queries_for_missing_code_spec_are_role_based_not_doc_bound():
@@ -279,7 +311,7 @@ def test_authority_evidence_need_maps_profile_to_chinese_terms_and_claim_scopes(
 
     need = build_authority_evidence_need(query, profile, plan)
 
-    assert need.required_roles == ["code_spec", "guide", "atlas_or_image"]
+    assert need.required_roles == ["code_spec"]
     assert "手术部" in need.domain_terms
     assert "放射科" in need.domain_terms
     assert "磁共振" in need.domain_terms
@@ -290,6 +322,18 @@ def test_authority_evidence_need_maps_profile_to_chinese_terms_and_claim_scopes(
     assert "workflow_zoning" in need.claim_scopes
     assert "spatial_layout" in need.claim_scopes
     assert all("surgery_department" not in term for term in need.search_terms)
+
+
+def test_authority_need_keeps_optional_spatial_roles_in_search_terms():
+    query = "护士站服务半径和通视隐私如何满足规范要求？"
+    profile = profile_question(query)
+    plan = build_evidence_plan(profile)
+
+    need = build_authority_evidence_need(query, profile, plan)
+
+    assert "guide" in need.optional_roles
+    assert "atlas_or_image" in need.optional_roles
+    assert any("图集" in term or "详图" in term for term in need.search_terms)
 
 
 def test_standards_first_queries_use_authority_need_terms_not_internal_enums():
@@ -431,6 +475,35 @@ def test_synthesize_empty_r2_state_uses_structured_control_plane_fallback():
     assert "evidence_plan" in diagnostics
 
 
+def test_recommended_questions_are_natural_and_hide_internal_graph_labels():
+    query = "门诊单元如何组织候诊、诊室和公共空间？"
+    graph = {
+        "expanded_entities": [
+            {"name": "候诊区", "type": "Space"},
+            {"name": "模块化分区", "type": "DesignMethod"},
+        ],
+        "expanded_relations": [
+            {"source": "候诊区", "target": "诊室", "relation": "相邻"},
+        ],
+        "knowledge_coverage": [{"domain": "Space"}, {"domain": "DesignMethod"}],
+    }
+
+    questions = synthesizer_agent._build_natural_recommended_questions(
+        query=query,
+        neo4j_query_path=graph,
+        aggregated_items_count=8,
+        include_online=False,
+    )
+
+    assert questions
+    joined = " ".join(questions)
+    assert "Space" not in joined
+    assert "DesignMethod" not in joined
+    assert "最佳实践" not in joined
+    assert "候诊区和诊室如何衔接" in joined
+    assert all(len(question) <= 34 for question in questions)
+
+
 def test_non_citable_inference_context_is_removed_from_final_citations():
     citations = [
         {"source": "GB 51039-2014 综合医院建筑设计规范", "snippet": "医疗工艺参数应由工艺设计确定"},
@@ -443,7 +516,7 @@ def test_non_citable_inference_context_is_removed_from_final_citations():
     assert [c["source"] for c in filtered] == ["GB 51039-2014 综合医院建筑设计规范"]
 
 
-def test_coverage_missing_required_lanes_uses_conservative_synthesis_mode():
+def test_coverage_missing_required_code_spec_still_uses_conservative_synthesis_mode():
     query = "如何在满足30米服务半径时平衡护士站通视和患者隐私？"
     profile = profile_question(query)
     plan = build_evidence_plan(profile)
@@ -459,6 +532,22 @@ def test_coverage_missing_required_lanes_uses_conservative_synthesis_mode():
     # 保守模式仍比 full 模式更收敛（不再硬编码具体数值，避免与放宽配额冲突）。
     assert mode["max_prompt_documents"] <= 12
     assert "code_spec" in mode["missing_required_lanes"]
+
+
+def test_coverage_missing_optional_design_lanes_does_not_force_conservative_mode():
+    query = "如何在满足30米服务半径时平衡护士站通视和患者隐私？"
+    profile = profile_question(query)
+    plan = build_evidence_plan(profile)
+    tiers = build_evidence_tiers([
+        {"source": "GB 51039-2014 综合医院建筑设计规范", "snippet": "护士站到最远病房门口距离不宜超过30m"}
+    ])
+    audit = audit_evidence_coverage(plan, tiers)
+
+    mode = synthesizer_agent._select_synthesis_mode(plan, audit)
+
+    assert audit.passed is True
+    assert mode["mode"] == "full_evidence_grounded"
+    assert mode["allow_full_generation"] is True
 
 
 def test_qa_mode_limits_synthesizer_connection_error_attempts(monkeypatch):
