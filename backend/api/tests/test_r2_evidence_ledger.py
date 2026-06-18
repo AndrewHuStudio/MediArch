@@ -682,6 +682,38 @@ def test_gate_keeps_answer_when_unsupported_but_evidence_present():
     assert diagnostics["pre_gate_claim_support_audit"]["unsupported_claim_count"] >= 1
 
 
+def test_claim_gate_never_replaces_with_structured_template_when_retrieved_tiers_exist():
+    generated_answer = "门诊部应结合候诊、诊室和公共空间组织流线，并兼顾患者到达与医护工作效率。"
+    citations = []
+    evidence_tiers = build_evidence_tiers(
+        [
+            {
+                "source": "医院建筑设计指南.pdf",
+                "location": "门诊部",
+                "snippet": "门诊部功能布局应结合候诊、诊室、公共空间和人流组织综合考虑。",
+                "chunk_id": "guide-outpatient",
+                "doc_category": "书籍报告",
+            }
+        ]
+    )
+    claim_audit = audit_claim_support(generated_answer, citations)
+
+    final_answer, diagnostics = synthesizer_agent._select_final_answer_after_claim_audit(
+        query="门诊部如何组织候诊、诊室和公共空间？",
+        generated_answer=generated_answer,
+        final_citations=citations,
+        evidence_tiers=evidence_tiers,
+        coverage_audit={"passed": True, "missing_required_lanes": [], "weak_lanes": [], "notes": []},
+        claim_support_audit=claim_audit,
+        benchmark_or_qa_mode=True,
+    )
+
+    assert final_answer == generated_answer
+    assert diagnostics["claim_support_gate_applied"] is False
+    assert "空间约束" not in final_answer
+    assert "推论边界" not in final_answer
+
+
 # ---------------------------------------------------------------------------
 # Step 4: scope sufficiency (role + scope, not mere scope existence)
 # ---------------------------------------------------------------------------
@@ -866,8 +898,8 @@ def test_gate_is_non_destructive_when_evidence_exists():
 
 
 def test_gate_falls_back_only_on_true_zero_evidence():
-    # When there are NO usable evidence cards at all, the gate may still fall
-    # back to the structured evidence-status answer (legitimate refusal).
+    # Even with no usable evidence cards, the claim audit is diagnostic only:
+    # it must not replace the answer with a fixed refusal template.
     generated_answer = "手术室数量应按表5.7.4确定。 [1]"
     citations = []  # zero evidence
     claim_audit = audit_claim_support(generated_answer, citations)
@@ -882,9 +914,9 @@ def test_gate_falls_back_only_on_true_zero_evidence():
         benchmark_or_qa_mode=True,
     )
 
-    # With zero evidence the gate engages and does not assert the unsupported claim.
-    assert diagnostics["claim_support_gate_applied"] is True
-    assert "手术室数量应按表5.7.4确定" not in final_answer
+    assert diagnostics["claim_support_gate_applied"] is False
+    assert diagnostics["claim_support_gate_reason"] == "claim_support_measured_only"
+    assert final_answer == generated_answer
 
 
 def test_multisource_design_expansion_is_skipped_when_coverage_not_passed():

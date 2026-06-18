@@ -243,8 +243,8 @@ def test_structured_fallback_does_not_emit_legacy_exploration_template():
 
     assert "延伸探索" not in answer
     assert "[unknown]" not in answer
-    assert "证据不足" in answer
-    assert "推论边界" in answer
+    assert "推论边界" not in answer
+    assert "未找到可用资料" in answer
 
 
 def test_structured_fallback_explains_missing_evidence_lanes_without_internal_key_evidence_label():
@@ -262,8 +262,9 @@ def test_structured_fallback_explains_missing_evidence_lanes_without_internal_ke
     )
 
     assert "关键证据" not in answer
-    assert "规范/标准依据" in answer
-    assert "图示/详图依据" in answer
+    assert "资料摘录" in answer
+    assert "规范/标准依据" not in answer
+    assert "图示/详图依据" not in answer
 
 
 def test_supplemental_queries_for_missing_code_spec_are_role_based_not_doc_bound():
@@ -466,7 +467,7 @@ def test_synthesize_empty_r2_state_uses_structured_control_plane_fallback():
     )
 
     assert "延伸探索" not in result["final_answer"]
-    assert "证据不足" in result["final_answer"]
+    assert "未找到可用资料" in result["final_answer"]
     assert result["recommended_questions"] == []
     diagnostics = result["synthesizer_diagnostics"]
     assert diagnostics["fallback_used"] is True

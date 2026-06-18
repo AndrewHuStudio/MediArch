@@ -76,7 +76,7 @@ async def get_expansion_llm():
                 model_provider=model_provider,
                 api_key=api_key,
                 base_url=base_url,
-                temperature=0.3,  # 稍微提高创造性，但保持准确性
+                temperature=0.0,
                 max_tokens=2000,
                 timeout=60,  # [FIX 2025-12-04] 添加60秒超时
             )

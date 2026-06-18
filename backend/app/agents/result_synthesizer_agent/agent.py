@@ -92,7 +92,7 @@ def _init_synthesizer_llm():
         model_provider=model_provider,
         api_key=api_key,
         base_url=base_url,
-        temperature=0.0,  # 评测需确定性：消除生成随机性这一最大噪声源，使 A/B 结果可复现
+        temperature=0.3,
         max_tokens=8000,
         timeout=timeout_s,
     )
@@ -457,33 +457,16 @@ _PROMPT_AUX_KEYS = ()
 # 极简 system prompt：去领域人设、去固定章节/骨架框架，让 LLM 依据证据自然组织回答；
 # 仅保留引用格式与最低防编造约束。{citations_count} 在调用处 format 填入。
 SYNTHESIZER_SYSTEM_PROMPT = (
-    "你是专业的医院领域问答助手。基于下面检索到的资料，准确、完整地回答用户问题。\n"
-    "- 先看 answer_domain_anchor：它指明本题属于哪个领域，请严格锚定该领域作答，"
-    "不要漂移到建筑空间、医疗工艺或设计等与问题无关的旁路领域（即使证据里含这类资料）。\n"
-    "- 如果问题包含多个子项（如多类科室、多条原则、多个方面），必须逐项作答：先在"
-    "evidence_tiers、citations_catalog、evidence_ledger、documents_view 所有通道里查找该子项的"
-    "材料，只要任一通道有相关内容就据此回答，不要因为某条引用未直接覆盖就跳过或笼统地说"
-    "“证据不足”。只有当所有通道都确实没有某子项的任何材料时，才简短说明该子项资料有限。\n"
-    "- 依据证据自然组织内容，不套用固定章节模板或人设；但要充分展开，覆盖问题涉及的"
-    "各个要点，不要只给一两句结论就收尾。\n"
-    "- 优先使用与问题领域直接匹配的证据；与问题领域无关的旁路证据不要作为主线展开。\n"
-    "- 引用只用 [1] 到 [{citations_count}]，紧跟被支持的句子；多引用写 [1][2]，"
-    "不要用 [1-4] 范围式，标题里不放引用。\n"
-    "- 有相关图片时可用 [image:i]，图片索引只能来自 related_images，不要虚构。\n"
-    "- 不要虚构具体的规范条文编号或精确数值；但对资料中确有支撑的内容应充分作答，"
-    "不要把“避免编造”误用成对有材料的子项也回避不答。"
+    "基于下面检索到的资料回答用户问题。\n"
+    "最终回答必须充分、完整、详尽；不要简略概括、精简压缩或一笔带过。\n"
+    "围绕用户问题覆盖可由证据支持的背景、细分要点、逻辑推导、补充说明、边界条件、实操细节和相关延伸解读。\n"
+    "可以自由使用 Markdown 标题层级（## / ###）、列表和加粗来组织答案，便于目录和重点阅读。\n"
+    "标题名称和行文结构必须由问题与证据自然决定，不要指定固定章节名，不要套用固定章节模板或预设话术。\n"
+    "尽量完整覆盖全部有效证据，不要主动删减有用信息；不同资料之间能互相补充时要展开说明其关系。\n"
+    "引用只用 [1] 到 [{citations_count}]，紧跟被支持的句子；多引用写 [1][2]。\n"
+    "有相关图片时进行图文配对：把 [image:i] 放在对应文字段落后面，不要集中堆到文末；图片索引只能来自 related_images。\n"
+    "不要虚构具体的规范条文编号或精确数值。"
 )
-
-
-def _has_body_evidence(context: Dict[str, Any]) -> bool:
-    tiers = context.get("evidence_tiers") or {}
-    if any(tiers.get(lane) for lane in tiers):
-        return True
-    if str(context.get("citations_catalog") or "").strip():
-        return True
-    if context.get("documents_view"):
-        return True
-    return False
 
 
 def _denoise_prompt_context(context: Dict[str, Any]) -> Dict[str, Any]:
@@ -495,8 +478,6 @@ def _denoise_prompt_context(context: Dict[str, Any]) -> Dict[str, Any]:
 
     不修改入参；只影响 prompt，不影响节点返回的前端引用/诊断字段。
     """
-    body_present = _has_body_evidence(context)
-
     ordered: Dict[str, Any] = {}
     # query 永远第一。
     if "query" in context:
@@ -514,14 +495,11 @@ def _denoise_prompt_context(context: Dict[str, Any]) -> Dict[str, Any]:
             continue
         ordered[key] = value
 
-    # 辅助通道最后，正文充足时压配额。
+    # 辅助通道最后。
     for key in _PROMPT_AUX_KEYS:
         if key not in context:
             continue
-        value = context[key]
-        if body_present and isinstance(value, list):
-            value = value[:PROMPT_AUX_CHANNEL_CAP]
-        ordered[key] = value
+        ordered[key] = context[key]
 
     return ordered
 
@@ -529,10 +507,10 @@ def _denoise_prompt_context(context: Dict[str, Any]) -> Dict[str, Any]:
 def _compact_document_view_for_prompt(doc: Dict[str, Any]) -> Dict[str, Any]:
     """Keep document role context, but drop heavy attrs/citations already represented elsewhere."""
     highlights = []
-    for highlight in (doc.get("highlights") or [])[:3]:
+    for highlight in (doc.get("highlights") or [])[:4]:
         snippet = re.sub(r"\s+", " ", str(highlight.get("snippet") or "")).strip()
-        if len(snippet) > 240:
-            snippet = snippet[:240] + "…"
+        if len(snippet) > 480:
+            snippet = snippet[:480] + "…"
         highlights.append(
             {
                 "title": highlight.get("title"),
@@ -600,16 +578,7 @@ _ANSWER_DOMAIN_ANCHOR = {
 
 
 def _format_answer_skeleton(query: str, source_type: str = "") -> str:
-    """按 source_type 给出轻量领域锚定提示，避免多源证据把回答带偏到旁路领域。
-
-    仅锚定"答哪个领域、紧扣问题"，不强加章节骨架或人设——这是对 6-15 根因修复
-    （source_type 锚定有效）与本次去框架需求（去模板/人设）的折中。
-    """
-    st = (source_type or "").strip().lower()
-    anchor = _ANSWER_DOMAIN_ANCHOR.get(st)
-    if anchor:
-        return anchor
-    return "请紧扣用户问题本身的领域作答，依据证据自然组织内容，不要漂移到与问题无关的领域。"
+    return ""
 
 
 def _should_include_online_supplements(query: str) -> bool:
@@ -955,123 +924,44 @@ def _build_rule_based_answer(
     notes: List[str],
     documents_view: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """基于规则的兜底答案生成（优化版 2026-01-12）
+    """基于规则的兜底答案生成。"""
+    lines = [f"# {query}".strip(), ""]
 
-    关键改进：
-    - 移除内部调试信息（agent来源、分数）
-    - 统一引用格式为 [n]
-    - 将推荐问题移到最后
-    - 添加清晰的结构分隔
-    """
-    lines = []
-
-    # 1. 核心答案部分
     if aggregated_items:
-        lines.append(f"## {query}\n")
-        lines.append("### 核心要点\n")
-
-        # 提取前5个最重要的结果作为要点
-        for idx, item in enumerate(aggregated_items[:5], 1):
+        lines.append("## 证据摘要")
+        for item in aggregated_items[:5]:
             title = item.name or item.label or item.entity_id or "未命名"
-            snippet = (item.snippet or "")[:150].strip()
-
+            snippet = (item.snippet or "")[:180].strip()
             if snippet:
-                lines.append(f"{idx}. **{title}**：{snippet}")
+                lines.append(f"- **{title}**：{snippet}")
             else:
-                lines.append(f"{idx}. **{title}**")
-
-            lines.append("")
-    else:
-        lines.append(f"## {query}\n")
-        lines.append("### 查询结果\n")
-        lines.append("未找到相关结果。建议：")
-        lines.append("- 调整查询关键词")
-        lines.append("- 检查资料库是否已加载相关文档")
-        lines.append("- 尝试使用在线深度搜索\n")
-
-    # 2. 参考资料部分
-    if documents_view:
-        lines.append("\n## 参考资料\n")
-
-        # 去重：同一资料只列出一次
+                lines.append(f"- **{title}**")
+    elif documents_view:
+        lines.append("## 资料摘录")
         seen_docs = set()
-        citation_idx = 1
-
         for doc in documents_view[:6]:
-            doc_name = doc.get('doc_name', '未标注资料')
-
-            # 跳过重复资料
+            doc_name = doc.get("doc_name", "未标注资料")
             if doc_name in seen_docs:
                 continue
             seen_docs.add(doc_name)
-
-            # 构建位置信息
-            location_parts = []
-            if doc.get("pages"):
-                pages = doc['pages'][:3]
-                if len(pages) == 1:
-                    location_parts.append(f"第{pages[0]}页")
-                else:
-                    location_parts.append(f"第{pages[0]}-{pages[-1]}页")
-
-            if doc.get("locations"):
-                location_parts.append(doc['locations'][0])
-
-            location_str = " | ".join(location_parts) if location_parts else ""
-
-            # 输出引用
-            if location_str:
-                lines.append(f"[{citation_idx}] {doc_name} | {location_str}")
-            else:
-                lines.append(f"[{citation_idx}] {doc_name}")
-
-            # 添加摘要（如果有）
             highlight = (doc.get("highlights") or [{}])[0]
-            snippet = (highlight.get("snippet") or "").strip()
+            snippet = " ".join(str(highlight.get("snippet") or "").split())[:200]
             if snippet:
-                # 清理snippet，移除多余空格和换行
-                snippet = " ".join(snippet.split())[:200]
-                lines.append(f"   {snippet}")
+                lines.append(f"- **{doc_name}**：{snippet}")
+            else:
+                lines.append(f"- **{doc_name}**")
+    else:
+        lines.append("未检索到可直接用于回答的资料。")
 
-            lines.append("")
-            citation_idx += 1
-
-    # 3. 诊断信息（仅在有重要提示时显示）
     if notes:
         important_notes = [n for n in notes if not any(
             skip in n for skip in ["聚合了", "个智能体", "agent", "分数"]
         )]
         if important_notes:
-            lines.append("\n## 提示信息\n")
-            for note in important_notes:
-                lines.append(f"- {note}")
             lines.append("")
-
-    # 4. 推荐问题（移到最后）
-    recommended_questions: List[str] = []
-    if aggregated_items:
-        topics: List[str] = []
-        for item in aggregated_items[:3]:
-            topic = item.name or item.label
-            if topic and topic not in topics:
-                topics.append(topic)
-
-        for topic in topics[:2]:
-            recommended_questions.append(f"关于「{topic}」的详细规范和标准是什么？")
-            recommended_questions.append(f"「{topic}」在实际项目中的应用案例？")
-
-    recommended_questions.append(f"[深度搜索] 是否需要对「{query}」进行在线深度搜索？")
-
-    # 去重并限制到5个
-    recommended_questions = list(dict.fromkeys(recommended_questions))[:5]
-
-    if recommended_questions:
-        lines.append("\n---\n")
-        lines.append("## 延伸探索\n")
-        for idx, question in enumerate(recommended_questions, 1):
-            lines.append(f"{idx}. {question}")
-
-    final_answer = "\n".join(lines)
+            lines.append("## 备注")
+            for note in important_notes[:3]:
+                lines.append(f"- {note}")
 
     # [FIX 2025-12-04] 提取图片引用
     image_references = []
@@ -1084,8 +974,8 @@ def _build_rule_based_answer(
                 })
 
     return {
-        "final_answer": final_answer,
-        "recommended_questions": recommended_questions,
+        "final_answer": "\n".join(lines).strip(),
+        "recommended_questions": [],
         "notes": notes,
         # ✅ [FIX 2025-12-04] 添加图片引用
         "image_references": image_references,
@@ -1111,105 +1001,26 @@ def build_structured_fallback_answer(
     evidence_tiers: Dict[str, List[Dict[str, Any]]],
     coverage_audit: Dict[str, Any],
 ) -> str:
-    missing = coverage_audit.get("missing_required_lanes") or []
-    notes = coverage_audit.get("notes") or []
-    coverage_passed = bool(coverage_audit.get("passed"))
-    lane_labels = {
-        "policy_document": "政策/规划依据",
-        "code_spec": "规范/标准依据",
-        "guide": "设计指南/手册依据",
-        "book_report": "书籍/报告依据",
-        "atlas_or_image": "图示/详图依据",
-        "paper_or_report": "研究/案例依据",
-    }
-    missing_text = "、".join(lane_labels.get(str(lane), str(lane)) for lane in missing)
-    code_count = len(evidence_tiers.get("code_spec") or [])
-    guide_count = len(evidence_tiers.get("guide") or [])
-    atlas_count = len(evidence_tiers.get("atlas_or_image") or [])
-    paper_count = len(evidence_tiers.get("paper_or_report") or [])
-
-    def public_notes(raw_notes: list[Any]) -> list[str]:
-        cleaned: list[str] = []
-        for note in raw_notes or []:
-            text = str(note or "").strip()
-            if not text:
-                continue
-            if text.startswith("missing required evidence lane"):
-                continue
-            if "does not hit question terms" in text:
-                continue
-            cleaned.append(text)
-            if len(cleaned) >= 3:
-                break
-        return cleaned
-
-    if coverage_passed and not missing:
-        evidence_status = "当前证据覆盖审计通过，但原回答中仍有主张超出了引用可支撑范围，因此不返回完整结论。"
-    else:
-        if missing_text:
-            evidence_status = f"当前证据不足：检索结果仍缺少这些资料类型：{missing_text}。因此不直接给出强制性尺寸或规范结论。"
-        else:
-            evidence_status = "当前证据不足以支撑完整规范性回答，因此不直接给出强制性尺寸或规范结论。"
-
-    evidence_lines: list[str] = []
-    ordered_lanes = (
-        ("policy_document", "政策依据"),
-        ("code_spec", "规范依据"),
-        ("guide", "设计转译依据"),
-        ("book_report", "书籍/报告依据"),
-        ("atlas_or_image", "图示/空间依据"),
-        ("paper_or_report", "研究/案例依据"),
-    )
-    citation_index = 1
-    for lane, label in ordered_lanes:
+    lines = [f"# {query}".strip(), ""]
+    collected: list[str] = []
+    for lane in ("code_spec", "policy_document", "guide", "book_report", "atlas_or_image", "paper_or_report"):
         for card in list(evidence_tiers.get(lane) or [])[:2]:
             snippet = re.sub(r"\s+", " ", str(card.get("snippet") or "")).strip()
-            if not snippet:
-                continue
-            if len(snippet) > 140:
-                snippet = snippet[:140].rstrip() + "..."
-            source = str(card.get("source") or label).strip()
-            location = str(card.get("location") or card.get("anchor") or "").strip()
-            location_text = f"（{location}）" if location else ""
-            evidence_lines.append(f"- {label}：{source}{location_text}显示，{snippet} [{citation_index}]")
-            citation_index += 1
-
-    if coverage_passed and not missing and evidence_lines:
-        lines = [
-            "### 有限证据结论",
-            "原回答中存在引用支撑不足的表述，以下仅保留当前证据可直接支持的内容：",
-            *evidence_lines,
-            "",
-            "### 回答边界",
-            "未在上述证据中直接出现的数值、配置、合规或设计推论已被排除；需要补充相应证据后才能扩展为完整答案。",
-        ]
-        if missing:
-            lines.append(f"当前仍缺少必需证据角色：{missing_text}。")
-        visible_notes = public_notes(notes)
-        if visible_notes:
-            lines.append("")
-            lines.append("检索诊断：" + "；".join(visible_notes))
-        return "\n".join(lines)
-
-    lines = [
-        "### 证据依据",
-        evidence_status,
-        f"已检索到的资料类型概况：规范/标准依据={code_count}，设计指南/手册依据={guide_count}，图示/详图依据={atlas_count}，研究/案例依据={paper_count}。",
-        "",
-        "### 空间约束",
-        "无法确认具体强制条文、数值边界或分区流线要求，因此不能把下列内容作为合规结论。",
-        "",
-        "### 设计回应",
-        f"针对「{query}」，只能给出非规范性的检查方向：先补充标准/条文证据，再用指南、图集或研究资料解释空间排布、分区和流线组织。",
-        "",
-        "### 推论边界",
-        "以上不是规范结论，需补充标准/条文证据后才能作为合规依据。",
-    ]
-    visible_notes = public_notes(notes)
-    if visible_notes:
-        lines.append("")
-        lines.append("检索诊断：" + "；".join(visible_notes))
-    return "\n".join(lines)
+            if snippet:
+                source = str(card.get("source") or "").strip()
+                location = str(card.get("location") or "").strip()
+                prefix = " / ".join(part for part in (source, location) if part)
+                collected.append(f"- **{prefix}**：{snippet}" if prefix else f"- {snippet}")
+            if len(collected) >= 6:
+                break
+        if len(collected) >= 6:
+            break
+    if collected:
+        lines.append("## 资料摘录")
+        lines.extend(collected)
+    else:
+        lines.append("未找到可用资料。")
+    return "\n".join(lines).strip()
 
 
 def _asdict_if_dataclass(value: Any) -> Dict[str, Any]:
@@ -1251,45 +1062,43 @@ def _select_final_answer_after_claim_audit(
         diagnostics["claim_support_audit"] = audit_dict
         return generated_answer, diagnostics
 
-    coverage_dict = _asdict_if_dataclass(coverage_audit)
-
-    # [2026-06-14] Non-destructive grounding. The audit MEASURES unsupported
-    # claims (recorded in diagnostics to drive the unsupported_claim metric and
-    # give per-claim visibility) without DELETING the model's prose. Deleting
-    # the unsupported sentences produced fragmented, lower-scoring answers
-    # (broken list numbering, a trailing "已删除…" disclaimer) and, perversely,
-    # raised the unsupported_claim metric it was meant to lower. As long as the
-    # retrieved evidence yields at least one usable citation card, the model's
-    # full answer is kept verbatim. Only a true zero-evidence answer (no usable
-    # cards at all) falls back to the structured evidence-status answer, which
-    # is a legitimate refusal rather than a destructive rewrite.
-    ledger = build_evidence_ledger(final_citations or [])
-    has_usable_evidence = bool(ledger.cards)
-
-    if has_usable_evidence:
-        diagnostics.update(
-            {
-                "claim_support_gate_applied": False,
-                "claim_support_gate_reason": "non_destructive_measured_only",
-                "claim_support_audit": audit_dict,
-                "original_answer_chars": len(generated_answer or ""),
-            }
-        )
-        return generated_answer, diagnostics
-
-    # True zero-evidence: fall back to the structured evidence-status answer.
-    gated_answer = build_structured_fallback_answer(query, evidence_tiers, coverage_dict)
-    final_audit = audit_claim_support(gated_answer, final_citations)
     diagnostics.update(
         {
-            "claim_support_gate_applied": True,
-            "claim_support_gate_reason": "zero_usable_evidence_fallback",
-            "claim_support_audit": asdict(final_audit),
-            "gated_answer_chars": len(gated_answer),
+            "claim_support_gate_applied": False,
+            "claim_support_gate_reason": "claim_support_measured_only",
+            "claim_support_audit": audit_dict,
             "original_answer_chars": len(generated_answer or ""),
         }
     )
-    return gated_answer, diagnostics
+    return generated_answer, diagnostics
+
+
+def _recover_aggregated_items_from_worker_responses(
+    worker_responses: List[Dict[str, Any]],
+) -> List[AgentItem]:
+    recovered: List[AgentItem] = []
+    for worker_resp in worker_responses or []:
+        if not isinstance(worker_resp, dict):
+            continue
+        agent_name = str(worker_resp.get("agent_name") or "unknown")
+        for item in worker_resp.get("items") or []:
+            if isinstance(item, AgentItem):
+                if not item.source:
+                    item.source = agent_name
+                recovered.append(item)
+                continue
+            if isinstance(item, dict):
+                try:
+                    data = dict(item)
+                    data.setdefault("source", agent_name)
+                    recovered.append(AgentItem(**data))
+                except Exception:
+                    continue
+    if not recovered:
+        return []
+    from backend.app.agents.base_agent import add_items_with_dedup
+
+    return add_items_with_dedup([], recovered)
 
 
 # ============================================================================
@@ -2513,6 +2322,14 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
     synthesize_started = time.time()
     aggregated_items = state.get("aggregated_items", [])
     worker_responses = state.get("worker_responses", [])
+    if not aggregated_items and worker_responses:
+        recovered_items = _recover_aggregated_items_from_worker_responses(worker_responses)
+        if recovered_items:
+            aggregated_items = recovered_items
+            logger.warning(
+                "[Synthesizer→Synthesize] aggregated_items 为空，已从 worker_responses 恢复 %d 条结果",
+                len(aggregated_items),
+            )
     notes = state.get("notes", [])
     retry_count = state.get("retry_count", 0)
     feedback_message = state.get("feedback_message", "")
@@ -2554,9 +2371,8 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         empty_ledger = _serialize_evidence_ledger([])
         coverage_audit = audit_evidence_coverage(evidence_plan, empty_tiers)
         if _is_benchmark_or_qa_mode(request):
-            final_answer = build_structured_fallback_answer(query, empty_tiers, asdict(coverage_audit))
             fallback = {
-                "final_answer": final_answer,
+                "final_answer": build_structured_fallback_answer(query, empty_tiers, asdict(coverage_audit)),
                 "recommended_questions": [],
                 "notes": notes,
                 "image_references": [],
@@ -2921,15 +2737,6 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
         "coverage_audit": asdict(coverage_audit),
         "supplemental_lane_queries": supplemental_lane_queries,
         "synthesis_mode": synthesis_mode,
-        "answer_evidence_policy": {
-            "must_include_hard_constraints_when_available": True,
-            "hard_constraints_available": hard_constraints_available,
-            "allow_design_inference": True,
-            "inference_must_be_labeled": True,
-            "do_not_present_inference_as_code": True,
-            "preferred_answer_flow": "证据依据 -> 空间约束 -> 设计回应 -> 推论边界",
-            "if_required_code_spec_missing": "state_evidence_insufficient_and_do_not_invent_normative_clauses",
-        },
         "evidence_tiers": _limit_evidence_tiers(
             evidence_tiers,
             per_tier=int(synthesis_mode["max_citations_per_tier"]),
@@ -2950,10 +2757,6 @@ async def node_synthesize(state: SynthesizerState) -> Dict[str, Any]:
             "rejected_count": evidence_ledger["rejected_count"],
         },
     }
-    # 按 source_type 锚定回答领域（6-15 已验证：防止多源证据把回答带偏）。
-    enhanced_context["answer_domain_anchor"] = _format_answer_skeleton(
-        query, source_type=getattr(evidence_context, "source_type", "")
-    )
 
     # 提取items的简要信息
     top_items = text_items[:6]

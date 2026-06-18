@@ -163,6 +163,53 @@ def test_image_is_inserted_after_specific_matching_sentence_not_section_title_on
     assert result.index("[image:0]") < result.index("诊室应保障")
 
 
+def test_image_placement_pairs_semantic_match_text_with_related_paragraph():
+    answer = (
+        "### 总体原则\n"
+        "门诊空间需要先明确入口、服务台、候诊和诊室之间的组织关系。\n\n"
+        "### 候诊与导引\n"
+        "候诊厅应承担到达后的分流、等候、咨询和排队组织，服务台需要保持清晰可见。\n\n"
+        "### 诊疗单元\n"
+        "诊室更关注一医一患、私密性和医生患者的基本操作距离。"
+    )
+    image_refs = [
+        {
+            "url": "/img/waiting-routing.png",
+            "caption": "公共空间图",
+            "match_text": "门诊大厅 候诊区 导医台 咨询台 分诊 排队 导向 标识 公共服务",
+            "source": "医院建筑设计指南.pdf",
+        }
+    ]
+
+    result = _inject_image_placeholders_inline(answer, image_refs, force_reposition=True)
+
+    assert "[image:0]" in result
+    assert result.index("候诊厅应承担") < result.index("[image:0]")
+    assert result.index("[image:0]") < result.index("### 诊疗单元")
+
+
+def test_image_placement_understands_common_design_synonyms():
+    answer = (
+        "### 候诊与导引\n"
+        "服务台应靠近患者到达后的主要流线，结合导引信息帮助患者完成分流和等候。\n\n"
+        "### 诊疗单元\n"
+        "诊室更关注一医一患、私密性和医生患者的基本操作距离。"
+    )
+    image_refs = [
+        {
+            "url": "/img/wayfinding.png",
+            "caption": "公共空间图",
+            "match_text": "导医台 动线 标识系统 分诊 候诊区",
+            "source": "医院建筑设计指南.pdf",
+        }
+    ]
+
+    result = _inject_image_placeholders_inline(answer, image_refs, force_reposition=True)
+
+    assert "[image:0]" in result
+    assert result.index("[image:0]") < result.index("### 诊疗单元")
+
+
 def test_unrelated_images_are_not_inserted_when_backend_repositions():
     answer = (
         "### 诊室设计\n"

@@ -274,6 +274,60 @@ def test_synthesizer_keeps_image_refs_for_explicit_visual_queries(monkeypatch):
     assert result["image_references"][0]["image_url"] == image_url
 
 
+def test_synthesizer_recovers_items_from_worker_responses_when_parent_items_are_empty(monkeypatch):
+    async def _fake_llm(*, messages, **_kwargs):
+        class _FakeResponse:
+            content = "门诊应结合候诊、诊室、公共空间和住院部衔接关系组织。"
+
+        return _FakeResponse()
+
+    monkeypatch.setattr(synthesizer_agent, "_call_llm_with_retry", _fake_llm)
+    item = AgentItem(
+        entity_id="mongo-1",
+        name="医院建筑设计指南.pdf",
+        source="mongodb_agent",
+        snippet="门诊部设计需要处理候诊、诊室、公共空间和住院部关系。",
+        attrs={
+            "source_document": "医院建筑设计指南.pdf",
+            "content_type": "text",
+            "chunk_text": "门诊部设计需要处理候诊、诊室、公共空间和住院部关系。",
+        },
+        citations=[
+            {
+                "source": "医院建筑设计指南.pdf",
+                "location": "门诊部设计",
+                "snippet": "门诊部设计需要处理候诊、诊室、公共空间和住院部关系。",
+                "content_type": "text",
+                "chunk_id": "mongo-1",
+            }
+        ],
+    )
+
+    result = asyncio.run(
+        synthesizer_agent.node_synthesize(
+            {
+                "query": "综合医院中，门诊如何设计？与住院部的关系是什么？",
+                "aggregated_items": [],
+                "worker_responses": [
+                    {
+                        "agent_name": "mongodb_agent",
+                        "items": [item],
+                        "item_count": 1,
+                    }
+                ],
+                "request": AgentRequest(
+                    query="综合医院中，门诊如何设计？与住院部的关系是什么？",
+                    metadata={"retrieval_mode": "R2"},
+                ),
+            }
+        )
+    )
+
+    assert result["final_answer"] != ""
+    assert "未找到可用资料" not in result["final_answer"]
+    assert result["synthesizer_diagnostics"]["documents_total"] >= 1
+
+
 def test_synthesizer_does_not_return_image_refs_for_plain_design_query(monkeypatch):
     async def _fake_llm(*, messages, **_kwargs):
         class _FakeResponse:

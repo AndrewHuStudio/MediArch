@@ -89,20 +89,20 @@ def test_enhanced_context_prompt_is_minimal():
 
 
 def test_answer_domain_anchor_keys_on_source_type():
-    """按 source_type 锚定领域（6-15 已验证根因修复），但不强加章节模板/人设。"""
+    """不再注入固定领域骨架提示。"""
     policy = synthesizer_agent._format_answer_skeleton("任意", source_type="policy_document")
     paper = synthesizer_agent._format_answer_skeleton("任意", source_type="academic_paper")
-    assert "政策" in policy and "建筑" in policy  # 锚定政策、显式禁止漂移到建筑
-    assert "研究" in paper
-    # 不再是固定章节骨架（无"空间约束 -> 设计回应"这类强制结构）
-    assert "空间约束 -> 设计回应" not in policy
+    assert policy == ""
+    assert paper == ""
 
 
 def test_system_prompt_anchors_domain_without_persona_or_template():
-    """system prompt：保留领域锚定+充分展开+防编造，但无建筑顾问人设、无固定章节模板。"""
+    """system prompt：保留 Markdown 自由组织与防编造，但无固定章节模板。"""
     src = synthesizer_agent.SYNTHESIZER_SYSTEM_PROMPT
-    assert "建筑顾问" not in src  # 无人设
-    assert "answer_domain_anchor" in src  # 指向领域锚定
-    assert "充分展开" in src  # 恢复完整性引导（修复过度精简导致的答案过短）
-    assert "证据不足" in src or "不要虚构" in src  # 防编造
-
+    assert "固定章节模板" in src
+    assert "Markdown" in src
+    assert "不要虚构" in src
+    assert "充分、完整、详尽" in src
+    assert "不要简略概括" in src
+    assert "不要指定固定章节名" in src
+    assert "图文配对" in src

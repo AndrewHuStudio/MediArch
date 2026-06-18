@@ -213,6 +213,40 @@ def test_mongodb_rewrite_adds_book_terms_for_book_context(monkeypatch):
     assert "规范" not in terms
 
 
+def test_mongodb_rewrite_filters_internal_labels_and_document_filename_noise(monkeypatch):
+    async def _no_llm_rewrite(_query):
+        return None
+
+    monkeypatch.setattr(mongodb_agent, "rewrite_query_with_llm", _no_llm_rewrite)
+    query = "综合医院中，门诊如何设计？"
+
+    result = asyncio.run(
+        mongodb_agent.node_rewrite_query(
+            {
+                "query": query,
+                "request": AgentRequest(
+                    query=query,
+                    metadata={
+                        "unified_hints": {
+                            "entity_names": [
+                                "门诊部",
+                                "DesignMethod社区",
+                                "GB51039-2014综合医院建筑设计标准.pdf",
+                            ],
+                            "search_terms": ["Outpatient Department", "医疗工艺", "医院建筑设计指南.pdf"],
+                        }
+                    },
+                ),
+            }
+        )
+    )
+
+    assert "门诊部" in result["search_terms"]
+    assert "Outpatient Department" in result["search_terms"]
+    assert "DesignMethod社区" not in result["search_terms"]
+    assert all(not term.lower().endswith(".pdf") for term in result["search_terms"])
+
+
 def test_r2_normative_queries_build_standards_first_search_plan():
     query = "护士站服务半径和通视隐私如何满足规范要求？"
 
@@ -466,7 +500,7 @@ def test_prompt_document_view_is_compact_and_drops_heavy_attrs():
 
     assert "citations" not in compact
     assert compact["images_count"] == 1
-    assert len(compact["highlights"][0]["snippet"]) <= 241
+    assert len(compact["highlights"][0]["snippet"]) <= 481
     assert "attrs" not in compact["highlights"][0]
 
 

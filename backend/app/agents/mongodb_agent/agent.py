@@ -189,12 +189,34 @@ async def get_rewrite_llm():
 # 辅助函数
 # ============================================================================
 
+_INTERNAL_SEARCH_TERM_PATTERNS = (
+    re.compile(r"^(?:Space|DesignMethod|FunctionalZone|KnowledgePoint|Source)(?:社区)?$", re.I),
+    re.compile(r"^[A-Za-z]+社区$"),
+)
+
+
+def _clean_search_term(term: Any) -> str:
+    text = re.sub(r"\s+", " ", str(term or "")).strip(" ：:，,。；;、")
+    if not text:
+        return ""
+    lower = text.lower()
+    if lower.endswith((".pdf", ".doc", ".docx", ".xlsx", ".txt")):
+        return ""
+    if any(pattern.match(text) for pattern in _INTERNAL_SEARCH_TERM_PATTERNS):
+        return ""
+    if re.search(r"(?:\.pdf|\.docx?|\.xlsx?|\.txt)$", lower):
+        return ""
+    if len(text) > 48 and not re.search(r"\s", text):
+        return ""
+    return text
+
+
 def deduplicate_terms(terms: List[str]) -> List[str]:
     """去重并保持顺序"""
     seen: set[str] = set()
     ordered: List[str] = []
     for term in terms:
-        term = term.strip()
+        term = _clean_search_term(term)
         if not term or term in seen:
             continue
         seen.add(term)

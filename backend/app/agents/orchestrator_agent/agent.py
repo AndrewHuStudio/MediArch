@@ -132,7 +132,7 @@ def _init_orchestrator_llm():
         model_provider=model_provider,
         api_key=api_key,
         base_url=base_url,
-        temperature=0.3,
+        temperature=0.0,
         max_tokens=12000,
         timeout=timeout_s,
     )

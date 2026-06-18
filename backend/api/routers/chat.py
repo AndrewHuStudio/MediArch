@@ -652,8 +652,15 @@ _IMAGE_DOMAIN_MATCH_TERMS = (
     "公共空间",
     "门诊大厅",
     "候诊区",
+    "候诊厅",
     "交通组织",
     "导引",
+    "导向",
+    "标识",
+    "标识系统",
+    "导医台",
+    "咨询台",
+    "分诊",
     "排队",
     "服务台",
     "诊室",
@@ -672,6 +679,18 @@ _IMAGE_DOMAIN_MATCH_TERMS = (
     "机电",
     "洁污",
     "流线",
+    "动线",
+)
+
+_IMAGE_MATCH_SYNONYM_GROUPS = (
+    ("导医台", "服务台", "咨询台", "分诊台"),
+    ("动线", "流线", "交通组织"),
+    ("导向", "导引", "标识", "标识系统", "寻路"),
+    ("候诊区", "候诊厅", "候诊", "等候"),
+    ("分诊", "分流", "排队"),
+    ("门诊大厅", "大厅", "公共空间"),
+    ("诊室", "诊疗单元", "诊疗空间"),
+    ("私密性", "隐私", "一医一患"),
 )
 
 
@@ -782,6 +801,9 @@ def _image_match_terms(ref: Dict[str, Any]) -> set[str]:
     for term in _IMAGE_DOMAIN_MATCH_TERMS:
         if term in text and term not in _IMAGE_MATCH_STOP_TERMS:
             terms.add(term)
+    for group in _IMAGE_MATCH_SYNONYM_GROUPS:
+        if any(term.lower() in text for term in group):
+            terms.update(term for term in group if term not in _IMAGE_MATCH_STOP_TERMS)
     return terms
 
 
