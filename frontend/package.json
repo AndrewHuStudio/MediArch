@@ -6,7 +6,9 @@
     "build": "next build",
     "dev": "next dev --port 3010",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test:wave-performance": "node scripts/check-wave-performance.mjs",
+    "test:knowledge-visuals": "node scripts/check-knowledge-showcase-visuals.mjs"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "latest",

@@ -7,6 +7,7 @@ from backend.api.routers.chat import (
     _build_image_caption,
     _filter_image_refs_for_answer,
     _inject_image_placeholders_inline,
+    _sanitize_image_tokens,
 )
 
 
@@ -254,3 +255,24 @@ def test_image_refs_are_filtered_by_question_and_answer_relevance():
     filtered = _filter_image_refs_for_answer(image_refs, query=query, answer=answer)
 
     assert [ref["url"] for ref in filtered] == ["/img/clinic.png"]
+
+
+def test_sanitize_image_tokens_removes_placeholder_writing():
+    # LLM 照抄 prompt 占位写法 [image:i] / [image:序号] / [image:i0],应被清除。
+    answer = "诊室设计要点。\n\n[image:i]\n图1 诊室图\n\n候诊区设计。\n\n[image:序号]\n\n[image:i0]"
+    cleaned = _sanitize_image_tokens(answer, 2)
+    assert "[image:i]" not in cleaned
+    assert "[image:序号]" not in cleaned
+    assert "[image:i0]" not in cleaned
+
+
+def test_sanitize_image_tokens_keeps_valid_and_drops_out_of_range():
+    answer = "段落甲。\n\n[image:0]\n\n段落乙。\n\n[image:5]"
+    cleaned = _sanitize_image_tokens(answer, 2)
+    assert "[image:0]" in cleaned  # 合法且在范围内,保留
+    assert "[image:5]" not in cleaned  # 越界,清除
+
+
+def test_sanitize_image_tokens_handles_empty():
+    assert _sanitize_image_tokens("", 3) == ""
+    assert _sanitize_image_tokens("没有图片 token 的正文", 0) == "没有图片 token 的正文"

@@ -130,12 +130,19 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
       return null
     }
 
+    const rawCaption = typeof props["data-chat-image-caption"] === "string"
+      ? props["data-chat-image-caption"]
+      : Array.isArray(node?.properties?.["data-chat-image-caption"])
+        ? String(node?.properties?.["data-chat-image-caption"]?.[0] ?? "")
+        : String(node?.properties?.["data-chat-image-caption"] ?? "")
+    const caption = (rawCaption || "").trim() || imageState.alt
+
     return (
-      <motion.div
+      <motion.figure
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
-        className="my-4"
+        className="my-4 flex flex-col items-center gap-1.5"
       >
         {imageState.src ? (
           <ImageLightbox
@@ -147,7 +154,12 @@ const createMarkdownComponents = (images?: string[], sources?: PDFSource[]): Com
             图片加载中
           </div>
         )}
-      </motion.div>
+        {caption ? (
+          <figcaption className="max-w-xs text-center text-xs leading-snug text-[#6c858c]">
+            {caption}
+          </figcaption>
+        ) : null}
+      </motion.figure>
     )
   },
 })

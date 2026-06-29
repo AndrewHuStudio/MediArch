@@ -465,13 +465,24 @@ _IMAGE_SPATIAL_QUERY_TRIGGERS = (
 )
 
 
-def _wants_images_in_answer(query: str) -> bool:
+def _has_explicit_image_intent(query: str) -> bool:
+    """问题是否带显式视觉意图(触发词)。"""
     q = (query or "").strip().lower()
-    if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
-        return False
     if any(trigger in q for trigger in _IMAGE_QUERY_TRIGGERS):
         return True
     return any(trigger in q for trigger in _IMAGE_SPATIAL_QUERY_TRIGGERS)
+
+
+def _wants_images_in_answer(query: str) -> bool:
+    """是否在回答中注入/返回图片。
+
+    默认图文并茂:除非用户显式拒绝,否则都走图片注入路径。
+    无关图片由 `_filter_image_refs_for_answer` 按相关性分数兜底剔除。
+    """
+    q = (query or "").strip().lower()
+    if any(neg in q for neg in _IMAGE_QUERY_NEGATIONS):
+        return False
+    return True
 
 
 def _build_image_caption(cite: Dict[str, Any]) -> str:
@@ -631,7 +642,26 @@ def _append_image_placeholders(answer: str, image_refs: List[Dict[str, Any]]) ->
 
 _IMAGE_TOKEN_LINE_RE = re.compile(r"^\s*\[image:(\d+)\]\s*$")
 _IMAGE_TOKEN_RE = re.compile(r"\[image:(\d+)\]")
+# LLM 偶尔会照抄 prompt 里的占位写法 [image:i] / [image:i0] / [image:序号]。
+# 这类非法 token 既不能渲染也会作为噪声残留,统一识别后清除。
+_IMAGE_TOKEN_MALFORMED_RE = re.compile(r"\[image:\s*(?!\d+\])[^\]\n]*\]")
 _IMAGE_CAPTION_LINE_RE = re.compile(r"^\s*(?:\*+)?(?:[（(]\s*)?图\s*\d+\s*(?:[：:]|\s).*$")
+
+
+def _sanitize_image_tokens(answer: str, available_count: int) -> str:
+    """规整 LLM 产出的图片 token:删除非法占位写法与越界索引,保留合法的 [image:n]。"""
+    if not answer:
+        return answer
+    text = _IMAGE_TOKEN_MALFORMED_RE.sub("", answer)
+
+    def _drop_out_of_range(m: "re.Match[str]") -> str:
+        idx = int(m.group(1))
+        return m.group(0) if 0 <= idx < available_count else ""
+
+    text = _IMAGE_TOKEN_RE.sub(_drop_out_of_range, text)
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
 _MIN_BACKEND_IMAGE_MATCH_SCORE = 6
 _IMAGE_MATCH_STOP_TERMS = {
     "相关配图",
@@ -1322,21 +1352,28 @@ async def chat(http_request: Request, request: ChatRequest):
         else:
             image_refs = _extract_image_refs(citations_full, api_base)
 
-        final_answer, image_refs = _align_answer_images(final_answer, image_refs)
-        image_refs = _filter_image_refs_for_answer(
-            image_refs,
-            query=request.message,
-            answer=final_answer,
-        )
-        answer_has_image_tokens = "[image:" in (final_answer or "")
-        if image_refs and (not answer_has_image_tokens):
-            image_refs = _order_image_refs_for_injection(image_refs)
+        # 先清除非法 token,再判断 LLM 是否已自行就近配图。
+        final_answer = _sanitize_image_tokens(final_answer, len(image_refs))
+        answer_has_image_tokens = bool(_IMAGE_TOKEN_RE.search(final_answer or ""))
 
-        # 让前端能渲染图片：优先尝试将图片插入正文附近；必要时再回退到末尾占位符。
-        # 严格交叉验证模式下，为避免破坏格式，不做任何占位符注入。
-        if not strict_cross_doc_mode and wants_images:
-            final_answer = _inject_image_placeholders_inline(final_answer, image_refs, force_reposition=True)
+        if answer_has_image_tokens:
+            # 信任 LLM 的就近配对:按位置对齐 token<->ref,丢弃无 ref 的孤儿 token,不重排。
             final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+        elif image_refs and not strict_cross_doc_mode and wants_images:
+            # LLM 未配图:按段落相关性过滤+排序,再由后端确定性注入。
+            image_refs = _filter_image_refs_for_answer(
+                image_refs,
+                query=request.message,
+                answer=final_answer,
+            )
+            if image_refs:
+                image_refs = _order_image_refs_for_injection(image_refs)
+                final_answer = _inject_image_placeholders_inline(
+                    final_answer, image_refs, force_reposition=True
+                )
+                final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+        else:
+            image_refs = []
 
         images = [ref.get("url") for ref in image_refs if ref.get("url")]
 
@@ -1746,21 +1783,28 @@ async def chat_stream(http_request: Request, request: ChatRequest):
             else:
                 image_refs = _extract_image_refs(all_citations_full, api_base)
 
-            final_answer, image_refs = _align_answer_images(final_answer, image_refs)
-            image_refs = _filter_image_refs_for_answer(
-                image_refs,
-                query=request.message,
-                answer=final_answer,
-            )
-            answer_has_image_tokens = "[image:" in (final_answer or "")
-            if image_refs and (not answer_has_image_tokens):
-                image_refs = _order_image_refs_for_injection(image_refs)
+            # 先清除非法 token,再判断 LLM 是否已自行就近配图。
+            final_answer = _sanitize_image_tokens(final_answer, len(image_refs))
+            answer_has_image_tokens = bool(_IMAGE_TOKEN_RE.search(final_answer or ""))
 
-            # 让前端能渲染图片：优先尝试插入正文附近；必要时回退到末尾占位符块。
-            # 严格交叉验证模式下，为避免破坏固定输出格式，不注入占位符。
-            if image_refs and not strict_cross_doc_mode and wants_images:
-                final_answer = _inject_image_placeholders_inline(final_answer, image_refs, force_reposition=True)
+            if answer_has_image_tokens:
+                # 信任 LLM 的就近配对:按位置对齐 token<->ref,不重排。
                 final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+            elif image_refs and not strict_cross_doc_mode and wants_images:
+                # LLM 未配图:按段落相关性过滤+排序,再由后端确定性注入。
+                image_refs = _filter_image_refs_for_answer(
+                    image_refs,
+                    query=request.message,
+                    answer=final_answer,
+                )
+                if image_refs:
+                    image_refs = _order_image_refs_for_injection(image_refs)
+                    final_answer = _inject_image_placeholders_inline(
+                        final_answer, image_refs, force_reposition=True
+                    )
+                    final_answer, image_refs = _align_answer_images(final_answer, image_refs)
+            else:
+                image_refs = []
 
             images = [ref.get("url") for ref in image_refs if ref.get("url")]
 

@@ -328,7 +328,8 @@ def test_synthesizer_recovers_items_from_worker_responses_when_parent_items_are_
     assert result["synthesizer_diagnostics"]["documents_total"] >= 1
 
 
-def test_synthesizer_does_not_return_image_refs_for_plain_design_query(monkeypatch):
+def test_synthesizer_returns_image_refs_for_plain_design_query_by_default(monkeypatch):
+    # 2026-06-18 图文并茂默认开:普通设计题也产出 image_references,无关图片由 chat 层相关性过滤兜底。
     async def _fake_llm(*, messages, **_kwargs):
         class _FakeResponse:
             content = "门诊单元应结合候诊、诊室和后台支持组织。"
@@ -363,6 +364,50 @@ def test_synthesizer_does_not_return_image_refs_for_plain_design_query(monkeypat
                 "aggregated_items": items,
                 "worker_responses": [],
                 "request": AgentRequest(query="门诊单元怎么设计？", metadata={"retrieval_mode": "R2"}),
+            }
+        )
+    )
+
+    assert result["image_references"]
+    assert result["image_references"][0]["image_url"] == image_url
+
+
+def test_synthesizer_omits_image_refs_when_user_declines_images(monkeypatch):
+    # 显式否定图片时仍然不产出 image_references。
+    async def _fake_llm(*, messages, **_kwargs):
+        class _FakeResponse:
+            content = "门诊单元应结合候诊、诊室和后台支持组织。"
+
+        return _FakeResponse()
+
+    monkeypatch.setattr(synthesizer_agent, "_call_llm_with_retry", _fake_llm)
+    image_url = "书籍报告/医疗功能房间详图集3/full/images/page_10.png"
+    items = [
+        AgentItem(
+            entity_id="image-1",
+            name="医疗功能房间详图集3.pdf",
+            source="mongodb_agent",
+            snippet="[图片] 门诊单元平面图",
+            attrs={"source_document": "医疗功能房间详图集3.pdf", "content_type": "image", "image_url": image_url},
+            citations=[
+                {
+                    "source": "医疗功能房间详图集3.pdf",
+                    "snippet": "门诊单元平面图",
+                    "content_type": "image",
+                    "image_url": image_url,
+                    "chunk_id": "image-1",
+                }
+            ],
+        )
+    ]
+
+    result = asyncio.run(
+        synthesizer_agent.node_synthesize(
+            {
+                "query": "门诊单元怎么设计？不需要图片",
+                "aggregated_items": items,
+                "worker_responses": [],
+                "request": AgentRequest(query="门诊单元怎么设计？不需要图片", metadata={"retrieval_mode": "R2"}),
             }
         )
     )

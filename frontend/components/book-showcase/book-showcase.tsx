@@ -10,6 +10,15 @@ import { BookDetails } from "./book-details"
 import { booksData } from "./book-data"
 import { WavyBackground } from "@/components/ui/wavy-background"
 
+const KNOWLEDGE_WAVE_PALETTES = {
+  standards: ["#f8fcfd", "#e9f6f9", "#d8edf3", "#c5e1ea", "#a9d1de"],
+  books: ["#f8fcfd", "#e8f8f3", "#d4f0e7", "#bce4d8", "#9bd3c2"],
+  papers: ["#fbfbff", "#eef2ff", "#dfe7ff", "#ccd8fb", "#b7c7f1"],
+  policy: ["#fbfdff", "#edf8fb", "#dff1f7", "#cfe6f0", "#b9d8e5"],
+  cases: ["#fffdf8", "#fff3df", "#ffe6bd", "#ffd99e", "#fac878"],
+  default: ["#f8fcfd", "#e9f6f9", "#d8edf3", "#c5e1ea", "#a9d1de"],
+}
+
 interface BookShowcaseProps {
   onNavigate: (sectionIndex: number) => void
 }
@@ -35,54 +44,54 @@ export default function BookShowcase({ onNavigate }: BookShowcaseProps) {
   const getWavyBackgroundConfig = (genres: string[]) => {
     if (genres.includes("规范标准")) {
       return {
-        colors: ["#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b"],
+        colors: KNOWLEDGE_WAVE_PALETTES.standards,
         backgroundFill: "#f7fbfc",
-        waveOpacity: 0.4,
+        waveOpacity: 0.24,
         blur: 8,
         speed: "fast" as const,
       }
     }
     if (genres.includes("书籍报告")) {
       return {
-        colors: ["#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b", "#475569"],
+        colors: KNOWLEDGE_WAVE_PALETTES.books,
         backgroundFill: "#f7fbfc",
-        waveOpacity: 0.4,
+        waveOpacity: 0.24,
         blur: 9,
         speed: "fast" as const,
       }
     }
     if (genres.includes("参考论文")) {
       return {
-        colors: ["#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155"],
+        colors: KNOWLEDGE_WAVE_PALETTES.papers,
         backgroundFill: "#f7fbfc",
-        waveOpacity: 0.5,
+        waveOpacity: 0.26,
         blur: 10,
         speed: "fast" as const,
       }
     }
     if (genres.includes("政策文件")) {
       return {
-        colors: ["#94a3b8", "#64748b", "#475569", "#334155", "#1e293b"],
+        colors: KNOWLEDGE_WAVE_PALETTES.policy,
         backgroundFill: "#f7fbfc",
-        waveOpacity: 0.5,
+        waveOpacity: 0.25,
         blur: 9,
         speed: "fast" as const,
       }
     }
     if (genres.includes("在线案例")) {
       return {
-        colors: ["#64748b", "#475569", "#334155", "#1e293b", "#0f172a"],
+        colors: KNOWLEDGE_WAVE_PALETTES.cases,
         backgroundFill: "#f7fbfc",
-        waveOpacity: 0.6,
+        waveOpacity: 0.28,
         blur: 8,
         speed: "fast" as const,
       }
     }
     // Default fallback
     return {
-      colors: ["#f1f5f9", "#e2e8f0", "#cbd5e1", "#94a3b8", "#64748b"],
+      colors: KNOWLEDGE_WAVE_PALETTES.default,
       backgroundFill: "#f7fbfc",
-      waveOpacity: 0.4,
+      waveOpacity: 0.24,
       blur: 8,
       speed: "fast" as const,
     }

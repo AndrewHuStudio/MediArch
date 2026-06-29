@@ -26,11 +26,15 @@ def _item(doc_name: str, *, source: str = "milvus_agent", chunk_id: str = "c1") 
     )
 
 
-def test_standard_fact_questions_do_not_request_images_by_default():
+def test_standard_fact_questions_default_to_images_with_relevance_filter():
+    # 2026-06-18 图文并茂默认开:除显式否定外都补图,无关图片由 chat 层相关性过滤兜底。
     query = "根据《综合医院建筑设计规范》GB 51039-2014，出入口和室内净高有哪些基本设计要求？"
 
-    assert synthesizer_agent._wants_images(query) is False
-    assert mongodb_agent._want_images(query) is False
+    assert synthesizer_agent._wants_images(query) is True
+    assert mongodb_agent._want_images(query) is True
+    # 标准事实题不带显式视觉意图,补图走低配额(auto 档)。
+    assert synthesizer_agent._has_explicit_image_intent(query) is False
+    assert mongodb_agent._has_explicit_image_intent(query) is False
 
 
 def test_explicit_drawing_questions_still_request_images():
@@ -38,6 +42,9 @@ def test_explicit_drawing_questions_still_request_images():
 
     assert synthesizer_agent._wants_images(query) is True
     assert mongodb_agent._want_images(query) is True
+    # 显式视觉意图走高配额(want 档)。
+    assert synthesizer_agent._has_explicit_image_intent(query) is True
+    assert mongodb_agent._has_explicit_image_intent(query) is True
 
 
 def test_explicit_image_negation_disables_images():

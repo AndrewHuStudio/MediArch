@@ -3,6 +3,12 @@ import type * as React from "react"
 import { useEffect, useRef } from "react"
 import { createNoise2D } from "simplex-noise"
 
+const DEFAULT_MAX_FPS = 30
+const FRAME_INTERVAL_MS = 1000 / DEFAULT_MAX_FPS
+const BASE_LINE_GAP = 10
+const BASE_POINT_GAP = 14
+const WAVE_TIME_SCALE = 1.45
+
 interface Point {
   x: number
   y: number
@@ -52,6 +58,9 @@ export function Waves({
   const rafRef = useRef<number | null>(null)
   const tickRef = useRef<(time: number) => void>(() => {})
   const boundingRef = useRef<DOMRect | null>(null)
+  const isVisibleRef = useRef(true)
+  const isDocumentVisibleRef = useRef(true)
+  const lastFrameTimeRef = useRef(0)
 
   // Initialization
   useEffect(() => {
@@ -66,7 +75,7 @@ export function Waves({
 
     if (containerRef.current) {
       (containerRef.current as any).stopAnimation = () => {
-        if (rafRef.current) {
+        if (rafRef.current !== null) {
           cancelAnimationFrame(rafRef.current)
           rafRef.current = null
         }
@@ -79,21 +88,48 @@ export function Waves({
 
     // Bind events
     window.addEventListener("resize", onResize)
-    window.addEventListener("mousemove", onMouseMove)
-    containerRef.current.addEventListener("touchmove", onTouchMove, { passive: false })
+    window.addEventListener("mousemove", onMouseMove, { passive: true })
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    containerRef.current.addEventListener("touchmove", onTouchMove, { passive: true })
+
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisibleRef.current = entry.isIntersecting
+      if (shouldAnimate()) {
+        startAnimation()
+      } else {
+        stopAnimation()
+      }
+    })
+    observer.observe(containerRef.current)
 
     // Start animation
-    if (!pausedRef.current) {
-      rafRef.current = requestAnimationFrame((time) => tickRef.current(time))
-    }
+    startAnimation()
 
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      stopAnimation()
+      observer.disconnect()
       window.removeEventListener("resize", onResize)
       window.removeEventListener("mousemove", onMouseMove)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
       containerRef.current?.removeEventListener("touchmove", onTouchMove)
     }
   }, [])
+
+  const shouldAnimate = () => !pausedRef.current && isVisibleRef.current && isDocumentVisibleRef.current
+
+  const startAnimation = () => {
+    if (!shouldAnimate() || rafRef.current !== null) return
+
+    lastFrameTimeRef.current = 0
+    rafRef.current = requestAnimationFrame((time) => tickRef.current(time))
+  }
+
+  const stopAnimation = () => {
+    if (rafRef.current === null) return
+
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = null
+  }
 
   // Set SVG size
   const setSize = () => {
@@ -119,11 +155,11 @@ export function Waves({
     })
     pathsRef.current = []
 
-    // Use smaller spacing to generate more lines and points for smoother results
-    const xGap = 8 // Reduced horizontal spacing
-    const yGap = 8 // Reduced vertical spacing for denser points
+    const densityScale = width < 768 ? 1.25 : 1
+    const xGap = BASE_LINE_GAP * densityScale
+    const yGap = BASE_POINT_GAP * densityScale
 
-    const oWidth = width + 200
+    const oWidth = width + 120
     const oHeight = height + 30
 
     const totalLines = Math.ceil(oWidth / xGap)
@@ -154,6 +190,8 @@ export function Waves({
       path.setAttribute("fill", "none")
       path.setAttribute("stroke", strokeColor)
       path.setAttribute("stroke-width", "1")
+      path.setAttribute("stroke-linecap", "round")
+      path.setAttribute("stroke-linejoin", "round")
 
       svgRef.current.appendChild(path)
       pathsRef.current.push(path)
@@ -176,9 +214,17 @@ export function Waves({
 
   // Touch handler
   const onTouchMove = (e: TouchEvent) => {
-    e.preventDefault()
     const touch = e.touches[0]
     updateMousePosition(touch.clientX, touch.clientY)
+  }
+
+  const onVisibilityChange = () => {
+    isDocumentVisibleRef.current = document.visibilityState === "visible"
+    if (shouldAnimate()) {
+      startAnimation()
+    } else {
+      stopAnimation()
+    }
   }
 
   // Update mouse position
@@ -218,8 +264,8 @@ export function Waves({
         // Wave movement - reduced amplitude for smoother waves
         const move =
           noise(
-            (p.x + time * 0.008) * 0.003, // Adjusted frequency
-            (p.y + time * 0.003) * 0.002, // Adjusted frequency
+            (p.x + time * 0.008 * WAVE_TIME_SCALE) * 0.003,
+            (p.y + time * 0.003 * WAVE_TIME_SCALE) * 0.002,
           ) * 8 // Reduced amplitude for smoother waves
 
         p.wave.x = Math.cos(move) * 12 // Reduced horizontal amplitude
@@ -264,7 +310,24 @@ export function Waves({
     return coords
   }
 
-  // Draw lines - using line segments
+  const buildSmoothPath = (points: Point[]) => {
+    const firstPoint = moved(points[0], false)
+    let d = `M ${firstPoint.x} ${firstPoint.y}`
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const current = moved(points[i])
+      const next = moved(points[i + 1])
+      const midX = (current.x + next.x) / 2
+      const midY = (current.y + next.y) / 2
+
+      d += ` Q ${current.x} ${current.y} ${midX} ${midY}`
+    }
+
+    const lastPoint = moved(points[points.length - 1])
+    return `${d} L ${lastPoint.x} ${lastPoint.y}`
+  }
+
+  // Draw lines - using smoothed curves
   const drawLines = () => {
     const { current: lines } = linesRef
     const { current: paths } = pathsRef
@@ -272,26 +335,23 @@ export function Waves({
     lines.forEach((points, lIndex) => {
       if (points.length < 2 || !paths[lIndex]) return
 
-      // First point
-      const firstPoint = moved(points[0], false)
-      let d = `M ${firstPoint.x} ${firstPoint.y}`
-
-      // Connect points with lines
-      for (let i = 1; i < points.length; i++) {
-        const current = moved(points[i])
-        d += `L ${current.x} ${current.y}`
-      }
-
-      paths[lIndex].setAttribute("d", d)
+      paths[lIndex].setAttribute("d", buildSmoothPath(points))
     })
   }
 
   // Animation logic
   const tick = (time: number) => {
-    if (pausedRef.current) {
+    if (!shouldAnimate()) {
       rafRef.current = null
       return
     }
+
+    const elapsed = time - lastFrameTimeRef.current
+    if (lastFrameTimeRef.current !== 0 && elapsed < FRAME_INTERVAL_MS) {
+      rafRef.current = requestAnimationFrame((nextTime) => tickRef.current(nextTime))
+      return
+    }
+    lastFrameTimeRef.current = time - (elapsed % FRAME_INTERVAL_MS)
 
     const { current: mouse } = mouseRef
 
@@ -328,12 +388,10 @@ export function Waves({
   }
 
   useEffect(() => {
-    if (paused && rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-    if (!paused && rafRef.current === null) {
-      rafRef.current = requestAnimationFrame((time) => tickRef.current(time))
+    if (shouldAnimate()) {
+      startAnimation()
+    } else {
+      stopAnimation()
     }
   }, [paused])
 

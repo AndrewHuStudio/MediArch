@@ -333,11 +333,9 @@ def heuristic_rewrite(query: str) -> Dict[str, Any]:
     }
 
 
-def _want_images(text: str) -> bool:
-    """Only request image retrieval when the question has explicit visual intent."""
+def _has_explicit_image_intent(text: str) -> bool:
+    """问题是否带显式视觉意图(图纸/示意/空间布置)。用于决定补图配额走 want 档(更多图)。"""
     q = (text or "").strip().lower()
-    if any(neg in q for neg in ("不要图", "不需要图", "不看图", "不要图片", "不需要图片")):
-        return False
     explicit_diagram_intent = any(
         k in q
         for k in (
@@ -358,6 +356,18 @@ def _want_images(text: str) -> bool:
     )
     spatial_intent = any(k in q for k in ("空间推理", "空间排布", "空间布局", "平面组织", "流线", "通视", "隐私", "分区"))
     return bool(explicit_diagram_intent or spatial_intent)
+
+
+def _want_images(text: str) -> bool:
+    """是否为本次回答补充图片。
+
+    默认开启图文并茂:除非用户显式拒绝图片,否则都补图。
+    无关图片由下游相关性过滤(chat.py `_filter_image_refs_for_answer`)兜底剔除。
+    """
+    q = (text or "").strip().lower()
+    if any(neg in q for neg in ("不要图", "不需要图", "不看图", "不要图片", "不需要图片")):
+        return False
+    return True
 
 
 EVIDENCE_SOURCE_ROLES = ("code_spec", "guide", "atlas_or_image", "paper_or_report")
@@ -1001,9 +1011,11 @@ async def _apply_image_supplement(
     top_k: int,
 ) -> tuple[List[Dict[str, Any]], int]:
     want_images = _want_images(query)
-    auto_diagrams = _should_auto_include_diagrams(query)
-    if not chunks or (not want_images and not auto_diagrams):
+    if not chunks or not want_images:
         return chunks, 0
+
+    # 显式视觉意图走高配额(want 档),默认图文并茂走低配额(auto 档,少量图避免稀释)。
+    explicit_intent = _has_explicit_image_intent(query) or _should_auto_include_diagrams(query)
 
     if explicit_page_numbers and explicit_page_window == 0:
         logger.info("[MongoDB→Search] 检测到 filters.page_numbers 且 page_window=0，跳过补图")
@@ -1019,7 +1031,7 @@ async def _apply_image_supplement(
     )
     img_k = (
         max(MongoDBAgentConfig.IMAGE_K_WANT_MIN, img_k_base)
-        if want_images
+        if explicit_intent
         else min(MongoDBAgentConfig.IMAGE_K_AUTO_MIN, img_k_base)
     )
     hints = _collect_doc_page_hints(

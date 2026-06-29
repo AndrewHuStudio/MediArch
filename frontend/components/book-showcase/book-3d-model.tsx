@@ -204,10 +204,10 @@ export function Book({
       clonedMaterial.map = props.texture
       props.texture.offset.set(props.offsetX, props.offsetY)
       clonedMaterial.color.setRGB(1, 1, 1)
-      clonedMaterial.metalness = 0.4
-      clonedMaterial.roughness = 1
-      clonedMaterial.emissive.setRGB(0, 0, 0)
-      clonedMaterial.emissiveIntensity = 0
+      clonedMaterial.metalness = 0.05
+      clonedMaterial.roughness = 0.78
+      clonedMaterial.emissive.setRGB(1, 1, 1)
+      clonedMaterial.emissiveIntensity = 0.04
       clonedMaterial.vertexColors = false
       clonedMaterial.transparent = false
       clonedMaterial.opacity = 1

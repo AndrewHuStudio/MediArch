@@ -15,6 +15,13 @@ const atxHeadingPattern = /^#{1,6}\s+/
 const sectionHeadingPattern = /^[一二三四五六七八九十]+[、.．]\s*/
 const anchorOnlyPattern = /^<a\s+id="[^"]+"\s*><\/a>$/
 
+const escapeHtmlAttribute = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+
 export const parseCitationNumbers = (raw: string | null): number[] => {
   if (!raw) return []
   const parts = raw
@@ -314,16 +321,23 @@ export const applyCitationMarkup = (text: string, maxCitation: number) => {
 export const replaceImagePlaceholders = (text: string, availableImageCount?: number) =>
   transformOutsideCodeFences(text, (segment) =>
     segment
-      .replace(/(^[ \t]*)\[image:(\d+)\][ \t]*$/gm, (_raw, indent, indexRaw) => {
-        const index = Number.parseInt(indexRaw, 10)
-        if (!Number.isFinite(index) || index < 0) {
-          return ""
-        }
-        if (typeof availableImageCount === "number" && index >= availableImageCount) {
-          return ""
-        }
-        return `${indent}<figure data-chat-image-index="${index}"></figure>`
-      })
+      // 行内 [image:N] 单独成行,且其后紧跟一行 "图N 主题" 图注:把图注收进 figure,避免重复渲染。
+      .replace(
+        /(^[ \t]*)\[image:(\d+)\][ \t]*(?:\r?\n[ \t]*(图\s*\d+[^\n]*))?[ \t]*$/gm,
+        (_raw, indent, indexRaw, captionRaw) => {
+          const index = Number.parseInt(indexRaw, 10)
+          if (!Number.isFinite(index) || index < 0) {
+            return ""
+          }
+          if (typeof availableImageCount === "number" && index >= availableImageCount) {
+            return ""
+          }
+          const captionAttr = captionRaw
+            ? ` data-chat-image-caption="${escapeHtmlAttribute(captionRaw.trim())}"`
+            : ""
+          return `${indent}<figure data-chat-image-index="${index}"${captionAttr}></figure>`
+        },
+      )
       .replace(imagePlaceholderPattern, (_raw, indexRaw) => {
         const index = Number.parseInt(indexRaw, 10)
         if (!Number.isFinite(index) || index < 0) {
